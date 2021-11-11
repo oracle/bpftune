@@ -38,7 +38,6 @@ for LATENCY in "" "latency 20ms" ; do
    for MODE in baseline test ; do
 
 	echo "Running ${MODE}..."
-	ping -c 1 $ADDR
 	test_run_cmd_local "ip netns exec $NETNS $IPERF3 -s -1 &"
 	if [[ $MODE == "test" ]]; then
 		test_run_cmd_local "$TCPTUNE &"
