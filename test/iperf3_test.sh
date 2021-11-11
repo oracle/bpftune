@@ -11,9 +11,16 @@
 
 . ./test_lib.sh
 
+SLEEPTIME=0.5
 
 for FAMILY in ipv4 ipv6 ; do
 
+for LATENCY in "" "latency 20ms" ; do
+ if [[ -n "$LATENCY" ]]; then
+  TIMEOUT=60
+ else
+  TIMEOUT=30
+ fi
  for CLIENT_OPTS in "" "-R" ; do
    case $FAMILY in
    ipv4)
@@ -24,21 +31,20 @@ for FAMILY in ipv4 ipv6 ; do
 	;;
    esac
 
-   test_start "$0|iperf3 test to $ADDR:$PORT $FAMILY opts $CLIENT_OPTS"
+   test_start "$0|iperf3 test to $ADDR:$PORT $FAMILY opts $CLIENT_OPTS $LATENCY"
 
    test_setup "true"
 
    for MODE in baseline test ; do
 
 	echo "Running ${MODE}..."
+	ping -c 1 $ADDR
 	test_run_cmd_local "ip netns exec $NETNS $IPERF3 -s -1 &"
 	if [[ $MODE == "test" ]]; then
 		test_run_cmd_local "$TCPTUNE &"
 	fi
-	sleep 0.5
-
 	test_run_cmd_local "$IPERF3 $CLIENT_OPTS -c $ADDR" true
-
+	sleep $SLEEPTIME
    done
    for PATTERN in sender receiver ; do
 	grep -E $PATTERN ${CMDLOG}
@@ -48,6 +54,7 @@ for FAMILY in ipv4 ipv6 ; do
 
    test_cleanup
  done
+done
 done
 
 test_exit

@@ -73,7 +73,8 @@ export VETH2="veth2-$$"
 export VETH2_IPV4="192.168.168.2"
 export VETH2_IPV6="fd::2"
 export MTU=1500
-export DROP_PERCENT=0
+export DROP=${DROP:-""}
+export LATENCY=${LATENCY:-""}
 
 export TCPTUNE=../src/tcptune
 export CGROUPDIR=${CGROUPDIR:-"/tmp/cgroupv2"}
@@ -154,9 +155,12 @@ test_setup_local()
 		ip netns exec $NETNS ip -6 addr add ${VETH1_IPV6}/64 dev $VETH1
 		ip netns exec $NETNS ip link set $VETH1 up
 		ip netns exec $NETNS sysctl -qw net.ipv4.conf.lo.rp_filter=0
-		if [[ $DROP_PERCENT != 0 ]]; then
-       	         tc qdisc add dev $VETH2 root netem loss ${DROP_PERCENT}%
+		if [[ -n "$DROP" ]] || [[ -n "$LATENCY" ]]; then
+       	         tc qdisc add dev $VETH2 root netem ${DROP} ${LATENCY}
 		 ethtool -K $VETH2 gso off
+		else
+		 tc qdisc del dev $VETH2 root 2>/dev/null|true
+		 ethtool -K $VETH2 gso on
         	fi
 		ip addr add ${VETH2_IPV4}/24 dev $VETH2
 		ip -6 addr add ${VETH2_IPV6}/64 dev $VETH2

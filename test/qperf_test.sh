@@ -14,6 +14,15 @@
 
 for FAMILY in ipv4 ipv6 ; do
 
+SLEEPTIME=0.5
+
+for LATENCY in "" "latency 20ms" ; do
+ if [[ -n "$LATENCY" ]]; then
+  TIMEOUT=60
+ else
+  TIMEOUT=30
+ fi
+
  for CLIENT_OPTS in bw lat ; do
    case $FAMILY in
    ipv4)
@@ -24,7 +33,7 @@ for FAMILY in ipv4 ipv6 ; do
 	;;
    esac
 
-   test_start "$0|qperf test to $ADDR:$PORT $FAMILY opts $CLIENT_OPTS"
+   test_start "$0|qperf test to $ADDR:$PORT $FAMILY opts $CLIENT_OPTS $LATENCY"
 
    test_setup "true"
 
@@ -35,16 +44,15 @@ for FAMILY in ipv4 ipv6 ; do
 	if [[ $MODE == "test" ]]; then
 		test_run_cmd_local "$TCPTUNE &"
 	fi
-	sleep 0.5
-
 	test_run_cmd_local "$QPERF -v $ADDR tcp_${CLIENT_OPTS}" true
-
+	sleep $SLEEPTIME
    done
    grep -E "${CLIENT_OPTS}.*=" ${CMDLOG}
 
    test_pass
 
    test_cleanup
+ done
  done
 done
 

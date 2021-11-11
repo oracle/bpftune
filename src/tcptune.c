@@ -18,6 +18,9 @@ static int sockops_fd, setsockopt_fd, cgroup_fd;
 static char *cgroupdir;
 struct tcptune_bpf *tcptune_skel;
 
+/* if we see > 1msec srtt, use BBR. */
+#define TCP_SRTT_THRESHOLD_US	1000
+
 static void cleanup(int sig)
 {
 	if (sockops_fd > 0)
@@ -61,6 +64,8 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "could not open tcptune\n");
 		return 1;
 	}
+	tcptune_skel->bss->srtt_threshold = TCP_SRTT_THRESHOLD_US;
+
 	signal(SIGINT, cleanup);
 	signal(SIGTERM, cleanup);
 

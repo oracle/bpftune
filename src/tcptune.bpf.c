@@ -9,8 +9,25 @@
 #include <bpf/bpf_tracing.h>
 #include <bpf/bpf_core_read.h>
 
+#ifndef SO_SNDBUF
 #define SO_SNDBUF	7
+#endif
+#ifndef SO_RCVBUF
 #define SO_RCVBUF	8
+#endif
+
+#ifndef SOL_TCP
+#define SOL_TCP		6
+#endif
+
+#ifndef TCP_CONGESTION
+#define TCP_CONGESTION	13
+#endif
+
+#ifndef TCP_CA_NAME_MAX
+#define TCP_CA_NAME_MAX 16
+#endif
+
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
 	__uint(max_entries, 64);
@@ -50,7 +67,7 @@ int setsockopt(struct bpf_sockopt_kern *ctx)
 	int level = ctx->level;
 	__u32 val;
 
-	__bpf_printk("setsockopt %d\n", optname);
+	//__bpf_printk("setsockopt %d\n", optname);
 
 	if (optname != SO_SNDBUF && optname != SO_RCVBUF)
 		return 1;
@@ -58,8 +75,8 @@ int setsockopt(struct bpf_sockopt_kern *ctx)
 	if (optval + sizeof(__u32) > optval_end)
                         return 1; /* EPERM, bounds check */
 
-	__bpf_printk("setsockopt %d %llu\n", optname,
-		     optval ? *((__u32 *)optval) : 0);
+	//__bpf_printk("setsockopt %d %llu\n", optname,
+	//	     optval ? *((__u32 *)optval) : 0);
 	return 1;
 }
 
@@ -70,15 +87,43 @@ int sendbuf_expand(struct pt_regs *ctx)
 	int sndbuf;
 
 	sndbuf = BPF_CORE_READ(sk, sk_sndbuf);
-	__bpf_printk("expanding send buffer for sock %llx, current %d\n",
-		     sk, sndbuf);
+	//__bpf_printk("expanding send buffer for sock %llx, current %d\n",
+	//	     sk, sndbuf);
 	return 0;
 }
+
+__u32 srtt_threshold;
 
 SEC("sockops")
 int bpf_sockops(struct bpf_sock_ops *ops)
 {
-	__bpf_printk("bpf sockops op %d\n", ops->op);
+	char dctcp[TCP_CA_NAME_MAX] = "dctcp";
+	char bbr[TCP_CA_NAME_MAX] = "bbr";
+	int ret = 0;
+
+	switch (ops->op) {
+	case BPF_SOCK_OPS_ACTIVE_ESTABLISHED_CB:
+	case BPF_SOCK_OPS_PASSIVE_ESTABLISHED_CB:
+		if (ops->srtt_us == 0)
+			return 0;
+		break;
+	default:
+		return 0;
+	}
+	__bpf_printk("bpf sockops op %d, srtt(us) %d, thresh %d\n",
+		     ops->op, ops->srtt_us, srtt_threshold);
+	if (ops->srtt_us > srtt_threshold) {
+		ret = bpf_setsockopt(ops, SOL_TCP, TCP_CONGESTION,
+				     &bbr, sizeof(bbr));
+		__bpf_printk("bpf sockops (srtt_us %d), cong bbr result %d\n",
+			     ops->srtt_us, ret);
+	} else {
+		ret = bpf_setsockopt(ops, SOL_TCP, TCP_CONGESTION,
+				     &dctcp, sizeof(dctcp));
+		 __bpf_printk("bpf sockops (srtt_us %d), cong dctcp result %d\n",
+			      ops->srtt_us, ret);
+	}
+
 	return 0;
 }
 
