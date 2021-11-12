@@ -17,13 +17,8 @@ for FAMILY in ipv4 ipv6 ; do
 SLEEPTIME=0.5
 
 for LATENCY in "" "latency 20ms" ; do
- if [[ -n "$LATENCY" ]]; then
-  TIMEOUT=60
- else
-  TIMEOUT=30
- fi
 
- for CLIENT_OPTS in bw lat ; do
+ for CLIENT_OPTS in tcp_bw tcp_lat ; do
    case $FAMILY in
    ipv4)
    	ADDR=$VETH1_IPV4
@@ -37,6 +32,7 @@ for LATENCY in "" "latency 20ms" ; do
 
    test_setup "true"
 
+   declare -A results
    for MODE in baseline test ; do
 
 	echo "Running ${MODE}..."
@@ -44,10 +40,40 @@ for LATENCY in "" "latency 20ms" ; do
 	if [[ $MODE == "test" ]]; then
 		test_run_cmd_local "$TCPTUNE &"
 	fi
-	test_run_cmd_local "$QPERF -v $ADDR tcp_${CLIENT_OPTS}" true
+	test_run_cmd_local \
+	    "$QPERF -v $ADDR -uu -oo msg_size:1:64k:*4 -vu ${CLIENT_OPTS}" true
 	sleep $SLEEPTIME
+	results=$(grep -E "bw.*=|lat.*=" ${CMDLOG} | awk '{print $3}')
+	units=$(grep -E "bw.*=|lat.*=" ${CMDLOG} | awk '{print $4}' |head -1)
+	if [[ $MODE == "baseline" ]]; then
+		read -r -a baseline_results <<< $results
+		echo "" > ${CMDLOG}
+	else
+		read -r -a test_results <<< $results
+	fi
    done
-   grep -E "${CLIENT_OPTS}.*=" ${CMDLOG}
+
+   for (( i=0; i < ${#baseline_results[@]}; i++ ))
+   do
+	printf "Results $i ${CLIENT_OPTS} (${units}): "
+	case $CLIENT_OPTS in
+	tcp_bw)
+		if [[ ${baseline_results[$i]} -gt ${test_results[$i]} ]]; then	
+			bold "Warning: baseline ${baseline_results[$i]} > test (${test_results[$i]})"
+		else
+			echo "baseline (${baseline_results[$i]}) < test (${test_results[$i]})"
+		fi
+		;;
+
+	tcp_lat)
+		if [[ ${baseline_results[$i]} -lt ${test_results[$i]} ]]; then
+			bold "Warning: baseline ${baseline_results[$i]} < test (${test_results[$i]})"
+		else
+			echo "baseline (${baseline_results[$i]}) > test (${test_results[$i]})"
+		fi
+		;;	
+	esac
+   done
 
    test_pass
 

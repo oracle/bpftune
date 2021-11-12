@@ -15,6 +15,7 @@ export TESTLOG_LAST="${TESTDIR}/testlog.last"
 
 export PASSED=${PASSED:-0}
 
+# 1: more output, >1: xtrace
 export VERBOSE=${VERBOSE:-0}
 # Set the following to 1 if you want to see state after failure.
 export SKIP_CLEANUP=${SKIP_CLEANUP:-0}
@@ -42,7 +43,7 @@ export N=$(tput -Tvt100 sgr0)
 
 test_init()
 {
-	if [ $VERBOSE -ne 0 ]; then
+	if [ $VERBOSE -gt 1 ]; then
 		set -o xtrace
 		export bpfevent_debug=1
 	fi
@@ -97,13 +98,17 @@ test_run_cmd_local()
 	CMD="$1"
 	DO_REDIRECT=${2:-"false"}
 
-	echo "Running \"$CMD\" on $(uname -n)."
+	if [[ $VERBOSE -gt 0 ]]; then
+		echo "Running \"$CMD\" on $(uname -n)."
+	fi
 
 	if [[ "$DO_REDIRECT" == "true" ]]; then
 		rm -f $TESTLOG_LAST
 		touch $CMDLOG
 		ln -s $CMDLOG $TESTLOG_LAST
-		echo "For output see ${CMDLOG}"
+		if [[ $VERBOSE -gt 0 ]]; then
+			echo "For output see ${CMDLOG}"
+		fi
         fi
 
 	BGCMD="&"
@@ -156,7 +161,6 @@ test_setup_local()
 		ip netns exec $NETNS ip link set $VETH1 up
 		ip netns exec $NETNS sysctl -qw net.ipv4.conf.lo.rp_filter=0
 		if [[ -n "$DROP" ]] || [[ -n "$LATENCY" ]]; then
-		 echo "adding netem qdisc ($DROP $LATENCY)"
        	         tc qdisc add dev $VETH2 root netem ${DROP} ${LATENCY}
 		 ethtool -K $VETH2 gso off
         	fi

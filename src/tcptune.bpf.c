@@ -69,14 +69,14 @@ int setsockopt(struct bpf_sockopt_kern *ctx)
 
 	//__bpf_printk("setsockopt %d\n", optname);
 
-	if (optname != SO_SNDBUF && optname != SO_RCVBUF)
-		return 1;
+	//if (optname != SO_SNDBUF && optname != SO_RCVBUF)
+	//	return 1;
 
 	if (optval + sizeof(__u32) > optval_end)
                         return 1; /* EPERM, bounds check */
 
-	//__bpf_printk("setsockopt %d %llu\n", optname,
-	//	     optval ? *((__u32 *)optval) : 0);
+	__bpf_printk("setsockopt %d %llu\n", optname,
+		     optval ? *((__u32 *)optval) : 0);
 	return 1;
 }
 
@@ -113,13 +113,13 @@ int bpf_sockops(struct bpf_sock_ops *ops)
 	if (ops->srtt_us > srtt_threshold) {
 		ret = bpf_setsockopt(ops, SOL_TCP, TCP_CONGESTION,
 				     &bbr, sizeof(bbr));
-		__bpf_printk("bpf sockops (srtt_us %d), cong bbr result %d\n",
-			     ops->srtt_us, ret);
+		//__bpf_printk("bpf sockops (srtt_us %d), cong bbr result %d\n",
+		//	     ops->srtt_us, ret);
 	} else {
 		ret = bpf_setsockopt(ops, SOL_TCP, TCP_CONGESTION,
 				     &dctcp, sizeof(dctcp));
-		 __bpf_printk("bpf sockops (srtt_us %d), cong dctcp result %d\n",
-			      ops->srtt_us, ret);
+		//__bpf_printk("bpf sockops (srtt_us %d), cong dctcp result %d\n",
+		//	      ops->srtt_us, ret);
 	}
 
 	return 0;

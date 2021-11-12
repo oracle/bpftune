@@ -69,12 +69,12 @@ int main(int argc, char *argv[])
 	signal(SIGINT, cleanup);
 	signal(SIGTERM, cleanup);
 
-	err = tcptune_bpf__attach(tcptune_skel);
-	if (err) {
-		fprintf(stderr, "could not attach tcptune: %s\n",
-			strerror(err));
-		goto out;
-	}
+	//err = tcptune_bpf__attach(tcptune_skel);
+	//if (err) {
+	//	fprintf(stderr, "could not attach tcptune: %s\n",
+	//		strerror(err));
+	//	goto out;
+	//}
 	if (cgroupdir) {
 		struct bpf_object *obj = tcptune_skel->obj;
 		struct bpf_program *prog;
@@ -95,8 +95,9 @@ int main(int argc, char *argv[])
 				attach_type = BPF_CGROUP_SOCK_OPS;
 				sockops_fd = prog_fd;
 			} else if (strcmp(sec_name, "cgroup/setsockopt") == 0) {
-				attach_type = BPF_CGROUP_SETSOCKOPT;
-				setsockopt_fd = prog_fd;
+			//	attach_type = BPF_CGROUP_SETSOCKOPT;
+			//	setsockopt_fd = prog_fd;
+
 			} else
 				continue;
 
