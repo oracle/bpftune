@@ -12,15 +12,11 @@
 . ./test_lib.sh
 
 SLEEPTIME=0.5
+TIMEOUT=30
 
 for FAMILY in ipv4 ipv6 ; do
 
 for LATENCY in "" "latency 20ms" ; do
- if [[ -n "$LATENCY" ]]; then
-  TIMEOUT=60
- else
-  TIMEOUT=30
- fi
  for CLIENT_OPTS in "" "-R" ; do
    case $FAMILY in
    ipv4)
@@ -42,6 +38,7 @@ for LATENCY in "" "latency 20ms" ; do
 	if [[ $MODE == "test" ]]; then
 		test_run_cmd_local "$TCPTUNE &"
 	fi
+	sleep $SLEEPTIME
 	test_run_cmd_local "$IPERF3 $CLIENT_OPTS -c $ADDR" true
 	sleep $SLEEPTIME
    done

@@ -110,8 +110,6 @@ int bpf_sockops(struct bpf_sock_ops *ops)
 	default:
 		return 0;
 	}
-	__bpf_printk("bpf sockops op %d, srtt(us) %d, thresh %d\n",
-		     ops->op, ops->srtt_us, srtt_threshold);
 	if (ops->srtt_us > srtt_threshold) {
 		ret = bpf_setsockopt(ops, SOL_TCP, TCP_CONGESTION,
 				     &bbr, sizeof(bbr));
