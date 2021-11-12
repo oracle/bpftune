@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <fcntl.h>
 #include <signal.h>
 #include <stdio.h>
@@ -11,7 +12,6 @@
 
 #include "tcptune.skel.h"
 #include "tcptune.h"
-
 static bool done;
 static bool debug;
 static int sockops_fd, setsockopt_fd, cgroup_fd;
