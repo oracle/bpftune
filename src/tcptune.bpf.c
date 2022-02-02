@@ -80,10 +80,9 @@ int setsockopt(struct bpf_sockopt_kern *ctx)
 	return 1;
 }
 
-SEC("kprobe/tcp_sndbuf_expand")
-int sendbuf_expand(struct pt_regs *ctx)
+SEC("fentry/tcp_sndbuf_expand")
+int BPF_PROG(sndbuf_expand, struct sock *sk)
 {
-	struct sock *sk = (struct sock *)PT_REGS_PARM1_CORE(ctx);
 	int sndbuf;
 
 	sndbuf = BPF_CORE_READ(sk, sk_sndbuf);
@@ -113,15 +112,16 @@ int bpf_sockops(struct bpf_sock_ops *ops)
 	if (ops->srtt_us > srtt_threshold) {
 		ret = bpf_setsockopt(ops, SOL_TCP, TCP_CONGESTION,
 				     &bbr, sizeof(bbr));
-		//__bpf_printk("bpf sockops (srtt_us %d), cong bbr result %d\n",
-		//	     ops->srtt_us, ret);
+		if (ret)
+		__bpf_printk("bpf sockops (srtt_us %d), cong bbr result %d\n",
+			     ops->srtt_us, ret);
 	} else {
 		ret = bpf_setsockopt(ops, SOL_TCP, TCP_CONGESTION,
 				     &dctcp, sizeof(dctcp));
-		//__bpf_printk("bpf sockops (srtt_us %d), cong dctcp result %d\n",
-		//	      ops->srtt_us, ret);
+		if (ret)
+		__bpf_printk("bpf sockops (srtt_us %d), cong dctcp result %d\n",
+			      ops->srtt_us, ret);
 	}
-
 	return 0;
 }
 

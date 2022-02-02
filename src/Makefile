@@ -7,18 +7,26 @@ LLC ?= llc
 LLVM_STRIP ?= llvm-strip
 BPFTOOL ?= bpftool
 BPF_INCLUDE := /usr/local/include
-INCLUDES := -I. -I$(BPF_INCLUDE) -I../include/uapi
+INCLUDES := -I../include -I$(BPF_INCLUDE) -I../include/uapi
 
 INSTALL ?= install
 
 KERNEL_REL := $(shell uname -r)
 
-ifeq ($(TCPTUNE_VERSION),)
-TCPTUNE_VERSION := $(KERNEL_REL)
+ifeq ($(BPFTUNE_VERSION),)
+BPFTUNE_VERSION := $(KERNEL_REL)
 endif
 
-CFLAGS := -g -Wall
-CFLAGS += -DTCPTUNE_VERSION='"$(TCPTUNE_VERSION)"'
+VERSION = 0.1.1
+VERSION_SCRIPT  := libbpftune.map
+
+CFLAGS = -fPIC -Wall -Wextra -march=native -g -I../include
+
+CFLAGS += -DBPFTUNE_VERSION='"$(BPFTUNE_VERSION)"'
+
+LDLIBS = -lbpf -ldl
+
+LDFLAGS += -L.
 
 # Try to detect best kernel BTF source
 KERNEL_REL := $(shell uname -r)
@@ -34,47 +42,63 @@ MAKEFLAGS += --no-print-directory
 submake_extras := feature_display=0
 endif
 
+TUNERS = neigh_table_tuner
+
+BPF_TUNERS = $(patsubst %,%.bpf,$(TUNERS))
+
 .DELETE_ON_ERROR:
 
-.PHONY: all clean tcptune
-all: tcptune
+.PHONY: all clean bpftune
+all: bpftune $(TUNERS)
 	
 clean:
-	$(call QUIET_CLEAN, tcptune)
-	$(Q)$(RM) *.o *.d
+	$(call QUIET_CLEAN, bpftune)
+	$(Q)$(RM) *.o *.d *.so.*
 	$(Q)$(RM) *.skel.h vmlinux.h
-	$(Q)$(RM) tcptune
+	$(Q)$(RM) bpftune
 	$(Q)$(RM) -r .output
 
-install: tcptune
-	$(call QUIET_INSTALL, tcptune)
+install: bpftune
+	$(call QUIET_INSTALL, bpftune)
 	$(Q)$(INSTALL) -m 0755 -d $(DESTDIR)$(prefix)/sbin
-	$(Q)$(INSTALL) tcptune $(DESTDIR)$(prefix)/sbin/tcptune
+	$(Q)$(INSTALL) bpftune $(DESTDIR)$(prefix)/sbin/bpftune
+	$(Q)$(INSTALL) libbpftune.so.$(VERSION) $(DESTDIR)$(prefix)/lib64
 
-tcptune: tcptune.o
-	$(QUIET_LINK)$(CC) $(CFLAGS) $^ -lbpf -o $@
+bpftune: bpftune.o libbpftune
+	$(QUIET_LINK)$(CC) $(CFLAGS) bpftune.o -o $@ \
+		$(LDFLAGS) $(LDLIBS) -lbpftune
 
-tcptune.o: tcptune.h tcptune.skel.h	      \
-			tcptune.bpf.o
+libbpftune: libbpftune.o
+	$(CC) $(CFLAGS) -Wl,--version-script=$(VERSION_SCRIPT) \
+			-Wl,--soname,libbpftune.so.$(VERSION) \
+			-shared -o $@.so.$(VERSION) $(@).o \
+			$(LDLIBS) $(LDFLAGS)
+	rm libbpftune.so
+	ln -s libbpftune.so.$(VERSION) libbpftune.so
 
-tcptune.bpf.o: vmlinux.h tcptune.h
+$(TUNERS): libbpftune $(TUNERS:%=%.bpf) $(TUNERS:=%=%.skel.h)
+	$(CC) $(CFLAGS) -shared -o $(@).so -c $(@).c \
+		$(LDLIBS) -lbpftune $(LDFLAGS)
+
+libbpftune.o:
+	$(QUIET_CC)$(CC) $(CFLAGS) $(INCLUDES) -c libbpftune.c -o $@
+
+bpftune.o: libbpftune.o
+	$(QUIET_CC)$(CC) $(CFLAGS) $(INCLUDES) -c bpftune.c -o $@
 
 %.skel.h: %.bpf.o
 	$(QUIET_GEN)$(BPFTOOL) gen skeleton $< > $@
 
-%.bpf.o: %.bpf.c
-	$(QUIET_GEN)$(CLANG) -g -D__TARGET_ARCH_$(SRCARCH) -O2 -target bpf \
-		$(INCLUDES) -c $(filter %.c,$^) -o $@ &&		   \
+$(BPF_TUNERS): vmlinux.h
+	$(CLANG) -g -D__TARGET_ARCH_$(SRCARCH) -O2 -target bpf			\
+		$(INCLUDES) -c $(@).c -o $(@).o &&		\
 	$(LLVM_STRIP) -g $@
 
-%.o: %.c
-	$(QUIET_CC)$(CC) $(CFLAGS) $(INCLUDES) -c $(filter %.c,$^) -o $@
-
 vmlinux.h: $(VMLINUX_BTF_PATH)
-	$(Q)if [ ! -e "$(VMLINUX_BTF_PATH)" ] ; then \
+	if [ ! -e "$(VMLINUX_BTF_PATH)" ] ; then \
 		echo "Couldn't find kernel BTF; set VMLINUX_BTF to"	       \
 			"specify its location." >&2;			       \
 		exit 1;\
 	fi
-	$(QUIET_GEN)$(BPFTOOL) btf dump file $(VMLINUX_BTF_PATH) format c > $@
+	$(BPFTOOL) btf dump file $(VMLINUX_BTF_PATH) format c > $@
 
