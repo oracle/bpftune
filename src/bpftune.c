@@ -55,11 +55,13 @@ int init(const char *library_dir, int page_cnt)
 			    library_dir, strerror(-err));
 		return err;
 	}
+	bpftune_log(LOG_DEBUG, "searching %s for plugins...\n", library_dir);
 	while ((dirent = readdir(dir)) != NULL) {
 		if (strstr(dirent->d_name, BPFTUNER_LIB_SUFFIX) == NULL)
 			continue;
 		snprintf(library_path, sizeof(library_path), "%s/%s",
 			 library_dir, dirent->d_name);
+		bpftune_log(LOG_DEBUG, "found lib %s, init\n", library_path);
 		tuners[num_tuners] = bpftuner_init(library_path, perf_map_fd);
 		/* individual tuner failure shouldn't prevent progress */
 		if (!tuners[num_tuners])
@@ -87,6 +89,8 @@ int main(int argc, char *argv[])
 	char *library_dir = BPFTUNER_LIB_DIR;
 	int page_cnt = 8, interval = 100;
 	int err;
+
+	bpftune_set_log(LOG_DEBUG, bpftune_log_stderr);
 
 	if (init(library_dir, page_cnt))
 		exit(EXIT_FAILURE);

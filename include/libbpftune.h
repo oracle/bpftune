@@ -21,13 +21,16 @@
 #include <bpf/libbpf.h>
 
 #define BPFTUNER_LIB_DIR		"/usr/lib64"
-#define BPFTUNER_LIB_SUFFIX		"-tuner.so"
+#define BPFTUNER_LIB_SUFFIX		"_tuner.so"
 
 void bpftune_log(int level, const char *fmt, ...);
 
-void bpftune_set_logfn(int level,
-                       void (*logfn)(void *ctx, int level, const char *fmt,
-                                     va_list args));
+void bpftune_log_stderr(void *ctx, int level, const char *fmt, va_list args);
+void bpftune_log_syslog(void *ctx, int level, const char *fmt, va_list args);
+
+void bpftune_set_log(int level,
+		     void (*logfn)(void *ctx, int level, const char *fmt,
+				   va_list args));
 void bpftune_log_bpf_err(int err, const char *fmt);
 
 struct bpftuner *bpftuner_init(const char *path, int perf_map_fd);
@@ -37,9 +40,4 @@ void *bpftune_perf_buffer_init(int perf_map_fd, int page_cnt,
 			       struct bpftuner **tuners);
 int bpftune_perf_buffer_poll(void *perf_buffer, int interval);
 void bpftune_perf_buffer_fini(void *perf_buffer);
-
-
-
-
-
 

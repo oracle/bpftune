@@ -26,15 +26,15 @@ void *bpftune_log_ctx;
 struct perf_buffer *perf_buffer;
 int perf_map_fd;
 
-static void bpftune_log_stderr(__attribute__((unused)) void *ctx,
-			       __attribute__((unused)) int level,
-			       const char *fmt, va_list args)
+void bpftune_log_stderr(__attribute__((unused)) void *ctx,
+			__attribute__((unused)) int level,
+			const char *fmt, va_list args)
 {
 	vfprintf(stderr, fmt, args);
 }
 
-static void bpftune_log_syslog(__attribute__((unused)) void *ctx, int level,
-			       const char *fmt, va_list args)
+void bpftune_log_syslog(__attribute__((unused)) void *ctx, int level,
+			const char *fmt, va_list args)
 {
 	char buf[512];
 	int buflen;
@@ -49,7 +49,7 @@ void (*bpftune_logfn)(void *ctx, int level, const char *fmt, va_list args) =
 
 static void __bpftune_log(int level, const char *fmt, va_list args)
 {
-	if (bpftune_loglevel >= level)
+	if (level <= bpftune_loglevel)
 		bpftune_logfn(bpftune_log_ctx, level, fmt, args);
 }
 
@@ -69,13 +69,14 @@ static int bpftune_printall(__attribute__((unused)) enum libbpf_print_level l,
         return 0;
 }
 
-void bpftune_set_logfn(int level,
-		       void (*logfn)(void *ctx, int level, const char *fmt,
-				     va_list args))
+void bpftune_set_log(int level,
+		     void (*logfn)(void *ctx, int level, const char *fmt,
+				   va_list args))
 {
 	if (logfn)
 		bpftune_logfn = logfn;
-	if (level > LOG_DEBUG)
+	bpftune_loglevel = level;
+	if (level >= LOG_DEBUG)
 		libbpf_set_print(bpftune_printall);
 }
 
@@ -100,11 +101,10 @@ struct bpftuner *bpftuner_init(const char *path, int perf_map_fd)
 		bpftune_log(LOG_ERR, "could not allocate tuner\n");
 		return NULL;
 	}
-	tuner->handle = dlopen(path, 0);
+	tuner->handle = dlopen(path, RTLD_NOW | RTLD_GLOBAL);
 	if (!tuner->handle) {
-		err = -errno;
 		bpftune_log(LOG_ERR, "could not dlopen '%s': %s\n",
-			    path, strerror(-err));
+			    path, dlerror());
 		free(tuner);
 		return NULL;
 	}
@@ -118,7 +118,8 @@ struct bpftuner *bpftuner_init(const char *path, int perf_map_fd)
 	tuner->fini = dlsym(tuner->handle, "fini");
 	tuner->event_handler = dlsym(tuner->handle, "event_handler");
 	
-	err = tuner->init(tuner);
+	bpftune_log(LOG_DEBUG, "calling init for '%s\n", path);
+	err = tuner->init(tuner, perf_map_fd);
 	if (err) {
 		dlclose(tuner->handle);
 		bpftune_log(LOG_ERR, "error initializing '%s: %s\n",
@@ -179,8 +180,10 @@ void *bpftune_perf_buffer_init(int perf_map_fd, int page_cnt,
 	pb_opts.sample_cb = bpftune_perf_event_read;
 	pb_opts.lost_cb = bpftune_perf_event_lost;
 	pb_opts.ctx = tuners;
+	bpftune_log(LOG_DEBUG, "calling perf_buffer__new, perf_map_fd %d\n",
+		    perf_map_fd);
 	pb = perf_buffer__new(perf_map_fd, page_cnt, &pb_opts);
-	err = libbpf_get_error(perf_buffer);
+	err = libbpf_get_error(pb);
 	if (err) {
 		bpftune_log_bpf_err(err, "couldnt create perf buffer: %s\n");
 		return NULL;

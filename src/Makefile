@@ -44,7 +44,11 @@ endif
 
 TUNERS = neigh_table_tuner
 
+TUNER_OBJS = $(patsubst %,%.so,$(TUNERS))
+
 BPF_TUNERS = $(patsubst %,%.bpf,$(TUNERS))
+
+BPF_SKELS = $(patsubst %,%.skel.h,$(TUNERS))
 
 .DELETE_ON_ERROR:
 
@@ -63,6 +67,7 @@ install: bpftune
 	$(Q)$(INSTALL) -m 0755 -d $(DESTDIR)$(prefix)/sbin
 	$(Q)$(INSTALL) bpftune $(DESTDIR)$(prefix)/sbin/bpftune
 	$(Q)$(INSTALL) libbpftune.so.$(VERSION) $(DESTDIR)$(prefix)/lib64
+	$(Q)$(INSTALL) $(TUNER_OBJS) $(DESTDIR)$(prefix)/lib64
 
 bpftune: bpftune.o libbpftune
 	$(QUIET_LINK)$(CC) $(CFLAGS) bpftune.o -o $@ \
@@ -76,8 +81,8 @@ libbpftune: libbpftune.o
 	rm libbpftune.so
 	ln -s libbpftune.so.$(VERSION) libbpftune.so
 
-$(TUNERS): libbpftune $(TUNERS:%=%.bpf) $(TUNERS:=%=%.skel.h)
-	$(CC) $(CFLAGS) -shared -o $(@).so -c $(@).c \
+$(TUNERS): libbpftune $(TUNERS:%=%.bpf) $(TUNERS:%=%.skel.h)
+	$(CC) $(CFLAGS) -shared -o $(@).so $(@).c \
 		$(LDLIBS) -lbpftune $(LDFLAGS)
 
 libbpftune.o:
@@ -92,7 +97,11 @@ bpftune.o: libbpftune.o
 $(BPF_TUNERS): vmlinux.h
 	$(CLANG) -g -D__TARGET_ARCH_$(SRCARCH) -O2 -target bpf			\
 		$(INCLUDES) -c $(@).c -o $(@).o &&		\
-	$(LLVM_STRIP) -g $@
+	$(LLVM_STRIP) -g $(@).o
+
+$(BPF_SKELS): $(BPF_TUNERS)
+	$(QUIET_GEN)$(BPFTOOL) gen skeleton $(<).o > $@
+
 
 vmlinux.h: $(VMLINUX_BTF_PATH)
 	if [ ! -e "$(VMLINUX_BTF_PATH)" ] ; then \

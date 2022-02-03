@@ -39,7 +39,7 @@ struct bpftuner {
 	void *handle;
 	const char *name;
 	void *skel;
-	int (*init)(struct bpftuner *tuner);
+	int (*init)(struct bpftuner *tuner, int perf_map_fd);
 	void (*fini)(struct bpftuner *tuner);
 	int perf_map_fd;
 	void (*event_handler)(struct bpftuner *tuner,

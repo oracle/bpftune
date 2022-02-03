@@ -9,18 +9,19 @@
 #include <bpf/bpf_tracing.h>
 #include <bpf/bpf_core_read.h>
 
-struct bpf_map_def SEC("maps") perf_map = {
-	.type = BPF_MAP_TYPE_PERF_EVENT_ARRAY,
-	.key_size = sizeof(int),
-	.value_size = sizeof(int),
-	.max_entries = 512,
-};
+struct {
+	__uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
+	__uint(max_entries, 512);
+	__type(key, int);
+	__type(value, int);
+} perf_map SEC(".maps");
 
 unsigned int tuner_id;
 
 SEC("tp_btf/neigh_create")
-int BPF_PROG(struct neigh_table *tbl, struct net_device *dev,
-	     const void *pkey, struct neighbour *n, bool exempt_from_gc)
+int BPF_PROG(handle_neigh_create, struct neigh_table *tbl,
+	     struct net_device *dev, const void *pkey,
+	     struct neighbour *n, bool exempt_from_gc)
 {
 	struct bpftune_event event = {};
 
@@ -36,3 +37,5 @@ int BPF_PROG(struct neigh_table *tbl, struct net_device *dev,
 
 	return 0;
 }
+
+char _license[] SEC("license") = "GPL";
