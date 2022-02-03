@@ -38,9 +38,11 @@ struct bpftuner {
 	const char *path;
 	void *handle;
 	const char *name;
+	void *tuner_bpf;
 	void *skel;
 	int (*init)(struct bpftuner *tuner, int perf_map_fd);
 	void (*fini)(struct bpftuner *tuner);
+	void *perf_map;
 	int perf_map_fd;
 	void (*event_handler)(struct bpftuner *tuner,
 			      struct bpftune_event *event, void *ctx);

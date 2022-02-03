@@ -34,6 +34,8 @@ void bpftune_set_log(int level,
 void bpftune_log_bpf_err(int err, const char *fmt);
 
 struct bpftuner *bpftuner_init(const char *path, int perf_map_fd);
+int __bpftuner_bpf_init(struct bpftuner *tuner, int perf_map_fd);
+
 void bpftuner_fini(struct bpftuner *tuner);
 
 void *bpftune_perf_buffer_init(int perf_map_fd, int page_cnt,
@@ -41,3 +43,25 @@ void *bpftune_perf_buffer_init(int perf_map_fd, int page_cnt,
 int bpftune_perf_buffer_poll(void *perf_buffer, int interval);
 void bpftune_perf_buffer_fini(void *perf_buffer);
 
+#define bpftuner_bpf_init(tuner_name, tuner, perf_map_fd)		     \
+	do {								     \
+		struct tuner_name##_tuner_bpf *__skel;			     \
+		int __err;						     \
+									     \
+		tuner->name = #tuner_name;				     \
+		__skel = tuner_name##_tuner_bpf__open();		     \
+		__err = libbpf_get_error(__skel);			     \
+		if (__err) {						     \
+			bpftune_log_bpf_err(__err,			     \
+					    #tuner_name " open bpf: %s\n");  \
+			return __err;					     \
+		}							     \
+		tuner->tuner_bpf = __skel;				     \
+		tuner->skel = __skel->skeleton;				     \
+		tuner->perf_map = __skel->maps.perf_map;		     \
+		__err = __bpftuner_bpf_init(tuner, perf_map_fd);	     \
+		if (__err) {						     \
+			tuner_name##_tuner_bpf__destroy(skel);		     \
+			return __err;					     \
+		}							     \
+	} while (0)

@@ -88,6 +88,40 @@ void bpftune_log_bpf_err(int err, const char *fmt)
 	bpftune_log(LOG_ERR, fmt, errbuf);
 }
 
+int __bpftuner_bpf_init(struct bpftuner *tuner, int perf_map_fd)
+{
+	int err;	
+
+	if (perf_map_fd > 0) {
+		err = bpf_map__reuse_fd(tuner->perf_map, perf_map_fd);
+		if (err < 0) {
+			bpftune_log_bpf_err(err, "could not reuse fd: %s\n");
+			return err;
+		}
+	}
+	err = bpf_object__load_skeleton(tuner->skel);
+	if (err) {
+		bpftune_log_bpf_err(err, "could not load skeleton: %s\n");      
+		return err;
+	}
+	err = bpf_object__attach_skeleton(tuner->skel);
+	if (err) {
+		bpftune_log_bpf_err(err, "could not attach skeleton: %s\n");
+		return err;
+	}
+	if (!perf_map_fd)
+		perf_map_fd = bpf_map__fd(tuner->perf_map);
+	tuner->perf_map_fd = perf_map_fd;
+
+	return 0;
+}
+
+void bpftuner_bpf_fini(struct bpftuner *tuner)
+{
+	bpf_object__destroy_skeleton(tuner->skel);
+	free(tuner->tuner_bpf);
+}
+
 /* add a tuner to the list of tuners, or replace existing inactive tuner.
  * If successful, call init().
  */
