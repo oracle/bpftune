@@ -69,11 +69,11 @@ install: bpftune
 	$(Q)$(INSTALL) libbpftune.so.$(VERSION) $(DESTDIR)$(prefix)/lib64
 	$(Q)$(INSTALL) $(TUNER_OBJS) $(DESTDIR)$(prefix)/lib64
 
-bpftune: bpftune.o libbpftune
+bpftune: bpftune.c bpftune.o libbpftune
 	$(QUIET_LINK)$(CC) $(CFLAGS) bpftune.o -o $@ \
 		$(LDFLAGS) $(LDLIBS) -lbpftune
 
-libbpftune: libbpftune.o
+libbpftune: bpftune.c libbpftune.o
 	$(CC) $(CFLAGS) -Wl,--version-script=$(VERSION_SCRIPT) \
 			-Wl,--soname,libbpftune.so.$(VERSION) \
 			-shared -o $@.so.$(VERSION) $(@).o \

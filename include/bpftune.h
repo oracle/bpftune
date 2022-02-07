@@ -9,15 +9,28 @@ enum bpftunable_type {
 	BPFTUNABLE_MAX,
 };
 
-struct bpftunable {
+enum bpftune_state {
+	BPFTUNE_INACTIVE,
+	BPFTUNE_ACTIVE,		/* actively being tuned. */
+	BPFTUNE_MANUAL,		/* manual intervention observed. */
+};
+
+/* some tunables are defined as triples */
+
+#define BPFTUNE_MAX_VALUES	3
+
+struct bpftunable_desc {
 	unsigned int id;
 	enum bpftunable_type type;
 	const char *name;
+	__u8 num_values;
 };
 
-enum bpftuner_state {
-	BPFTUNER_INACTIVE,
-	BPFTUNER_ACTIVE,
+struct bpftunable {
+	struct bpftunable_desc desc;
+	enum bpftune_state state;
+	__s64 initial_values[BPFTUNE_MAX_VALUES];
+	__s64 current_values[BPFTUNE_MAX_VALUES];
 };
 
 struct bpftunable_update {
@@ -34,7 +47,7 @@ struct bpftune_event {
 
 struct bpftuner {
 	unsigned int id;
-	enum bpftuner_state state;
+	enum bpftune_state state;
 	const char *path;
 	void *handle;
 	const char *name;
@@ -46,6 +59,7 @@ struct bpftuner {
 	int perf_map_fd;
 	void (*event_handler)(struct bpftuner *tuner,
 			      struct bpftune_event *event, void *ctx);
-	struct bpftunable tunables[BPFTUNE_MAX_TUNABLES];
+	unsigned int num_tunables;
+	struct bpftunable *tunables;
 	const char **scenarios;
 };

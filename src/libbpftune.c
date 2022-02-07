@@ -247,3 +247,132 @@ void bpftune_perf_buffer_fini(__attribute__((unused)) void *perf_buffer)
 {
 	perf_buffer_done = true;
 }
+
+
+#define PROC_SYS	"/proc/sys/"
+static void sysctl_name_to_path(const char *name, char *path, size_t path_sz)
+{
+	size_t i;
+
+	snprintf(path, path_sz, PROC_SYS "%s", name);
+	for (i = 0; i < path_sz && path[i] != 0; i++)
+		if (path[i] == '.')
+			path[i] = '/';
+}
+
+int bpftune_sysctl_read(const char *name, long *values)
+{
+	int i, num_values = 0;
+	char path[512];
+	int err = 0;	
+	FILE *fp;
+
+	sysctl_name_to_path(name, path, sizeof(path));
+
+	fp = fopen(path, "r");
+	if (!fp) {
+		err = -errno;
+		bpftune_log(LOG_ERR, "could not open %s for reading: %s\n",
+			    path, strerror(-err));
+		return err;
+	}
+	num_values = fscanf(fp, "%ld %ld %ld",
+			    &values[0], &values[1], &values[2]);
+	if (num_values == 0)
+		err = -ENOENT;
+	else if (num_values < 0)
+		err = -errno;
+	fclose(fp);
+
+	if (err) {
+		bpftune_log(LOG_ERR, "could not read from %s: %s\n", path,
+			    strerror(-err));
+		return err;
+	}
+
+	for (i = 0; i < num_values; i++) {
+		bpftune_log(LOG_DEBUG, "Read %s[%d] = %ld\n",
+			    name, i, values[i]);
+	}
+
+	return num_values;
+}
+
+int bpftune_sysctl_write(const char *name, __u8 num_values, long *values)
+{
+	long old_values[BPFTUNE_MAX_VALUES];
+	__u8 old_num_values;
+	char path[512];
+	int i, err = 0;
+	FILE *fp;
+
+	sysctl_name_to_path(name, path, sizeof(path));
+
+	/* If value is already set to val, do nothing. */
+	old_num_values = bpftune_sysctl_read(path, old_values);
+	if (err)
+		return err;
+	if (num_values == old_num_values) {
+		for (i = 0; i < num_values; i++) {
+			if (old_values[i] != values[i])
+				break;
+		}
+		if (i == num_values)
+			return 0;
+	}
+        fp = fopen(path, "w");
+        if (!fp) {
+                err = -errno;
+                bpftune_log(LOG_DEBUG, "could not open %s for writing: %s\n",
+			    path, strerror(-err));
+                return err;
+        }
+
+	for (i = 0; i < num_values; i++)
+		fprintf(fp, "%ld ", values[i]);
+        fclose(fp);
+
+	for (i = 0; i < num_values; i++) {
+		bpftune_log(LOG_DEBUG, "Wrote %s[%d] = %ld\n",
+			    name, i, values[i]);
+	}
+        return 0;
+}
+
+int bpftuner_tunables_init(struct bpftuner *tuner, unsigned int num_descs,
+			   struct bpftunable_desc *descs)
+{
+	unsigned int i;
+
+	tuner->tunables = calloc(num_descs, sizeof(struct bpftunable));
+	if (!tuner->tunables) {
+		bpftune_log(LOG_DEBUG, "no memory to alloc tunables for %s\n",
+			    tuner->name);
+		return -ENOMEM;
+	}
+	tuner->num_tunables = num_descs;
+	for (i = 0; i < num_descs; i++) {
+		int num_values;
+
+		memcpy(&tuner->tunables[i].desc, &descs[i], sizeof(*descs));
+		num_values = bpftune_sysctl_read(descs[i].name,
+				tuner->tunables[i].current_values);
+		if (num_values < 0) {
+			bpftune_log(LOG_ERR, "error reading tunable '%s': %s\n",
+				    descs[i].name, strerror(-num_values));
+			return num_values;
+		}
+		if (num_values != descs[i].num_values) {
+			bpftune_log(LOG_ERR, "error reading tunable '%s'; expected %d values, got %d\n",
+				    descs[i].num_values, num_values);
+			return -EINVAL;
+	}
+
+	return 0;
+}
+
+void bpftuner_tunables_fini(struct bpftuner *tuner)
+{
+	tuner->num_tunables = 0;
+	free(tuner->tunables);
+}

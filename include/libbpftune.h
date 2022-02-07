@@ -35,14 +35,15 @@ void bpftune_log_bpf_err(int err, const char *fmt);
 
 struct bpftuner *bpftuner_init(const char *path, int perf_map_fd);
 int __bpftuner_bpf_init(struct bpftuner *tuner, int perf_map_fd);
+int bpftuner_tunables_init(struct bpftuner *tuner, unsigned int num_descs,
+			   struct bpftunable_desc *descs);
+
 
 void bpftuner_fini(struct bpftuner *tuner);
+void bpftuner_bpf_fini(struct bpftuner *tuner);
+void bpftuner_tunables_fini(struct bpftuner *tuner);
 
-void *bpftune_perf_buffer_init(int perf_map_fd, int page_cnt,
-			       struct bpftuner **tuners);
-int bpftune_perf_buffer_poll(void *perf_buffer, int interval);
-void bpftune_perf_buffer_fini(void *perf_buffer);
-
+/* need a macro in order to generate code for skeleton-specific struct */
 #define bpftuner_bpf_init(tuner_name, tuner, perf_map_fd)		     \
 	do {								     \
 		struct tuner_name##_tuner_bpf *__skel;			     \
@@ -65,3 +66,12 @@ void bpftune_perf_buffer_fini(void *perf_buffer);
 			return __err;					     \
 		}							     \
 	} while (0)
+
+void *bpftune_perf_buffer_init(int perf_map_fd, int page_cnt,
+			       struct bpftuner **tuners);
+int bpftune_perf_buffer_poll(void *perf_buffer, int interval);
+void bpftune_perf_buffer_fini(void *perf_buffer);
+
+int bpftune_sysctl_read(const char *name, long *values);
+int bpftune_sysctl_write(const char *name, __u8 num_values, long *values);
+
