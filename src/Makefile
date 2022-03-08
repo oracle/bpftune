@@ -78,7 +78,7 @@ libbpftune: bpftune.c libbpftune.o
 			-Wl,--soname,libbpftune.so.$(VERSION) \
 			-shared -o $@.so.$(VERSION) $(@).o \
 			$(LDLIBS) $(LDFLAGS)
-	rm libbpftune.so
+	rm -f libbpftune.so
 	ln -s libbpftune.so.$(VERSION) libbpftune.so
 
 $(TUNERS): libbpftune $(TUNERS:%=%.bpf) $(TUNERS:%=%.skel.h)
