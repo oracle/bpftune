@@ -37,7 +37,7 @@ for LATENCY in "" "latency 20ms" ; do
 	echo "Running ${MODE}..."
 	test_run_cmd_local "ip netns exec $NETNS $IPERF3 -s -1 &"
 	if [[ $MODE == "test" ]]; then
-		test_run_cmd_local "$TCPTUNE &"
+		test_run_cmd_local "$BPFTUNE &"
 	fi
 	sleep $SLEEPTIME
 	test_run_cmd_local "$IPERF3 -fm $CLIENT_OPTS -c $ADDR" true

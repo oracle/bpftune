@@ -355,6 +355,12 @@ int bpftuner_tunables_init(struct bpftuner *tuner, unsigned int num_descs,
 		int num_values;
 
 		memcpy(&tuner->tunables[i].desc, &descs[i], sizeof(*descs));
+
+		if (descs[i].type != BPFTUNABLE_SYSCTL) {
+			bpftune_log(LOG_ERR, "cannot add '%s': only sysctl tunables supported\n",
+				    descs[i].name);
+			return -EINVAL;
+		}
 		num_values = bpftune_sysctl_read(descs[i].name,
 				tuner->tunables[i].current_values);
 		if (num_values < 0) {
@@ -366,6 +372,7 @@ int bpftuner_tunables_init(struct bpftuner *tuner, unsigned int num_descs,
 			bpftune_log(LOG_ERR, "error reading tunable '%s'; expected %d values, got %d\n",
 				    descs[i].num_values, num_values);
 			return -EINVAL;
+		}
 	}
 
 	return 0;

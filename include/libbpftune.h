@@ -1,3 +1,6 @@
+#ifndef __LIBBPFTUNE_H
+#define __LIBBPFTUNE_H
+
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdlib.h>
@@ -75,3 +78,4 @@ void bpftune_perf_buffer_fini(void *perf_buffer);
 int bpftune_sysctl_read(const char *name, long *values);
 int bpftune_sysctl_write(const char *name, __u8 num_values, long *values);
 
+#endif /* __LIBBPFTUNE_H */

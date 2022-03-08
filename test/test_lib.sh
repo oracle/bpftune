@@ -9,7 +9,7 @@
 
 # Setup/teardown code for testing.
 
-export TESTDIR="/tmp/tcptunetest"
+export TESTDIR="/tmp/bpftunetest"
 export TESTLOG=${TESTLOG:-"${TESTDIR}/testlog.${PPID}"}
 export TESTLOG_LAST="${TESTDIR}/testlog.last"
 
@@ -65,7 +65,7 @@ export NUM_TESTS=0
 export TARGET=127.0.0.1
 
 export PORT=10200
-export NETNS_PREFIX="tcptunens"
+export NETNS_PREFIX="bpftunens"
 export NETNS="${NETNS_PREFIX}-$$"
 export VETH1="veth1-$$"
 export VETH1_IPV4="192.168.168.1"
@@ -77,10 +77,9 @@ export MTU=1500
 export DROP=${DROP:-""}
 export LATENCY=${LATENCY:-""}
 
-export TCPTUNE=../src/tcptune
+export BPFTUNE=../src/bpftune
 export CGROUPDIR=${CGROUPDIR:-"/tmp/cgroupv2"}
-export TCPTUNE="../src/tcptune -c $CGROUPDIR"
-
+export BPFTUNE="../src/bpftune -c $CGROUPDIR"
 
 # Don't want __pycache__ files hanging around.
 export PYTHONCMD="python3 -B"

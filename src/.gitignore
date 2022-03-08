@@ -1,4 +1,2 @@
-tcptune
-tcptune.*o
-tcptune.skel.h
+bpftune
 vmlinux.h

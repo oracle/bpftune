@@ -42,7 +42,7 @@ MAKEFLAGS += --no-print-directory
 submake_extras := feature_display=0
 endif
 
-TUNERS = neigh_table_tuner
+TUNERS = neigh_table_tuner sysctl_tuner
 
 TUNER_OBJS = $(patsubst %,%.so,$(TUNERS))
 
@@ -100,7 +100,7 @@ $(BPF_TUNERS): vmlinux.h
 	$(LLVM_STRIP) -g $(@).o
 
 $(BPF_SKELS): $(BPF_TUNERS)
-	$(QUIET_GEN)$(BPFTOOL) gen skeleton $(<).o > $@
+	$(BPFTOOL) gen skeleton $(subst .skel.h,.bpf.o,$@) > $@
 
 
 vmlinux.h: $(VMLINUX_BTF_PATH)

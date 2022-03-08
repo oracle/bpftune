@@ -1,3 +1,7 @@
+#ifndef __BPFTUNE_H
+#define __BPFTUNE_H
+
+
 #define BPFTUNE_MAX_TUNERS		64
 
 /* max # of tunables per tuner */
@@ -39,10 +43,15 @@ struct bpftunable_update {
 	__s64 new;
 };
 
+#define BPFTUNE_MAX_NAME	128
+
 struct bpftune_event {
 	unsigned int tuner_id;
 	unsigned int scenario_id;
-	struct bpftunable_update update[BPFTUNE_MAX_TUNABLES];
+	union {
+		struct bpftunable_update update[BPFTUNE_MAX_TUNABLES];
+		char str[BPFTUNE_MAX_NAME];
+	};
 };
 
 struct bpftuner {
@@ -63,3 +72,5 @@ struct bpftuner {
 	struct bpftunable *tunables;
 	const char **scenarios;
 };
+
+#endif /* __BPFTUNE_H */

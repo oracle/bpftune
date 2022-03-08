@@ -1,22 +1,36 @@
 #include <libbpftune.h>
+#include "neigh_table_tuner.h"
 #include "neigh_table_tuner.skel.h"
 
 struct neigh_table_tuner_bpf *skel;
 
 struct bpftunable_desc descs[] = {
-{ 0,	BPFTUNABLE_SYSCTL,	"net.ipv4.neigh.default.gc_interval",	1 },
-{ 1,	BPFTUNABLE_SYSCTL,	"net.ipv4.neigh.default.gc_stale_time",	1, },
-{ 2,	BPFTUNABLE_SYSCTL,	"net.ipv4.neigh.default.gc_thresh1",	1, },
-{ 3,	BPFTUNABLE_SYSCTL,	"net.ipv4.neigh.default.gc_thresh2",	1, },
-{ 4,	BPFTUNABLE_SYSCTL,	"net.ipv4.neigh.default.gc_thresh3",	1, },
+{ NEIGH_TABLE_IPV4_GC_INTERVAL,		BPFTUNABLE_SYSCTL,
+  		"net.ipv4.neigh.default.gc_interval",	1 },
+{ NEIGH_TABLE_IPV4_GC_STALE_TIME,	BPFTUNABLE_SYSCTL,
+		"net.ipv4.neigh.default.gc_stale_time",	1, },
+{ NEIGH_TABLE_IPV4_GC_THRESH1,		BPFTUNABLE_SYSCTL,
+		"net.ipv4.neigh.default.gc_thresh1",	1, },
+{ NEIGH_TABLE_IPV4_GC_THRESH2,		BPFTUNABLE_SYSCTL,
+		"net.ipv4.neigh.default.gc_thresh2",	1, },
+{ NEIGH_TABLE_IPV4_GC_THRESH3,		BPFTUNABLE_SYSCTL,
+		"net.ipv4.neigh.default.gc_thresh3",	1, },
+{ NEIGH_TABLE_IPV6_GC_INTERVAL,		BPFTUNABLE_SYSCTL,
+		"net.ipv6.neigh.default.gc_interval",   1 },
+{ NEIGH_TABLE_IPV6_GC_STALE_TIME,	BPFTUNABLE_SYSCTL,
+		"net.ipv6.neigh.default.gc_stale_time", 1, },
+{ NEIGH_TABLE_IPV6_GC_THRESH1,		BPFTUNABLE_SYSCTL,
+		"net.ipv6.neigh.default.gc_thresh1",    1, },
+{ NEIGH_TABLE_IPV6_GC_THRESH2,		BPFTUNABLE_SYSCTL,
+		"net.ipv6.neigh.default.gc_thresh2",    1, },
+{ NEIGH_TABLE_IPV6_GC_THRESH3,		BPFTUNABLE_SYSCTL,
+		"net.ipv6.neigh.default.gc_thresh3",    1, },
 };
 
 int init(struct bpftuner *tuner, int perf_map_fd)
 {
-	struct bpftunable *tunables;
-
 	bpftuner_bpf_init(neigh_table, tuner, perf_map_fd);
-	return bpftuner_tunables_init(tuner, 5, descs);
+	return bpftuner_tunables_init(tuner, NEIGH_TABLE_NUM_TUNABLES, descs);
 }
 
 void fini(struct bpftuner *tuner)
