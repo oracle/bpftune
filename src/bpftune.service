@@ -1,0 +1,10 @@
+[Unit]
+Description=BPF-based auto-tuning of system parameters
+After=network.target
+
+[Service]
+ExecStart=/usr/sbin/bpftune
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

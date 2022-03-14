@@ -62,11 +62,12 @@ clean:
 	$(Q)$(RM) bpftune
 	$(Q)$(RM) -r .output
 
-install: bpftune
+install: bpftune bpftune.service
 	$(call QUIET_INSTALL, bpftune)
 	$(Q)$(INSTALL) -m 0755 -d $(DESTDIR)$(prefix)/sbin
 	$(Q)$(INSTALL) bpftune $(DESTDIR)$(prefix)/sbin/bpftune
 	$(Q)$(INSTALL) libbpftune.so.$(VERSION) $(DESTDIR)$(prefix)/lib64
+	$(Q)$(INSTALL) bpftune.service $(DESTDIR)/lib/systemd/system
 	$(Q)$(INSTALL) $(TUNER_OBJS) $(DESTDIR)$(prefix)/lib64
 
 bpftune: bpftune.c bpftune.o libbpftune
