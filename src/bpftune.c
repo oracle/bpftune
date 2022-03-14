@@ -2,6 +2,7 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <ctype.h>
 #include <dlfcn.h>
 #include <errno.h>
 #include <getopt.h>
@@ -19,11 +20,17 @@
 
 #include "libbpftune.h"
 
+#ifndef BPFTUNE_VERSION
+#define BPFTUNE_VERSION  "0.1"
+#endif
+
 struct bpftuner *tuners[BPFTUNE_MAX_TUNERS];
 unsigned int num_tuners;
 
 void *perf_buffer;
 int perf_map_fd;
+
+char *bin_name;
 
 static void cleanup(int sig)
 {
@@ -84,13 +91,73 @@ int init(const char *library_dir, int page_cnt)
 	return 0;
 }
 
+void do_help(void)
+{
+	fprintf(stderr,
+		"Usage: %s [OPTIONS]\n"
+		"	OPTIONS := { { -d|--debug} {-D|--daemon}\n"
+		"		     {-h|--help}}\n"
+		"		     { -l|--library_path library_path\n"
+		"		     { -V|--version}}\n",
+		bin_name);
+}
+
+static void do_version(void)
+{
+	printf("%s v%s\n", bin_name, BPFTUNE_VERSION);
+}
+
+static void do_usage(void)
+{
+	do_help();
+	exit(1);
+}
+
 int main(int argc, char *argv[])
 {
+	static const struct option options[] = {
+		{ "debug",	no_argument,		NULL,	'd' },
+		{ "help",	no_argument,		NULL,	'h' },
+		{ "libdir",	required_argument,	NULL,	'l' },
+		{ "version",	no_argument,		NULL,	'V' },
+		{ 0 }
+	};
 	char *library_dir = BPFTUNER_LIB_DIR;
 	int page_cnt = 8, interval = 100;
-	int err;
+	int log_level = LOG_WARNING;
+	int err, opt;
 
-	bpftune_set_log(LOG_DEBUG, bpftune_log_stderr);
+	bin_name = argv[0];
+
+	while ((opt = getopt_long(argc, argv, "dDhl:V", options, NULL)) >= 0) {
+		switch (opt) {
+		case 'd':
+			log_level = LOG_DEBUG;
+			break;
+		case 'D':
+			if (daemon(1, 1)) {
+				fprintf(stderr, "cannot daemonize: %s\n",
+					strerror(errno));
+				return 1;
+			}
+			break;
+		case 'h':
+			do_help();
+			return 0;
+		case 'l':
+			library_dir = optarg;
+			break;
+		case 'V':
+			do_version();
+			return 0;
+		default:
+			fprintf(stderr, "unrecognized option '%s'\n",
+				argv[optind - 1]);
+			do_usage();
+		}
+	}
+
+	bpftune_set_log(log_level, bpftune_log_stderr);
 
 	if (init(library_dir, page_cnt))
 		exit(EXIT_FAILURE);
