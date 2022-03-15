@@ -17,19 +17,13 @@ int init(struct bpftuner *tuner, int perf_map_fd)
 	bpftuner_bpf_init(sysctl, tuner, perf_map_fd);
 
 	/* attach to root cgroup */
-	cgroup_dir = bpftune_get_cgroup();
+	cgroup_dir = bpftune_cgroup_name();
 
 	if (!cgroup_dir) {
 		bpftune_log(LOG_ERR, "cannot get cgroup_dir\n");
 		return 1;
 	}
-	cgroup_fd = open(cgroup_dir, O_RDONLY);
-	if (cgroup_fd < 0) {
-		err = -errno;
-		bpftune_log(LOG_ERR, "cannot open cgroup dir '%s': %s\n",
-			    cgroup_dir, strerror(-err));
-		return 1;
-	}
+	cgroup_fd = bpftune_cgroup_fd();
 	skel = tuner->tuner_bpf;
 	prog_fd = bpf_program__fd(skel->progs.sysctl_write);
 
@@ -47,6 +41,12 @@ int init(struct bpftuner *tuner, int perf_map_fd)
 void fini(struct bpftuner *tuner)
 {
 	bpftune_log(LOG_DEBUG, "calling fini for %s\n", tuner->name);
+	if (skel->progs.sysctl_write) {
+		int prog_fd = bpf_program__fd(skel->progs.sysctl_write);
+		int cgroup_fd = bpftune_cgroup_fd();
+
+		bpf_prog_detach2(prog_fd, cgroup_fd, BPF_CGROUP_SYSCTL);
+	}
 	bpftuner_bpf_fini(tuner);
 }
 

@@ -11,9 +11,11 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <fcntl.h>
 #include <dirent.h>
 #include <libgen.h>
 #include <linux/types.h>
+#include <sys/mount.h>
 
 #include "libbpftune.h"
 
@@ -89,15 +91,52 @@ void bpftune_log_bpf_err(int err, const char *fmt)
 }
 
 static char bpftune_cgroup_path[PATH_MAX];
+static int __bpftune_cgroup_fd;
 
-void bpftune_set_cgroup(const char *cgroup_path)
+int bpftune_cgroup_init(const char *cgroup_path)
 {
+	int err;
+
 	strncpy(bpftune_cgroup_path, cgroup_path, sizeof(bpftune_cgroup_path));
+	__bpftune_cgroup_fd = open(cgroup_path, O_RDONLY);
+	if (__bpftune_cgroup_fd < 0) {
+		if (!mkdir(cgroup_path, 0777)) {
+			err = -errno;
+			bpftune_log(LOG_ERR, "couldnt create cgroup dir '%s': %s\n",
+				    cgroup_path, strerror(-err));
+                        return err;
+                }
+		if (!mount("none" , cgroup_path, "cgroup2", 0, NULL)) {
+			err = -errno;
+			bpftune_log(LOG_ERR, "couldnt mount cgroup2 for '%s': %s\n",
+				    strerror(-err));
+			return err;
+		}
+		__bpftune_cgroup_fd = open(cgroup_path, O_RDONLY);
+		if (__bpftune_cgroup_fd < 0) {
+			err = -errno;
+			bpftune_log(LOG_ERR, "cannot open cgroup dir '%s': %s\n",
+				    cgroup_path, strerror(-err));
+			return err;
+		}
+	}
+	return 0;
 }
 
-const char *bpftune_get_cgroup(void)
+const char *bpftune_cgroup_name(void)
 {
 	return bpftune_cgroup_path;
+}
+
+int bpftune_cgroup_fd(void)
+{
+	return __bpftune_cgroup_fd;
+}
+
+void bpftune_cgroup_fini(void)
+{
+	if (__bpftune_cgroup_fd)
+		close(__bpftune_cgroup_fd);
 }
 
 int __bpftuner_bpf_init(struct bpftuner *tuner, int perf_map_fd)

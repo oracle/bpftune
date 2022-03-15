@@ -38,8 +38,10 @@ void bpftune_set_log(int level,
 void bpftune_log_bpf_err(int err, const char *fmt);
 
 
-void bpftune_set_cgroup(const char *cgroup_path);
-const char *bpftune_get_cgroup(void);
+int bpftune_cgroup_init(const char *cgroup_path);
+const char *bpftune_cgroup_name(void);
+int bpftune_cgroup_fd(void);
+void bpftune_cgroup_fini(void);
 
 struct bpftuner *bpftuner_init(const char *path, int perf_map_fd);
 int __bpftuner_bpf_init(struct bpftuner *tuner, int perf_map_fd);

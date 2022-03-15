@@ -46,6 +46,7 @@ void fini(void)
 		bpftuner_fini(tuners[i]);
 		tuners[i] = NULL;
 	}
+	bpftune_cgroup_fini();
 }
 
 int init(const char *cgroup_dir, const char *library_dir, int page_cnt)
@@ -55,22 +56,9 @@ int init(const char *cgroup_dir, const char *library_dir, int page_cnt)
 	DIR *dir;
 	int err;
 
-	dir = opendir(cgroup_dir);
-	if (!dir) {
-		if (!mkdir(cgroup_dir, 0777)) {
-			err = -errno;
-			bpftune_log(LOG_ERR, "couldnt create cgroup dir '%s': %s\n",
-				    cgroup_dir, strerror(-err));
-			return err;
-		}
-	}
-	if (!mount("none" , cgroup_dir, "cgroup2", 0)) {
-		err = -errno;
-		bpftune_log(LOG_ERR, "couldnt mount cgroup2 for '%s': %s\n",
-			    strerror(-err));
+	err = bpftune_cgroup_init(cgroup_dir);
+	if (err)
 		return err;
-	}
-	bpftune_set_cgroup(cgroup_dir);
 
 	dir = opendir(library_dir);
 	if (!dir) {
