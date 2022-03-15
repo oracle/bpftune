@@ -14,6 +14,7 @@
 #include <fcntl.h>
 #include <dirent.h>
 #include <libgen.h>
+#include <linux/limits.h>
 #include <linux/types.h>
 #include <sys/mount.h>
 
@@ -174,6 +175,9 @@ void bpftuner_bpf_fini(struct bpftuner *tuner)
 	free(tuner->tuner_bpf);
 }
 
+static struct bpftuner *bpftune_tuners[BPFTUNE_MAX_TUNERS];
+static unsigned int bpftune_num_tuners;
+
 /* add a tuner to the list of tuners, or replace existing inactive tuner.
  * If successful, call init().
  */
@@ -213,6 +217,8 @@ struct bpftuner *bpftuner_init(const char *path, int perf_map_fd)
 		free(tuner);
 		return NULL;
 	}
+	tuner->id = bpftune_num_tuners;
+	bpftune_tuners[bpftune_num_tuners++] = tuner;
 	return tuner;
 }
 
@@ -224,6 +230,18 @@ void bpftuner_fini(struct bpftuner *tuner)
 		tuner->fini(tuner);
 }
 
+struct bpftuner *bpftune_tuner(unsigned int index)
+{
+	if (index < bpftune_num_tuners)
+		return bpftune_tuners[index];
+	return NULL;
+}
+
+unsigned int bpftune_tuner_num(void)
+{
+	return bpftune_num_tuners;
+}
+
 static void bpftune_perf_event_lost(__attribute__((unused)) void *ctx, int cpu,
 						  __u64 cnt)
 {
@@ -233,7 +251,6 @@ static void bpftune_perf_event_lost(__attribute__((unused)) void *ctx, int cpu,
 static void bpftune_perf_event_read(void *ctx, int cpu, void *data, __u32 size)
 {
 	struct bpftune_event *event = data;
-	struct bpftuner **tuners = ctx;
 	struct bpftuner *tuner;
 
 	if (size < sizeof(*event)) {
@@ -246,7 +263,7 @@ static void bpftune_perf_event_read(void *ctx, int cpu, void *data, __u32 size)
 			    event->tuner_id, cpu);
 		return;
 	}
-	tuner = tuners[event->tuner_id];
+	tuner = bpftune_tuner(event->tuner_id);
 	if (!tuner) {
 		bpftune_log(LOG_ERR, "no tuner for id %d, CPU%d\n",
 			    event->tuner_id, cpu);
@@ -256,8 +273,7 @@ static void bpftune_perf_event_read(void *ctx, int cpu, void *data, __u32 size)
 	tuner->event_handler(tuner, event, ctx);
 }
 
-void *bpftune_perf_buffer_init(int perf_map_fd, int page_cnt,
-			       struct bpftuner **tuners)
+void *bpftune_perf_buffer_init(int perf_map_fd, int page_cnt, void *ctx)
 {
 	struct perf_buffer_opts pb_opts;
 	struct perf_buffer *pb;
@@ -265,7 +281,7 @@ void *bpftune_perf_buffer_init(int perf_map_fd, int page_cnt,
 
 	pb_opts.sample_cb = bpftune_perf_event_read;
 	pb_opts.lost_cb = bpftune_perf_event_lost;
-	pb_opts.ctx = tuners;
+	pb_opts.ctx = ctx;
 	bpftune_log(LOG_DEBUG, "calling perf_buffer__new, perf_map_fd %d\n",
 		    perf_map_fd);
 	pb = perf_buffer__new(perf_map_fd, page_cnt, &pb_opts);

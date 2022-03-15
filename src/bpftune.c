@@ -24,9 +24,6 @@
 #define BPFTUNE_VERSION  "0.1"
 #endif
 
-struct bpftuner *tuners[BPFTUNE_MAX_TUNERS];
-unsigned int num_tuners;
-
 void *perf_buffer;
 int perf_map_fd;
 
@@ -40,12 +37,10 @@ static void cleanup(int sig)
 
 void fini(void)
 {
-	unsigned int i;
+	struct bpftuner *tuner;
 
-	for (i = 0; i < num_tuners; i++) {
-		bpftuner_fini(tuners[i]);
-		tuners[i] = NULL;
-	}
+	bpftune_for_each_tuner(tuner)
+		bpftuner_fini(tuner);
 	bpftune_cgroup_fini();
 }
 
@@ -69,24 +64,24 @@ int init(const char *cgroup_dir, const char *library_dir, int page_cnt)
 	}
 	bpftune_log(LOG_DEBUG, "searching %s for plugins...\n", library_dir);
 	while ((dirent = readdir(dir)) != NULL) {
+		struct bpftuner *tuner;
+
 		if (strstr(dirent->d_name, BPFTUNER_LIB_SUFFIX) == NULL)
 			continue;
 		snprintf(library_path, sizeof(library_path), "%s/%s",
 			 library_dir, dirent->d_name);
 		bpftune_log(LOG_DEBUG, "found lib %s, init\n", library_path);
-		tuners[num_tuners] = bpftuner_init(library_path, perf_map_fd);
+		tuner = bpftuner_init(library_path, perf_map_fd);
 		/* individual tuner failure shouldn't prevent progress */
-		if (!tuners[num_tuners])
+		if (!tuner)
 			continue;
-		tuners[num_tuners]->id = num_tuners;
 		if (perf_map_fd == 0)
-			perf_map_fd = tuners[num_tuners]->perf_map_fd;
-		num_tuners++;
+			perf_map_fd = tuner->perf_map_fd;
 	}
 
 	if (perf_map_fd > 0) {
 		perf_buffer = bpftune_perf_buffer_init(perf_map_fd, page_cnt,
-						       tuners);
+						       NULL);
 		if (!perf_buffer)
 			return -1;
 	} else {

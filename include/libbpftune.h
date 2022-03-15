@@ -48,6 +48,10 @@ int __bpftuner_bpf_init(struct bpftuner *tuner, int perf_map_fd);
 int bpftuner_tunables_init(struct bpftuner *tuner, unsigned int num_descs,
 			   struct bpftunable_desc *descs);
 
+struct bpftuner *bpftune_tuner(unsigned int index);
+unsigned int bpftune_tuner_num(void);
+#define bpftune_for_each_tuner(tuner)					     \
+	for (unsigned int __i = 0; (tuner = bpftune_tuner(__i)) != NULL; __i++)
 
 void bpftuner_fini(struct bpftuner *tuner);
 void bpftuner_bpf_fini(struct bpftuner *tuner);
@@ -77,8 +81,7 @@ void bpftuner_tunables_fini(struct bpftuner *tuner);
 		}							     \
 	} while (0)
 
-void *bpftune_perf_buffer_init(int perf_map_fd, int page_cnt,
-			       struct bpftuner **tuners);
+void *bpftune_perf_buffer_init(int perf_map_fd, int page_cnt, void *ctx);
 int bpftune_perf_buffer_poll(void *perf_buffer, int interval);
 void bpftune_perf_buffer_fini(void *perf_buffer);
 

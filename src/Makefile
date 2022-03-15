@@ -20,7 +20,7 @@ endif
 VERSION = 0.1.1
 VERSION_SCRIPT  := libbpftune.map
 
-CFLAGS = -fPIC -Wall -Wextra -march=native -g -I../include
+CFLAGS = -fPIC -Wall -Wextra -march=native -g -I../include -std=c99
 
 CFLAGS += -DBPFTUNE_VERSION='"$(BPFTUNE_VERSION)"'
 
