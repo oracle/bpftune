@@ -79,6 +79,7 @@ void bpftuner_tunables_fini(struct bpftuner *tuner);
 			tuner_name##_tuner_bpf__destroy(skel);		     \
 			return __err;					     \
 		}							     \
+		__skel->bss->tuner_id = bpftune_tuner_num();		     \
 	} while (0)
 
 void *bpftune_perf_buffer_init(int perf_map_fd, int page_cnt, void *ctx);

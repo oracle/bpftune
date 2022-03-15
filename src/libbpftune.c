@@ -219,6 +219,8 @@ struct bpftuner *bpftuner_init(const char *path, int perf_map_fd)
 	}
 	tuner->id = bpftune_num_tuners;
 	bpftune_tuners[bpftune_num_tuners++] = tuner;
+	bpftune_log(LOG_DEBUG, "sucessfully intialized tuner %s[%d]\n",
+		    tuner->name, tuner->id);
 	return tuner;
 }
 
@@ -269,7 +271,8 @@ static void bpftune_perf_event_read(void *ctx, int cpu, void *data, __u32 size)
 			    event->tuner_id, cpu);
 		return;
 	}
-	bpftune_log(LOG_DEBUG, "event for tuner %s, CPU%d\n", tuner->name, cpu);
+	bpftune_log(LOG_DEBUG, "event[%d] for tuner %s[%d], CPU%d\n",
+		    event->tuner_id, tuner->name, tuner->id, cpu);
 	tuner->event_handler(tuner, event, ctx);
 }
 

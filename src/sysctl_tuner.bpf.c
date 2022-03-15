@@ -19,6 +19,10 @@ struct {
 unsigned int tuner_id;
 unsigned int bpftune_pid;
 
+/* should return 1 to allow read/write to proceed, 0 otherwise.
+ * Currently just used to see if admin has fiddled with tunables
+ * we're auto-tuning; if so, hands off for us...
+ */
 SEC("cgroup/sysctl")
 int sysctl_write(struct bpf_sysctl *ctx)
 {
@@ -26,16 +30,16 @@ int sysctl_write(struct bpf_sysctl *ctx)
 	int err;
 
 	if (!ctx->write)
-		return 0;
+		return 1;
 	event.tuner_id = tuner_id;
 	event.scenario_id = 0;
 	err = bpf_sysctl_get_name(ctx, event.str, sizeof(event.str), 0);
 	if (err <= 0 || err > BPFTUNE_MAX_NAME)
-		return 0;
+		return 1;
 
 	bpf_perf_event_output(ctx, &perf_map, BPF_F_CURRENT_CPU,	
 			      &event, sizeof(event));
-	return 0;
+	return 1;
 }
 
 char _license[] SEC("license") = "GPL";
