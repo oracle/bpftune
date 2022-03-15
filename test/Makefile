@@ -7,8 +7,11 @@
 # as published by the Free Software Foundation.
 #
 
-COMMON_TESTS = iperf3_test qperf_test
-DEFAULT_TESTS = $(COMMON_TESTS)
+PERF_TESTS = iperf3_test qperf_test
+
+TUNER_TESTS = sysctl_tuner
+
+DEFAULT_TESTS = $(TUNER_TESTS) $(PERF_TESTS)
 
 TESTS = $(DEFAULT_TESTS)
 
@@ -31,7 +34,9 @@ PHONY: clean
 	
 test: $(TESTS)
 	
-test_common: $(COMMON_TESTS)
+test_perf: $(PERF_TESTS)
+
+test_tuner: $(TUNER_TESTS)
 	
 install: $(INSTALLFILES)
 	$(install_sh_DIR) -d $(INSTALLPATH) ; \
