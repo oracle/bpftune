@@ -40,7 +40,7 @@ void fini(void)
 	struct bpftuner *tuner;
 
 	bpftune_for_each_tuner(tuner)
-		bpftuner_fini(tuner);
+		bpftuner_fini(tuner, BPFTUNE_INACTIVE);
 	bpftune_cgroup_fini();
 }
 

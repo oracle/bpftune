@@ -218,18 +218,20 @@ struct bpftuner *bpftuner_init(const char *path, int perf_map_fd)
 		return NULL;
 	}
 	tuner->id = bpftune_num_tuners;
+	tuner->state = BPFTUNE_ACTIVE;
 	bpftune_tuners[bpftune_num_tuners++] = tuner;
 	bpftune_log(LOG_DEBUG, "sucessfully intialized tuner %s[%d]\n",
 		    tuner->name, tuner->id);
 	return tuner;
 }
 
-void bpftuner_fini(struct bpftuner *tuner)
+void bpftuner_fini(struct bpftuner *tuner, enum bpftune_state state)
 {
-	if (!tuner)
+	if (!tuner || tuner->state != BPFTUNE_ACTIVE)
 		return;
 	if (tuner->fini)
 		tuner->fini(tuner);
+	tuner->state = state;
 }
 
 struct bpftuner *bpftune_tuner(unsigned int index)
@@ -320,12 +322,12 @@ void bpftune_perf_buffer_fini(__attribute__((unused)) void *perf_buffer)
 }
 
 
-#define PROC_SYS	"/proc/sys/"
-static void sysctl_name_to_path(const char *name, char *path, size_t path_sz)
+#define BPFTUNE_PROC_SYS	"/proc/sys/"
+void bpftune_sysctl_name_to_path(const char *name, char *path, size_t path_sz)
 {
 	size_t i;
 
-	snprintf(path, path_sz, PROC_SYS "%s", name);
+	snprintf(path, path_sz, BPFTUNE_PROC_SYS "%s", name);
 	for (i = 0; i < path_sz && path[i] != 0; i++)
 		if (path[i] == '.')
 			path[i] = '/';
@@ -338,7 +340,7 @@ int bpftune_sysctl_read(const char *name, long *values)
 	int err = 0;	
 	FILE *fp;
 
-	sysctl_name_to_path(name, path, sizeof(path));
+	bpftune_sysctl_name_to_path(name, path, sizeof(path));
 
 	fp = fopen(path, "r");
 	if (!fp) {
@@ -377,7 +379,7 @@ int bpftune_sysctl_write(const char *name, __u8 num_values, long *values)
 	int i, err = 0;
 	FILE *fp;
 
-	sysctl_name_to_path(name, path, sizeof(path));
+	bpftune_sysctl_name_to_path(name, path, sizeof(path));
 
 	/* If value is already set to val, do nothing. */
 	old_num_values = bpftune_sysctl_read(path, old_values);
@@ -447,6 +449,18 @@ int bpftuner_tunables_init(struct bpftuner *tuner, unsigned int num_descs,
 	}
 
 	return 0;
+}
+
+struct bpftunable *bpftuner_tunable(struct bpftuner *tuner, unsigned int index)
+{
+	if (index < tuner->num_tunables)
+		return &tuner->tunables[index];
+	return NULL;
+}
+
+unsigned int bpftuner_num_tunables(struct bpftuner *tuner)
+{
+	return tuner->num_tunables;
 }
 
 void bpftuner_tunables_fini(struct bpftuner *tuner)

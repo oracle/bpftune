@@ -14,12 +14,15 @@ LIBBPFTUNE_0.1.1 {
 		bpftuner_init;
 		__bpftuner_bpf_init;
 		bpftuner_tunables_init;
+		bpftuner_tunable;
+		bpftuner_tunable_num;
 		bpftuner_fini;
 		bpftuner_bpf_fini;
 		bpftuner_tunables_fini;
 		bpftune_perf_buffer_init;
 		bpftune_perf_buffer_poll;
 		bpftune_perf_buffer_fini;
+		bpftune_sysctl_name_to_path;
 		bpftune_sysctl_read;
 		bpftune_sysctl_write;
 	local:
