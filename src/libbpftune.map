@@ -5,6 +5,8 @@ LIBBPFTUNE_0.1.1 {
 		bpftune_log;
 		bpftune_set_log;
 		bpftune_log_bpf_err;
+		bpftune_set_cgroup;
+		bpftune_get_cgroup;
 		bpftuner_init;
 		__bpftuner_bpf_init;
 		bpftuner_tunables_init;

@@ -3,7 +3,7 @@ Description=BPF-based auto-tuning of system parameters
 After=network.target
 
 [Service]
-ExecStart=/usr/sbin/bpftune
+ExecStart=/usr/sbin/bpftune -d
 Restart=on-failure
 
 [Install]

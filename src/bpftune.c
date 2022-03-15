@@ -48,12 +48,29 @@ void fini(void)
 	}
 }
 
-int init(const char *library_dir, int page_cnt)
+int init(const char *cgroup_dir, const char *library_dir, int page_cnt)
 {
 	char library_path[512];
 	struct dirent *dirent;
 	DIR *dir;
 	int err;
+
+	dir = opendir(cgroup_dir);
+	if (!dir) {
+		if (!mkdir(cgroup_dir, 0777)) {
+			err = -errno;
+			bpftune_log(LOG_ERR, "couldnt create cgroup dir '%s': %s\n",
+				    cgroup_dir, strerror(-err));
+			return err;
+		}
+	}
+	if (!mount("none" , cgroup_dir, "cgroup2", 0)) {
+		err = -errno;
+		bpftune_log(LOG_ERR, "couldnt mount cgroup2 for '%s': %s\n",
+			    strerror(-err));
+		return err;
+	}
+	bpftune_set_cgroup(cgroup_dir);
 
 	dir = opendir(library_dir);
 	if (!dir) {
@@ -96,6 +113,7 @@ void do_help(void)
 	fprintf(stderr,
 		"Usage: %s [OPTIONS]\n"
 		"	OPTIONS := { { -d|--debug} {-D|--daemon}\n"
+		"		     { -c|--cgroup_path cgroup_path}\n"
 		"		     {-h|--help}}\n"
 		"		     { -l|--library_path library_path\n"
 		"		     { -V|--version}}\n",
@@ -116,12 +134,14 @@ static void do_usage(void)
 int main(int argc, char *argv[])
 {
 	static const struct option options[] = {
+		{ "cgroup",	required_argument,	NULL,	'c' },
 		{ "debug",	no_argument,		NULL,	'd' },
 		{ "help",	no_argument,		NULL,	'h' },
 		{ "libdir",	required_argument,	NULL,	'l' },
 		{ "version",	no_argument,		NULL,	'V' },
 		{ 0 }
 	};
+	char *cgroup_dir = BPFTUNER_CGROUP_DIR;
 	char *library_dir = BPFTUNER_LIB_DIR;
 	int page_cnt = 8, interval = 100;
 	int log_level = LOG_WARNING;
@@ -129,8 +149,12 @@ int main(int argc, char *argv[])
 
 	bin_name = argv[0];
 
-	while ((opt = getopt_long(argc, argv, "dDhl:V", options, NULL)) >= 0) {
+	while ((opt = getopt_long(argc, argv, "c:dDhl:V", options, NULL))
+		>= 0) {
 		switch (opt) {
+		case 'c':
+			cgroup_dir = optarg;
+			break;
 		case 'd':
 			log_level = LOG_DEBUG;
 			break;
@@ -159,7 +183,7 @@ int main(int argc, char *argv[])
 
 	bpftune_set_log(log_level, bpftune_log_stderr);
 
-	if (init(library_dir, page_cnt))
+	if (init(cgroup_dir, library_dir, page_cnt))
 		exit(EXIT_FAILURE);
 
 	signal(SIGINT, cleanup);

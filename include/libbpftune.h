@@ -23,6 +23,7 @@
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
 
+#define BPFTUNER_CGROUP_DIR		"/tmp/cgroupv2"
 #define BPFTUNER_LIB_DIR		"/usr/lib64"
 #define BPFTUNER_LIB_SUFFIX		"_tuner.so"
 
@@ -35,6 +36,10 @@ void bpftune_set_log(int level,
 		     void (*logfn)(void *ctx, int level, const char *fmt,
 				   va_list args));
 void bpftune_log_bpf_err(int err, const char *fmt);
+
+
+void bpftune_set_cgroup(const char *cgroup_path);
+const char *bpftune_get_cgroup(void);
 
 struct bpftuner *bpftuner_init(const char *path, int perf_map_fd);
 int __bpftuner_bpf_init(struct bpftuner *tuner, int perf_map_fd);

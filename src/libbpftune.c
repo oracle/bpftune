@@ -88,6 +88,18 @@ void bpftune_log_bpf_err(int err, const char *fmt)
 	bpftune_log(LOG_ERR, fmt, errbuf);
 }
 
+static char bpftune_cgroup_path[PATH_MAX];
+
+void bpftune_set_cgroup(const char *cgroup_path)
+{
+	strncpy(bpftune_cgroup_path, cgroup_path, sizeof(bpftune_cgroup_path));
+}
+
+const char *bpftune_get_cgroup(void)
+{
+	return bpftune_cgroup_path;
+}
+
 int __bpftuner_bpf_init(struct bpftuner *tuner, int perf_map_fd)
 {
 	int err;	
@@ -104,6 +116,7 @@ int __bpftuner_bpf_init(struct bpftuner *tuner, int perf_map_fd)
 		bpftune_log_bpf_err(err, "could not load skeleton: %s\n");      
 		return err;
 	}
+	/* may need to attach cgroup later, don't fail */
 	err = bpf_object__attach_skeleton(tuner->skel);
 	if (err) {
 		bpftune_log_bpf_err(err, "could not attach skeleton: %s\n");
