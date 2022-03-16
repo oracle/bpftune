@@ -34,7 +34,11 @@ int init(struct bpftuner *tuner, int perf_map_fd)
 			    cgroup_dir, strerror(-err));
 		return 1;
 	}
-			
+	/* set our pid so we can identify tuning events that come from
+	 * outside.
+	 */
+	skel->bss->bpftune_pid = getpid();
+
 	return 0;
 }
 

@@ -26,8 +26,9 @@ unsigned int bpftune_pid;
 SEC("cgroup/sysctl")
 int sysctl_write(struct bpf_sysctl *ctx)
 {
+	struct task_struct *current_task;
 	struct bpftune_event event = {};
-	int err;
+	int current_pid, err;
 
 	if (!ctx->write)
 		return 1;
@@ -36,9 +37,12 @@ int sysctl_write(struct bpf_sysctl *ctx)
 	err = bpf_sysctl_get_name(ctx, event.str, sizeof(event.str), 0);
 	if (err <= 0 || err > BPFTUNE_MAX_NAME)
 		return 1;
-
-	bpf_perf_event_output(ctx, &perf_map, BPF_F_CURRENT_CPU,	
-			      &event, sizeof(event));
+	/* bpf_get_current_pid_tgid() helper not allowed for sysctl */
+	current_task = (struct task_struct *)bpf_get_current_task();
+	current_pid = BPF_CORE_READ(current_task, pid);
+	if (current_pid != bpftune_pid)
+		bpf_perf_event_output(ctx, &perf_map, BPF_F_CURRENT_CPU,	
+				      &event, sizeof(event));
 	return 1;
 }
 
