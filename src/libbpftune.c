@@ -26,8 +26,8 @@
 int bpftune_loglevel = LOG_INFO;
 void *bpftune_log_ctx;
 
-struct perf_buffer *perf_buffer;
-int perf_map_fd;
+struct ring_buffer *ring_buffer;
+int ring_buffer_fd;
 
 void bpftune_log_stderr(__attribute__((unused)) void *ctx,
 			__attribute__((unused)) int level,
@@ -140,12 +140,12 @@ void bpftune_cgroup_fini(void)
 		close(__bpftune_cgroup_fd);
 }
 
-int __bpftuner_bpf_init(struct bpftuner *tuner, int perf_map_fd)
+int __bpftuner_bpf_init(struct bpftuner *tuner, int ring_buffer_fd)
 {
 	int err;	
 
-	if (perf_map_fd > 0) {
-		err = bpf_map__reuse_fd(tuner->perf_map, perf_map_fd);
+	if (ring_buffer_fd > 0) {
+		err = bpf_map__reuse_fd(tuner->ringbuf_map, ring_buffer_fd);
 		if (err < 0) {
 			bpftune_log_bpf_err(err, "could not reuse fd: %s\n");
 			return err;
@@ -162,9 +162,9 @@ int __bpftuner_bpf_init(struct bpftuner *tuner, int perf_map_fd)
 		bpftune_log_bpf_err(err, "could not attach skeleton: %s\n");
 		return err;
 	}
-	if (!perf_map_fd)
-		perf_map_fd = bpf_map__fd(tuner->perf_map);
-	tuner->perf_map_fd = perf_map_fd;
+	if (!ring_buffer_fd)
+		ring_buffer_fd = bpf_map__fd(tuner->ringbuf_map);
+	tuner->ringbuf_map_fd = ring_buffer_fd;
 
 	return 0;
 }
@@ -181,7 +181,7 @@ static unsigned int bpftune_num_tuners;
 /* add a tuner to the list of tuners, or replace existing inactive tuner.
  * If successful, call init().
  */
-struct bpftuner *bpftuner_init(const char *path, int perf_map_fd)
+struct bpftuner *bpftuner_init(const char *path, int ringbuf_map_fd)
 {
 	struct bpftuner *tuner = NULL;
 	int err;
@@ -202,14 +202,14 @@ struct bpftuner *bpftuner_init(const char *path, int perf_map_fd)
  	 * for other perf maps (so we can use the same perf buffer for all
  	 * BPF events.
  	 */
-	if (perf_map_fd > 0)
-		tuner->perf_map_fd = perf_map_fd;
+	if (ringbuf_map_fd > 0)
+		tuner->ringbuf_map_fd = ringbuf_map_fd;
 	tuner->init = dlsym(tuner->handle, "init");
 	tuner->fini = dlsym(tuner->handle, "fini");
 	tuner->event_handler = dlsym(tuner->handle, "event_handler");
 	
 	bpftune_log(LOG_DEBUG, "calling init for '%s\n", path);
-	err = tuner->init(tuner, perf_map_fd);
+	err = tuner->init(tuner, ringbuf_map_fd);
 	if (err) {
 		dlclose(tuner->handle);
 		bpftune_log(LOG_ERR, "error initializing '%s: %s\n",
@@ -246,79 +246,68 @@ unsigned int bpftune_tuner_num(void)
 	return bpftune_num_tuners;
 }
 
-static void bpftune_perf_event_lost(__attribute__((unused)) void *ctx, int cpu,
-						  __u64 cnt)
-{
-	bpftune_log(LOG_ERR, "lost %lld events on CPU%d\n", cnt, cpu);
-}
-
-static void bpftune_perf_event_read(void *ctx, int cpu, void *data, __u32 size)
+static int bpftune_ringbuf_event_read(void *ctx, void *data, size_t size)
 {
 	struct bpftune_event *event = data;
 	struct bpftuner *tuner;
 
 	if (size < sizeof(*event)) {
-		bpftune_log(LOG_ERR, "unexpected size event %d, CPU%d\n", size,
-			    cpu);
-		return;
+		bpftune_log(LOG_ERR, "unexpected size event %d\n", size);
+		return 0;
 	}
 	if (event->tuner_id > BPFTUNE_MAX_TUNERS) {
-		bpftune_log(LOG_ERR, "invalid tuner id %d, CPU%d\n",
-			    event->tuner_id, cpu);
-		return;
+		bpftune_log(LOG_ERR, "invalid tuner id %d\n", event->tuner_id);
+		return 0;
 	}
 	tuner = bpftune_tuner(event->tuner_id);
 	if (!tuner) {
-		bpftune_log(LOG_ERR, "no tuner for id %d, CPU%d\n",
-			    event->tuner_id, cpu);
-		return;
+		bpftune_log(LOG_ERR, "no tuner for id %d\n", event->tuner_id);
+		return 0;
 	}
-	bpftune_log(LOG_DEBUG, "event[%d] for tuner %s[%d], CPU%d\n",
-		    event->tuner_id, tuner->name, tuner->id, cpu);
+	bpftune_log(LOG_DEBUG, "event[%d] for tuner %s[%d]\n",
+		    event->tuner_id, tuner->name, tuner->id);
 	tuner->event_handler(tuner, event, ctx);
-}
 
-void *bpftune_perf_buffer_init(int perf_map_fd, int page_cnt, void *ctx)
-{
-	struct perf_buffer_opts pb_opts;
-	struct perf_buffer *pb;
-	int err;
-
-	pb_opts.sample_cb = bpftune_perf_event_read;
-	pb_opts.lost_cb = bpftune_perf_event_lost;
-	pb_opts.ctx = ctx;
-	bpftune_log(LOG_DEBUG, "calling perf_buffer__new, perf_map_fd %d\n",
-		    perf_map_fd);
-	pb = perf_buffer__new(perf_map_fd, page_cnt, &pb_opts);
-	err = libbpf_get_error(pb);
-	if (err) {
-		bpftune_log_bpf_err(err, "couldnt create perf buffer: %s\n");
-		return NULL;
-	}
-	return pb;
-}
-
-static int perf_buffer_done;
-
-int bpftune_perf_buffer_poll(void *perf_buffer, int interval)
-{
-	struct perf_buffer *pb = perf_buffer;
-	int err;
-
-	while (!perf_buffer_done) {
-		err = perf_buffer__poll(pb, interval);
-		if (err < 0) {
-			bpftune_log_bpf_err(err, "perf_buffer__poll: %s\n");
-			break;
-		}
-	}
-	perf_buffer__free(pb);
 	return 0;
 }
 
-void bpftune_perf_buffer_fini(__attribute__((unused)) void *perf_buffer)
+void *bpftune_ring_buffer_init(int ringbuf_map_fd, void *ctx)
 {
-	perf_buffer_done = true;
+	struct ring_buffer *rb;
+	int err;
+
+	bpftune_log(LOG_DEBUG, "calling ring_buffer__new, ringbuf_map_fd %d\n",
+		    ringbuf_map_fd);
+	rb = ring_buffer__new(ringbuf_map_fd, bpftune_ringbuf_event_read, ctx, NULL);
+	err = libbpf_get_error(rb);
+	if (err) {
+		bpftune_log_bpf_err(err, "couldnt create ring buffer: %s\n");
+		return NULL;
+	}
+	return rb;
+}
+
+static int ring_buffer_done;
+
+int bpftune_ring_buffer_poll(void *ring_buffer, int interval)
+{
+	struct ring_buffer *rb = ring_buffer;
+	int err;
+
+	while (!ring_buffer_done) {
+		err = ring_buffer__poll(rb, interval);
+		if (err < 0) {
+			bpftune_log_bpf_err(err, "ring_buffer__poll: %s\n");
+			break;
+		}
+	}
+	ring_buffer__free(rb);
+	return 0;
+}
+
+void bpftune_ring_buffer_fini(__attribute__((unused)) void *ring_buffer)
+{
+	ring_buffer_done = true;
 }
 
 

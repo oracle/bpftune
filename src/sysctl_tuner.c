@@ -55,7 +55,7 @@ void fini(struct bpftuner *tuner)
 }
 
 void event_handler(struct bpftuner *tuner, struct bpftune_event *event,
-		   void *ctx)
+		   __attribute__((unused))void *ctx)
 {
 	struct bpftuner *t;
 

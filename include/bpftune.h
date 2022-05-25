@@ -33,8 +33,8 @@ struct bpftunable_desc {
 struct bpftunable {
 	struct bpftunable_desc desc;
 	enum bpftune_state state;
-	__s64 initial_values[BPFTUNE_MAX_VALUES];
-	__s64 current_values[BPFTUNE_MAX_VALUES];
+	long initial_values[BPFTUNE_MAX_VALUES];
+	long current_values[BPFTUNE_MAX_VALUES];
 };
 
 struct bpftunable_update {
@@ -62,10 +62,10 @@ struct bpftuner {
 	const char *name;
 	void *tuner_bpf;
 	void *skel;
-	int (*init)(struct bpftuner *tuner, int perf_map_fd);
+	int (*init)(struct bpftuner *tuner, int ringbuf_map_fd);
 	void (*fini)(struct bpftuner *tuner);
-	void *perf_map;
-	int perf_map_fd;
+	void *ringbuf_map;
+	int ringbuf_map_fd;
 	void (*event_handler)(struct bpftuner *tuner,
 			      struct bpftune_event *event, void *ctx);
 	unsigned int num_tunables;

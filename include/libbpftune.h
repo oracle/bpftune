@@ -45,8 +45,8 @@ const char *bpftune_cgroup_name(void);
 int bpftune_cgroup_fd(void);
 void bpftune_cgroup_fini(void);
 
-struct bpftuner *bpftuner_init(const char *path, int perf_map_fd);
-int __bpftuner_bpf_init(struct bpftuner *tuner, int perf_map_fd);
+struct bpftuner *bpftuner_init(const char *path, int ringbuf_map_fd);
+int __bpftuner_bpf_init(struct bpftuner *tuner, int ringbuf_map_fd);
 int bpftuner_tunables_init(struct bpftuner *tuner, unsigned int num_descs,
 			   struct bpftunable_desc *descs);
 struct bpftunable *bpftuner_tunable(struct bpftuner *tuner, unsigned int index);
@@ -64,7 +64,7 @@ void bpftuner_bpf_fini(struct bpftuner *tuner);
 void bpftuner_tunables_fini(struct bpftuner *tuner);
 
 /* need a macro in order to generate code for skeleton-specific struct */
-#define bpftuner_bpf_init(tuner_name, tuner, perf_map_fd)		     \
+#define bpftuner_bpf_init(tuner_name, tuner, ringbuf_map_fd)		     \
 	do {								     \
 		struct tuner_name##_tuner_bpf *__skel;			     \
 		int __err;						     \
@@ -79,8 +79,8 @@ void bpftuner_tunables_fini(struct bpftuner *tuner);
 		}							     \
 		tuner->tuner_bpf = __skel;				     \
 		tuner->skel = __skel->skeleton;				     \
-		tuner->perf_map = __skel->maps.perf_map;		     \
-		__err = __bpftuner_bpf_init(tuner, perf_map_fd);	     \
+		tuner->ringbuf_map = __skel->maps.ringbuf_map;		     \
+		__err = __bpftuner_bpf_init(tuner, ringbuf_map_fd);	     \
 		if (__err) {						     \
 			tuner_name##_tuner_bpf__destroy(skel);		     \
 			return __err;					     \
@@ -88,9 +88,9 @@ void bpftuner_tunables_fini(struct bpftuner *tuner);
 		__skel->bss->tuner_id = bpftune_tuner_num();		     \
 	} while (0)
 
-void *bpftune_perf_buffer_init(int perf_map_fd, int page_cnt, void *ctx);
-int bpftune_perf_buffer_poll(void *perf_buffer, int interval);
-void bpftune_perf_buffer_fini(void *perf_buffer);
+void *bpftune_ring_buffer_init(int ringbuf_map_fd, void *ctx);
+int bpftune_ring_buffer_poll(void *ring_buffer, int interval);
+void bpftune_ring_buffer_fini(void *ring_buffer);
 
 void bpftune_sysctl_name_to_path(const char *name, char *path, size_t path_sz);
 int bpftune_sysctl_read(const char *name, long *values);

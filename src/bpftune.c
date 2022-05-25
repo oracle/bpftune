@@ -1,3 +1,4 @@
+#define _BSD_SOURCE
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdlib.h>
@@ -14,6 +15,7 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <unistd.h>
 #include <dirent.h>
 #include <libgen.h>
 #include <linux/types.h>
@@ -24,15 +26,15 @@
 #define BPFTUNE_VERSION  "0.1"
 #endif
 
-void *perf_buffer;
-int perf_map_fd;
+void *ring_buffer;
+int ringbuf_map_fd;
 
 char *bin_name;
 
 static void cleanup(int sig)
 {
 	bpftune_log(LOG_DEBUG, "cleaning up, got signal %d\n", sig);
-	bpftune_perf_buffer_fini(perf_buffer);
+	bpftune_ring_buffer_fini(ring_buffer);
 }
 
 void fini(void)
@@ -44,7 +46,7 @@ void fini(void)
 	bpftune_cgroup_fini();
 }
 
-int init(const char *cgroup_dir, const char *library_dir, int page_cnt)
+int init(const char *cgroup_dir, const char *library_dir)
 {
 	char library_path[512];
 	struct dirent *dirent;
@@ -71,21 +73,20 @@ int init(const char *cgroup_dir, const char *library_dir, int page_cnt)
 		snprintf(library_path, sizeof(library_path), "%s/%s",
 			 library_dir, dirent->d_name);
 		bpftune_log(LOG_DEBUG, "found lib %s, init\n", library_path);
-		tuner = bpftuner_init(library_path, perf_map_fd);
+		tuner = bpftuner_init(library_path, ringbuf_map_fd);
 		/* individual tuner failure shouldn't prevent progress */
 		if (!tuner)
 			continue;
-		if (perf_map_fd == 0)
-			perf_map_fd = tuner->perf_map_fd;
+		if (ringbuf_map_fd == 0)
+			ringbuf_map_fd = tuner->ringbuf_map_fd;
 	}
 
-	if (perf_map_fd > 0) {
-		perf_buffer = bpftune_perf_buffer_init(perf_map_fd, page_cnt,
-						       NULL);
-		if (!perf_buffer)
+	if (ringbuf_map_fd > 0) {
+		ring_buffer = bpftune_ring_buffer_init(ringbuf_map_fd, NULL);
+		if (!ring_buffer)
 			return -1;
 	} else {
-		bpftune_log(LOG_ERR, "no perf events to watch, exiting.\n");
+		bpftune_log(LOG_ERR, "no ringbuf events to watch, exiting.\n");
 		return -ENOENT;
 	}
 	return 0;
@@ -126,8 +127,8 @@ int main(int argc, char *argv[])
 	};
 	char *cgroup_dir = BPFTUNER_CGROUP_DIR;
 	char *library_dir = BPFTUNER_LIB_DIR;
-	int page_cnt = 8, interval = 100;
 	int log_level = LOG_WARNING;
+	int interval = 100;
 	int err, opt;
 
 	bin_name = argv[0];
@@ -166,13 +167,13 @@ int main(int argc, char *argv[])
 
 	bpftune_set_log(log_level, bpftune_log_stderr);
 
-	if (init(cgroup_dir, library_dir, page_cnt))
+	if (init(cgroup_dir, library_dir))
 		exit(EXIT_FAILURE);
 
 	signal(SIGINT, cleanup);
 	signal(SIGTERM, cleanup);
 
-	err = bpftune_perf_buffer_poll(perf_buffer, interval);
+	err = bpftune_ring_buffer_poll(ring_buffer, interval);
 
 	fini();
 

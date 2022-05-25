@@ -1,22 +1,8 @@
 /* SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause) */
 /* Copyright (c) 2021, Oracle and/or its affiliates. */
 
-#include "vmlinux.h"
+#include "bpftune.bpf.h"
 
-#include "bpftune.h"
-
-#include <bpf/bpf_helpers.h>
-#include <bpf/bpf_tracing.h>
-#include <bpf/bpf_core_read.h>
-
-struct {
-	__uint(type, BPF_MAP_TYPE_PERF_EVENT_ARRAY);
-	__uint(max_entries, 512);
-	__type(key, int);
-	__type(value, int);
-} perf_map SEC(".maps");
-
-unsigned int tuner_id;
 unsigned int bpftune_pid;
 
 /* should return 1 to allow read/write to proceed, 0 otherwise.
@@ -41,8 +27,7 @@ int sysctl_write(struct bpf_sysctl *ctx)
 	current_task = (struct task_struct *)bpf_get_current_task();
 	current_pid = BPF_CORE_READ(current_task, pid);
 	if (current_pid != bpftune_pid)
-		bpf_perf_event_output(ctx, &perf_map, BPF_F_CURRENT_CPU,	
-				      &event, sizeof(event));
+		bpf_ringbuf_output(&ringbuf_map, &event, sizeof(event), 0);
 	return 1;
 }
 

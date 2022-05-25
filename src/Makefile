@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause)
 
-include Makefile.arch
+SRCARCH := $(shell uname -m | sed -e s/i.86/x86/ -e s/x86_64/x86/ \
+				  -e /arm64/!s/arm.*/arm/ -e s/sa110/arm/ \
+				  -e s/aarch64.*/arm64/ )
 
 CLANG ?= clang
 LLC ?= llc
@@ -42,7 +44,7 @@ MAKEFLAGS += --no-print-directory
 submake_extras := feature_display=0
 endif
 
-TUNERS = neigh_table_tuner sysctl_tuner
+TUNERS = neigh_table_tuner sysctl_tuner cong_tuner
 
 TUNER_OBJS = $(patsubst %,%.so,$(TUNERS))
 
