@@ -9,7 +9,7 @@ all: srcdir docdir
 srcdir:
 	cd src; make
 docdir:
-	cd Documentation; make man
+	cd docs; make man
 
 test:	FORCE
 	cd test; make test
