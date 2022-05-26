@@ -13,8 +13,8 @@ SYNOPSIS
 	**bpftune** [*OPTIONS*]
 
 	*OPTIONS* := { { **-V** | **--version** } | { **-h** | **--help** }
-	| { [**-P** | **--pages**] nr_pages} | { [**-c** | **--cgroup**] cgroup} |
-        { [**-c** | **--cgroup** ] cgroup} | [{ **-d** | **--debug** }] }
+	| { [**-s** | **--stderr** } | { [**-c** | **--cgroup**] cgroup} |
+        { [**-l** | **--libdir** ] libdir} | [{ **-d** | **--debug** }] }
 
 DESCRIPTION
 ===========
@@ -33,9 +33,10 @@ OPTIONS
                   Show debug output.
         -c, --cgroup
                   Filter events for cgroup.
-        -P, --pages
-                  Specify number of pages used per-CPU for perf event
-                  collection.  Default is 8.
+        -s, --stderr
+                  Log to standard error instead of syslog.
+        -l, --libdir
+                  bptune plugin directory; defaults to
+                  /usr/lib64
+        
 
-EXAMPLES
-========

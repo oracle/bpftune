@@ -122,6 +122,7 @@ int main(int argc, char *argv[])
 		{ "debug",	no_argument,		NULL,	'd' },
 		{ "help",	no_argument,		NULL,	'h' },
 		{ "libdir",	required_argument,	NULL,	'l' },
+		{ "stderr", 	no_argument,		NULL,	's' },
 		{ "version",	no_argument,		NULL,	'V' },
 		{ 0 }
 	};

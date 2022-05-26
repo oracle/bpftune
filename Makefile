@@ -28,4 +28,4 @@ install: srcinstall docinstall
 srcinstall:
 	cd src; make install
 docinstall:
-	cd Documentation; make install
+	cd docs; make install
