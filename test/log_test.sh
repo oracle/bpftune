@@ -16,10 +16,14 @@ SLEEPTIME=0.5
 
 for TUNER in neigh_table ; do
 
- for MODE in debug info ; do
+ for MODE in debug info syslog; do
 
+   LOGFILE=$TESTLOG_LAST
    if [[ $MODE == "debug" ]]; then
 	OPTIONS="-ds"
+   elif [[ $MODE == "syslog" ]]; then
+	OPTIONS=""
+	LOGFILE=/var/log/messages
    else
 	OPTIONS="-s"
    fi
@@ -35,10 +39,10 @@ for TUNER in neigh_table ; do
 	val=$(sysctl -qn $SYSCTL)
 	sysctl -qw ${SYSCTL}=${val}
    done
-   grep "modified sysctl" $TESTLOG_LAST
+   grep "modified sysctl" $LOGFILE
    if [[ "$OPTIONS" == "-ds" ]]; then
 	# should see multiple lines for debug
-	LINES=$(wc -l $TESTLOG_LAST | awk '{ print $1 }')
+	LINES=$(wc -l $LOGFILE | awk '{ print $1 }')
 	if [[ $LINES -gt 1 ]]; then
 	   test_pass
 	fi
