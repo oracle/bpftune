@@ -9,6 +9,8 @@
 
 # run iperf3 test
 
+PORT=5201
+
 . ./test_lib.sh
 
 SLEEPTIME=0.5

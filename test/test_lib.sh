@@ -37,6 +37,7 @@ export IPERF3=$(which iperf3 2>/dev/null)
 check_prog iperf3 iperf3
 export QPERF=$(which qperf 2>/dev/null)
 check_prog qperf qperf
+export FIREWALL_CMD=$(which firewall-cmd 2>/dev/null)
 
 export B=$(tput -Tvt100 bold)
 export N=$(tput -Tvt100 sgr0)
@@ -64,7 +65,7 @@ export NUM_TESTS=0
 
 export TARGET=127.0.0.1
 
-export PORT=10200
+export PORT=${PORT:-10200}
 export NETNS_PREFIX="bpftunens"
 export NETNS="${NETNS_PREFIX}-$$"
 export VETH1="veth1-$$"
@@ -160,7 +161,11 @@ test_setup_local()
 		ip netns exec $NETNS ip link set $VETH1 up
 		ip netns exec $NETNS sysctl -qw net.ipv4.conf.lo.rp_filter=0
 		if [[ -n "$DROP" ]] || [[ -n "$LATENCY" ]]; then
-       	         tc qdisc add dev $VETH2 root netem ${DROP} ${LATENCY}
+		 D=$DROP
+		 if [[ -n "$DROP" ]]; then
+		  D="${DROP}%"
+		 fi
+       	         tc qdisc add dev $VETH2 root netem loss ${D} ${LATENCY}
 		 ethtool -K $VETH2 gso off
         	fi
 		ip addr add ${VETH2_IPV4}/24 dev $VETH2
@@ -172,7 +177,9 @@ test_setup_local()
 	else
 		echo "skipping netns setup, $NETNS already present"
 	fi
-
+	if [[ -f "$FIREWALL_CMD" ]]; then
+		$FIREWALL_CMD --add-port=${PORT}/tcp
+	fi
 	test_run_cmd_local "$CMD" true
 }
 

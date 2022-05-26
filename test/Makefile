@@ -9,7 +9,7 @@
 
 PERF_TESTS = iperf3_test qperf_test
 
-TUNER_TESTS = sysctl_tuner
+TUNER_TESTS = sysctl_test
 
 DEFAULT_TESTS = $(TUNER_TESTS) $(PERF_TESTS)
 
@@ -42,7 +42,7 @@ install: $(INSTALLFILES)
 	$(install_sh_DIR) -d $(INSTALLPATH) ; \
 	$(install_sh_PROGRAM) $^ -t $(INSTALLPATH) ; \
 
-$(DEFAULT_TESTS): %:%.sh
+$(TESTS): %:%.sh
 	bash $<
 
 .PHONY: clean

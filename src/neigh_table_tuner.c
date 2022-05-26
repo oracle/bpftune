@@ -27,9 +27,9 @@ struct bpftunable_desc descs[] = {
 		"net.ipv6.neigh.default.gc_thresh3",    1, },
 };
 
-int init(struct bpftuner *tuner, int perf_map_fd)
+int init(struct bpftuner *tuner, int ringbuf_map_fd)
 {
-	bpftuner_bpf_init(neigh_table, tuner, perf_map_fd);
+	bpftuner_bpf_init(neigh_table, tuner, ringbuf_map_fd);
 	return bpftuner_tunables_init(tuner, NEIGH_TABLE_NUM_TUNABLES, descs);
 }
 

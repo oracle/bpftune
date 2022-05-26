@@ -77,12 +77,12 @@ void bpftuner_tunables_fini(struct bpftuner *tuner);
 					    #tuner_name " open bpf: %s\n");  \
 			return __err;					     \
 		}							     \
-		tuner->tuner_bpf = __skel;				     \
-		tuner->skel = __skel->skeleton;				     \
+		tuner->skel = __skel;				  	     \
+		tuner->skeleton = __skel->skeleton;			     \
 		tuner->ringbuf_map = __skel->maps.ringbuf_map;		     \
 		__err = __bpftuner_bpf_init(tuner, ringbuf_map_fd);	     \
 		if (__err) {						     \
-			tuner_name##_tuner_bpf__destroy(skel);		     \
+			tuner_name##_tuner_bpf__destroy(__skel);	     \
 			return __err;					     \
 		}							     \
 		__skel->bss->tuner_id = bpftune_tuner_num();		     \

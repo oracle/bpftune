@@ -60,7 +60,7 @@ struct bpftuner {
 	const char *path;
 	void *handle;
 	const char *name;
-	void *tuner_bpf;
+	struct bpf_object_skeleton *skeleton;
 	void *skel;
 	int (*init)(struct bpftuner *tuner, int ringbuf_map_fd);
 	void (*fini)(struct bpftuner *tuner);

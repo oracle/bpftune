@@ -9,13 +9,14 @@
 
 struct cong_tuner_bpf *skel;
 
-int init(struct bpftuner *tuner, int perf_map_fd)
+int init(struct bpftuner *tuner, int ringbuf_map_fd)
 {
 	int prog_fd, cgroup_fd, err;
 	const char *cgroup_dir;
 
-	bpftuner_bpf_init(cong, tuner, perf_map_fd);
+	bpftuner_bpf_init(cong, tuner, ringbuf_map_fd);
 
+	skel = tuner->skel;
 	/* attach to root cgroup */
 	cgroup_dir = bpftune_cgroup_name();
 
@@ -24,8 +25,8 @@ int init(struct bpftuner *tuner, int perf_map_fd)
 		return 1;
 	}
 	cgroup_fd = bpftune_cgroup_fd();
-	skel = tuner->tuner_bpf;
-	prog_fd = bpf_program__fd(skel->progs.bpf_sockops);
+
+	prog_fd = bpf_program__fd(skel->progs.cong_sockops);
 
 	if (bpf_prog_attach(prog_fd, cgroup_fd,
 			    BPF_CGROUP_SOCK_OPS, BPF_F_ALLOW_MULTI)) {
@@ -41,8 +42,8 @@ int init(struct bpftuner *tuner, int perf_map_fd)
 void fini(struct bpftuner *tuner)
 {
 	bpftune_log(LOG_DEBUG, "calling fini for %s\n", tuner->name);
-	if (skel->progs.bpf_sockops) {
-		int prog_fd = bpf_program__fd(skel->progs.bpf_sockops);
+	if (skel->progs.cong_sockops) {
+		int prog_fd = bpf_program__fd(skel->progs.cong_sockops);
 		int cgroup_fd = bpftune_cgroup_fd();
 
 		bpf_prog_detach2(prog_fd, cgroup_fd, BPF_CGROUP_SOCK_OPS);

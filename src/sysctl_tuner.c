@@ -7,14 +7,13 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
-struct sysctl_tuner_bpf *skel;
-
-int init(struct bpftuner *tuner, int perf_map_fd)
+int init(struct bpftuner *tuner, int ringbuf_map_fd)
 {
+	struct sysctl_tuner_bpf *skel;
 	int prog_fd, cgroup_fd, err;
 	const char *cgroup_dir;
 
-	bpftuner_bpf_init(sysctl, tuner, perf_map_fd);
+	bpftuner_bpf_init(sysctl, tuner, ringbuf_map_fd);
 
 	/* attach to root cgroup */
 	cgroup_dir = bpftune_cgroup_name();
@@ -24,7 +23,7 @@ int init(struct bpftuner *tuner, int perf_map_fd)
 		return 1;
 	}
 	cgroup_fd = bpftune_cgroup_fd();
-	skel = tuner->tuner_bpf;
+	skel = tuner->skel;
 	prog_fd = bpf_program__fd(skel->progs.sysctl_write);
 
 	if (bpf_prog_attach(prog_fd, cgroup_fd,
@@ -34,6 +33,8 @@ int init(struct bpftuner *tuner, int perf_map_fd)
 			    cgroup_dir, strerror(-err));
 		return 1;
 	}
+	bpftune_log(LOG_DEBUG, "attached prog fd %d to cgroup fd %d\n",
+		    prog_fd, cgroup_fd);
 	/* set our pid so we can identify tuning events that come from
 	 * outside.
 	 */
@@ -44,12 +45,21 @@ int init(struct bpftuner *tuner, int perf_map_fd)
 
 void fini(struct bpftuner *tuner)
 {
+	struct sysctl_tuner_bpf *skel;
+	int err, prog_fd, cgroup_fd;
+
+	skel = tuner->skel;
+
 	bpftune_log(LOG_DEBUG, "calling fini for %s\n", tuner->name);
 	if (skel->progs.sysctl_write) {
-		int prog_fd = bpf_program__fd(skel->progs.sysctl_write);
-		int cgroup_fd = bpftune_cgroup_fd();
+		prog_fd = bpf_program__fd(skel->progs.sysctl_write);
+		cgroup_fd = bpftune_cgroup_fd();
 
-		bpf_prog_detach2(prog_fd, cgroup_fd, BPF_CGROUP_SYSCTL);
+		if (bpf_prog_detach2(prog_fd, cgroup_fd, BPF_CGROUP_SYSCTL)) {
+			err = -errno;
+			bpftune_log(LOG_ERR, "error detaching prog fd %d, cgroup fd %d: %s\n",
+				prog_fd, cgroup_fd, strerror(-err));
+		}
 	}
 	bpftuner_bpf_fini(tuner);
 }
