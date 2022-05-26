@@ -54,6 +54,7 @@ void fini(struct bpftuner *tuner)
 void event_handler(struct bpftuner *tuner, struct bpftune_event *event,
 		   __attribute__((unused))void *ctx)
 {
-	bpftune_log(LOG_DEBUG, "due to loss events, specified BBR congestoin control algorithm: (scenario %d) for tuner %s\n",
+	bpftune_log(LOG_INFO,
+		    "due to loss events, specified BBR congestoin control algorithm: (scenario %d) for tuner %s\n",
 		    event->str, event->scenario_id, tuner->name);
 }
