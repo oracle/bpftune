@@ -127,7 +127,7 @@ int main(int argc, char *argv[])
 	};
 	char *cgroup_dir = BPFTUNER_CGROUP_DIR;
 	char *library_dir = BPFTUNER_LIB_DIR;
-	int log_level = LOG_WARNING;
+	int log_level = LOG_INFO;
 	bool is_daemon = false;
 	bool use_stderr = false;
 	int interval = 100;

@@ -33,7 +33,8 @@ void bpftune_log_stderr(__attribute__((unused)) void *ctx,
 			__attribute__((unused)) int level,
 			const char *fmt, va_list args)
 {
-	vfprintf(stderr, fmt, args);
+	if (level <= bpftune_loglevel)
+		vfprintf(stderr, fmt, args);
 }
 
 void bpftune_log_syslog(__attribute__((unused)) void *ctx, int level,
@@ -52,7 +53,6 @@ void (*bpftune_logfn)(void *ctx, int level, const char *fmt, va_list args) =
 
 static void __bpftune_log(int level, const char *fmt, va_list args)
 {
-	if (level <= bpftune_loglevel)
 		bpftune_logfn(bpftune_log_ctx, level, fmt, args);
 }
 
@@ -61,7 +61,7 @@ void bpftune_log(int level, const char *fmt, ...)
 	va_list args;
 
 	va_start(args, fmt);
-	__bpftune_log(level, fmt, args);
+	bpftune_logfn(bpftune_log_ctx, level, fmt, args);
 	va_end(args);
 }
 

@@ -20,7 +20,7 @@ for TUNER in neigh_table ; do
 
    test_setup "true"
 
-   test_run_cmd_local "$BPFTUNE -d &" true
+   test_run_cmd_local "$BPFTUNE -ds &" true
 
    sleep $SLEEPTIME
    for SYSCTL in kernel.core_pattern net.ipv4.neigh.default.gc_thresh1 ; do
