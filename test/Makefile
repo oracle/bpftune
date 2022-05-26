@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0
 #
-# Copyright (c) 2019, Oracle and/or its affiliates. All rights reserved.
+# Copyright (c) 2022, Oracle and/or its affiliates. All rights reserved.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License version 2
@@ -9,7 +9,7 @@
 
 PERF_TESTS = iperf3_test qperf_test
 
-TUNER_TESTS = sysctl_test
+TUNER_TESTS = sysctl_test log_test
 
 DEFAULT_TESTS = $(TUNER_TESTS) $(PERF_TESTS)
 

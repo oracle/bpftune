@@ -178,7 +178,7 @@ test_setup_local()
 		echo "skipping netns setup, $NETNS already present"
 	fi
 	if [[ -f "$FIREWALL_CMD" ]]; then
-		$FIREWALL_CMD --add-port=${PORT}/tcp
+		$FIREWALL_CMD --add-port=${PORT}/tcp >/dev/null 2>&1
 	fi
 	test_run_cmd_local "$CMD" true
 }
