@@ -46,7 +46,7 @@ static __always_inline int tcpbpf_set_key(struct bpf_sock_ops *ops,
         return 0;
 }
 
-#define RETRANSMIT_THRESH       100
+#define RETRANSMIT_THRESH       500
 
 /* If we retransmitted to this host in the last hour, we've surpassed
  * retransmit threshold.
