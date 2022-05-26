@@ -16,8 +16,15 @@ SLEEPTIME=0.5
 
 for TUNER in neigh_table ; do
 
- for OPTIONS in "-ds" "-s" ; do
-   test_start "$0|log test: does setting $OPTIONS generate messages?"
+ for MODE in debug info ; do
+
+   if [[ $MODE == "debug" ]]; then
+	OPTIONS="-ds"
+   else
+	OPTIONS="-s"
+   fi
+
+   test_start "$0|log test: does setting $MODE logging generate messages?"
 
    test_setup "true"
 
