@@ -38,6 +38,7 @@ check_prog iperf3 iperf3
 export QPERF=$(which qperf 2>/dev/null)
 check_prog qperf qperf
 export FIREWALL_CMD=$(which firewall-cmd 2>/dev/null)
+export LOGFILE=${LOGFILE:-"/var/log/messages"}
 
 export B=$(tput -Tvt100 bold)
 export N=$(tput -Tvt100 sgr0)

@@ -99,8 +99,16 @@ int BPF_PROG(cong_retransmit, struct sock *sk, struct sk_buff *skb)
 	if (ret < 0)
 		return 0;
 	remote_host = bpf_map_lookup_elem(&remote_host_map, &key);
-	if (remote_host)
+	if (!remote_host) {
+		struct remote_host new_remote_host = {};
+		bpf_map_update_elem(&remote_host_map, &key, &new_remote_host, BPF_ANY);
+		remote_host = bpf_map_lookup_elem(&remote_host_map, &key);
+	}
+	if (remote_host) {
+		__bpf_printk("retransmit for remote host!!\n");
 		remote_host_retransmit(remote_host);
+	}
+	
 	return 0;
 }
 
@@ -117,16 +125,20 @@ int cong_sockops(struct bpf_sock_ops *ops)
 	switch (ops->op) {
 	case BPF_SOCK_OPS_ACTIVE_ESTABLISHED_CB:
 	case BPF_SOCK_OPS_PASSIVE_ESTABLISHED_CB:
-		if (!tcpbpf_set_key(ops, &key))
+		if (tcpbpf_set_key(ops, &key))
 			return 0;
 		break;
 	default:
 		return 0;
 	}
 
+	__bpf_printk("looking up remote host %x\n", key.s6_addr32[0]);
 	remote_host = bpf_map_lookup_elem(&remote_host_map, &key);
-	if (!remote_host)
+	if (!remote_host) {
+		__bpf_printk("remote host not found!\n");
 		return 0;
+	}
+	__bpf_printk("remote host found!!\n");
 
 	/* We have retransmitted to this host, so use BBR as congestion algorithm */
 	if (remote_host_retransmit_threshold(remote_host)) {
@@ -134,8 +146,9 @@ int cong_sockops(struct bpf_sock_ops *ops)
 				     &bbr, sizeof(bbr));
 		event.tuner_id = tuner_id;
 		event.scenario_id = 0;
-		__bpf_printk("bpf sockops (srtt_us %d), cong bbr result %d\n",
-			     ops->srtt_us, ret);
+		__builtin_memcpy(event.str, bbr, sizeof(bbr));
+		__bpf_printk("remote host %x (srtt_us %d), cong bbr result %d\n",
+			     key.s6_addr32[0], ops->srtt_us, ret);
 		bpf_ringbuf_output(&ringbuf_map, &event, sizeof(event), 0);
 	}
 	return 0;
