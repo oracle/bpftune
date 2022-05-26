@@ -79,6 +79,10 @@ void bpftune_set_log(int level,
 	if (logfn)
 		bpftune_logfn = logfn;
 	bpftune_loglevel = level;
+	if (logfn == bpftune_log_syslog) {
+		setlogmask(LOG_UPTO(level));
+                openlog("bpftune", LOG_NDELAY | LOG_PID, LOG_DAEMON);
+	}
 	if (level >= LOG_DEBUG)
 		libbpf_set_print(bpftune_printall);
 }

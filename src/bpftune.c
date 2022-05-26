@@ -128,12 +128,14 @@ int main(int argc, char *argv[])
 	char *cgroup_dir = BPFTUNER_CGROUP_DIR;
 	char *library_dir = BPFTUNER_LIB_DIR;
 	int log_level = LOG_WARNING;
+	bool is_daemon = false;
+	bool use_stderr = false;
 	int interval = 100;
 	int err, opt;
 
 	bin_name = argv[0];
 
-	while ((opt = getopt_long(argc, argv, "c:dDhl:V", options, NULL))
+	while ((opt = getopt_long(argc, argv, "c:dDhl:sV", options, NULL))
 		>= 0) {
 		switch (opt) {
 		case 'c':
@@ -148,12 +150,16 @@ int main(int argc, char *argv[])
 					strerror(errno));
 				return 1;
 			}
+			is_daemon = true;
 			break;
 		case 'h':
 			do_help();
 			return 0;
 		case 'l':
 			library_dir = optarg;
+			break;
+		case 's':
+			use_stderr = true;
 			break;
 		case 'V':
 			do_version();
@@ -165,7 +171,7 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	bpftune_set_log(log_level, bpftune_log_stderr);
+	bpftune_set_log(log_level, is_daemon || !use_stderr ? bpftune_log_syslog : bpftune_log_stderr);
 
 	if (init(cgroup_dir, library_dir))
 		exit(EXIT_FAILURE);
