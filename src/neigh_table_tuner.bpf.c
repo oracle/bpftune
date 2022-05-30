@@ -20,8 +20,10 @@ static __always_inline struct tbl_stats *get_tbl_stats(struct neigh_table *tbl, 
 		new_tbl_stats.family = tbl->family;
 		new_tbl_stats.entries = tbl->entries.counter;
 		new_tbl_stats.max = tbl->gc_thresh3;
-		if (dev)
+		if (dev) {
 			__builtin_memcpy(&new_tbl_stats.dev, dev->name, sizeof(new_tbl_stats.dev));
+			new_tbl_stats.ifindex = dev->ifindex;
+		}
 		bpf_map_update_elem(&tbl_map, &tbl, &new_tbl_stats, BPF_ANY);
 		tbl_stats = bpf_map_lookup_elem(&tbl_map, &tbl);
 		if (!tbl_stats)
@@ -51,8 +53,8 @@ int BPF_PROG(bpftune_neigh_create, struct neigh_table *tbl,
  	 * do take up table entries.
  	 */
 
-	__bpf_printk("neigh_create: dev %p tbl entries %d (%d gc)\n",
-		     dev, tbl_stats->entries, tbl_stats->gc_entries);
+	__bpf_printk("neigh_create: tbl entries %d (%d gc) %d max\n",
+		     tbl_stats->entries, tbl_stats->gc_entries, tbl->gc_thresh3);
 	//if (NEARLY_FULL(tbl_stats->entries, tbl_stats->max)) {
 	{	
 		event.tuner_id = tuner_id;

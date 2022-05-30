@@ -16,12 +16,12 @@ struct {
 } remote_host_map SEC(".maps");
 
 
-static __always_inline int tcpbpf_set_key(struct bpf_sock_ops *ops,
-					  struct in6_addr *key)
+static __always_inline int tcpbpf_get_addr(struct bpf_sock_ops *ops,
+					   struct sockaddr_in6 *sin6)
 {
-	__u32 *key_raddr = (__u32 *)key;
+	__u32 *addr = (__u32 *)&sin6->sin6_addr;
 
-	__builtin_memset(key, 0, sizeof(*key));
+	sin6->sin6_family = ops->family;
 
 	/* NB; the order of assignment matters here. Why? Because
 	 * the BPF verifier will optimize a load of two adjacent
@@ -31,13 +31,13 @@ static __always_inline int tcpbpf_set_key(struct bpf_sock_ops *ops,
 	 */
 	switch (ops->family) {
 	case AF_INET6:
-		key_raddr[3] = ops->remote_ip6[3];
-		key_raddr[1] = ops->remote_ip6[1];
-		key_raddr[0] = ops->remote_ip6[0];
-		key_raddr[2] = ops->remote_ip6[2];
+		addr[3] = ops->remote_ip6[3];
+		addr[1] = ops->remote_ip6[1];
+		addr[0] = ops->remote_ip6[0];
+		addr[2] = ops->remote_ip6[2];
 		break;
 	case AF_INET:
-		key_raddr[0] = ops->remote_ip4;
+		addr[0] = ops->remote_ip4;
 		break;
 	default:
 		return -EINVAL;
@@ -118,22 +118,23 @@ int cong_sockops(struct bpf_sock_ops *ops)
 	struct bpftune_event event = {};
 	char bbr[TCP_CA_NAME_MAX] = "bbr";
 	struct remote_host *remote_host;
-	struct in6_addr key;
+	struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)&event.raw_data;
+	struct in6_addr *key;
 	void *ctx;
 	int ret = 0;
 
 	switch (ops->op) {
 	case BPF_SOCK_OPS_ACTIVE_ESTABLISHED_CB:
 	case BPF_SOCK_OPS_PASSIVE_ESTABLISHED_CB:
-		if (tcpbpf_set_key(ops, &key))
+		if (tcpbpf_get_addr(ops, sin6))
 			return 0;
 		break;
 	default:
 		return 0;
 	}
 
-	__bpf_printk("looking up remote host %x\n", key.s6_addr32[0]);
-	remote_host = bpf_map_lookup_elem(&remote_host_map, &key);
+	key = &sin6->sin6_addr;
+	remote_host = bpf_map_lookup_elem(&remote_host_map, key);
 	if (!remote_host) {
 		__bpf_printk("remote host not found!\n");
 		return 0;
@@ -146,9 +147,8 @@ int cong_sockops(struct bpf_sock_ops *ops)
 				     &bbr, sizeof(bbr));
 		event.tuner_id = tuner_id;
 		event.scenario_id = 0;
-		__builtin_memcpy(event.str, bbr, sizeof(bbr));
 		__bpf_printk("remote host %x (srtt_us %d), cong bbr result %d\n",
-			     key.s6_addr32[0], ops->srtt_us, ret);
+			     key->s6_addr32[0], ops->srtt_us, ret);
 		bpf_ringbuf_output(&ringbuf_map, &event, sizeof(event), 0);
 	}
 	return 0;

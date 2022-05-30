@@ -21,7 +21,7 @@ clean: srcclean docclean
 srcclean:
 	cd src; make clean
 docclean:
-	cd Documentation; make clean
+	cd docs; make clean
 
 install: srcinstall docinstall
 	

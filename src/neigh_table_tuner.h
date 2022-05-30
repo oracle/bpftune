@@ -23,5 +23,6 @@ struct tbl_stats {
 	int entries;
 	int gc_entries;
 	int max;
+	int ifindex;
 	char dev[IFNAMSIZ];
 };

@@ -9,7 +9,8 @@ LLC ?= llc
 LLVM_STRIP ?= llvm-strip
 BPFTOOL ?= bpftool
 BPF_INCLUDE := /usr/local/include
-INCLUDES := -I../include -I$(BPF_INCLUDE) -I../include/uapi
+NL_INCLUDE := /usr/include/libnl3
+INCLUDES := -I../include -I$(BPF_INCLUDE) -I$(NL_INCLUDE) -I../include/uapi
 
 INSTALL ?= install
 
@@ -26,7 +27,7 @@ CFLAGS = -fPIC -Wall -Wextra -march=native -g -I../include -std=c99
 
 CFLAGS += -DBPFTUNE_VERSION='"$(BPFTUNE_VERSION)"'
 
-LDLIBS = -lbpf -ldl
+LDLIBS = -lbpf -ldl -lnl-route-3
 
 LDFLAGS += -L.
 
@@ -85,7 +86,7 @@ libbpftune: bpftune.c libbpftune.o
 	ln -s libbpftune.so.$(VERSION) libbpftune.so
 
 $(TUNERS): libbpftune $(TUNERS:%=%.bpf) $(TUNERS:%=%.skel.h)
-	$(CC) $(CFLAGS) -shared -o $(@).so $(@).c \
+	$(CC) $(CFLAGS) -shared $(INCLUDES) -o $(@).so $(@).c \
 		$(LDLIBS) -lbpftune $(LDFLAGS)
 
 libbpftune.o:

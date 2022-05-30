@@ -1,6 +1,7 @@
 #include <libbpftune.h>
 #include "cong_tuner.skel.h"
 
+#include <arpa/inet.h>
 #include <errno.h>
 #include <string.h>
 #include <sys/types.h>
@@ -54,7 +55,11 @@ void fini(struct bpftuner *tuner)
 void event_handler(struct bpftuner *tuner, struct bpftune_event *event,
 		   __attribute__((unused))void *ctx)
 {
+	struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)&event->raw_data;
+	char buf[INET6_ADDRSTRLEN];
+
+	inet_ntop(sin6->sin6_family, &sin6->sin6_addr, buf, sizeof(buf));
 	bpftune_log(LOG_INFO,
-		    "due to loss events, specified '%s' congestion control algorithm: (scenario %d) for tuner %s\n",
-		    event->str, event->scenario_id, tuner->name);
+		    "due to loss events for %s, specified 'bbr' congestion control algorithm: (scenario %d) for tuner %s\n",
+		    buf, event->scenario_id, tuner->name);
 }
