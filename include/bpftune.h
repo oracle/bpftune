@@ -44,6 +44,7 @@ struct bpftunable_update {
 };
 
 #define BPFTUNE_MAX_NAME	128
+#define BPFTUNE_MAX_DATA	128
 
 struct bpftune_event {
 	unsigned int tuner_id;
@@ -51,6 +52,7 @@ struct bpftune_event {
 	union {
 		struct bpftunable_update update[BPFTUNE_MAX_TUNABLES];
 		char str[BPFTUNE_MAX_NAME];
+		__u8 raw_data[BPFTUNE_MAX_DATA];
 	};
 };
 

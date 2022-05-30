@@ -13,6 +13,7 @@
 #include <bpf/bpf_tracing.h>
 #include <bpf/bpf_core_read.h>
 
+#define DEBUG
 /* don't want __bpf_printk()s slipping into production... */
 #ifndef DEBUG
 #undef __bpf_printk
@@ -58,10 +59,23 @@ unsigned int tuner_id;
 #define s6_addr32		in6_u.u6_addr32
 #endif
 
+/* TCP congestion algorithm tuning */
 #ifndef TCP_CA_NAME_MAX
 #define TCP_CA_NAME_MAX		16
+#endif
+
+/* neigh table tuning */
+#ifndef NUD_PERMANENT
+#define NUD_PERMANENT	0x80
+#endif
+#ifndef NTF_EXT_LEARNED
+#define NTF_EXT_LEARNED	0x10
 #endif
 
 #define SECOND	((__u64)1000000000)
 
 #define HOUR	(3600 * SECOND)
+
+/* 75% full */
+#define NEARLY_FULL(val, limit)	\
+	((val) >= ((limit) - ((limit) >> 2)))

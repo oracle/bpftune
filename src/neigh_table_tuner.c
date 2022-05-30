@@ -42,6 +42,12 @@ void fini(struct bpftuner *tuner)
 void event_handler(struct bpftuner *tuner, struct bpftune_event *event,
 		   __attribute__((unused))void *ctx)
 {
+	struct tbl_stats *tbl_stats = (struct tbl_stats *)&event->raw_data;
+
 	bpftune_log(LOG_DEBUG, "got scenario %d for tuner %s\n",
 		    event->scenario_id, tuner->name);
+	bpftune_log(LOG_DEBUG,
+		    "neigh_create: dev: %s tbl family %d entries %d (%d gc) max %d\n",
+		    tbl_stats->dev, tbl_stats->family, tbl_stats->entries, tbl_stats->gc_entries,
+		    tbl_stats->max);
 }
