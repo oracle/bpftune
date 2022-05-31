@@ -12,6 +12,8 @@ DESTDIR ?=
 prefix ?= /usr
 installprefix ?= $(DESTDIR)/$(prefix)
 
+INSTALLPATH = $(installprefix)
+
 .DELETE_ON_ERROR:
 
 .PHONY: all clean

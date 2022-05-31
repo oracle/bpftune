@@ -14,6 +14,12 @@ INCLUDES := -I../include -I$(BPF_INCLUDE) -I$(NL_INCLUDE) -I../include/uapi
 
 INSTALL ?= install
 
+DESTDIR ?=
+prefix ?= /usr
+installprefix = $(DESTDIR)/$(prefix)
+
+INSTALLPATH = $(installprefix)
+
 KERNEL_REL := $(shell uname -r)
 
 ifeq ($(BPFTUNE_VERSION),)
@@ -68,15 +74,14 @@ clean:
 	$(Q)$(RM) -r .output
 
 install: libbpftune.so bpftune bpftune.service
-	$(call QUIET_INSTALL, bpftune)
-	$(Q)$(INSTALL) -m 0755 -d $(DESTDIR)$(prefix)/sbin
-	$(Q)$(INSTALL) bpftune $(DESTDIR)$(prefix)/sbin/bpftune
-	$(Q)$(INSTALL) -m 0755 -d $(DESTDIR)$(prefix)/lib64
-	$(Q)$(INSTALL) libbpftune.so* $(DESTDIR)$(prefix)/lib64
-	$(Q)$(INSTALL) -m 0755 -d $(DESTDIR)/lib/systemd/system
-	$(Q)$(INSTALL) bpftune.service $(DESTDIR)/lib/systemd/system
-	$(Q)$(INSTALL) -m 0755 -d $(DESTDIR)$(prefix)/lib64/bpftune
-	$(Q)$(INSTALL) $(TUNER_LIBS) $(DESTDIR)$(prefix)/lib64/bpftune
+	$(INSTALL) -m 0755 -d $(INSTALLPATH)/sbin
+	$(INSTALL) bpftune $(INSTALLPATH)/sbin/bpftune
+	$(INSTALL) -m 0755 -d $(INSTALLPATH)/lib64
+	$(INSTALL) libbpftune.so* $(INSTALLPATH)/lib64
+	$(INSTALL) -m 0755 -d $(installprefix)/lib/systemd/system
+	$(INSTALL) bpftune.service $(installprefix)/lib/systemd/system
+	$(INSTALL) -m 0755 -d $(INSTALLPATH)/lib64/bpftune
+	$(INSTALL) $(TUNER_LIBS) $(INSTALLPATH)/lib64/bpftune
 
 bpftune: bpftune.c bpftune.o
 	$(QUIET_LINK)$(CC) $(CFLAGS) bpftune.o -o $@ \
@@ -85,7 +90,7 @@ bpftune: bpftune.c bpftune.o
 libbpftune.so: libbpftune.c libbpftune.o
 	$(CC) $(CFLAGS) -Wl,--version-script=$(VERSION_SCRIPT) \
 			-Wl,--soname,libbpftune.so.$(VERSION) \
-			-shared -o $@.$(VERSION) $(patsubst %.so,%.o,$(@)) \
+			-shared -o $(@).$(VERSION) $(patsubst %.so,%.o,$(@)) \
 			$(LDLIBS) $(LDFLAGS) ; \
 	rm -f libbpftune.so ; \
 	ln -s libbpftune.so.$(VERSION) libbpftune.so

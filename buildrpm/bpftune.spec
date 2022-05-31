@@ -37,19 +37,12 @@ rm -Rf %{buildroot}
 
 %files
 %defattr(-,root,root)
-%dir %attr(0555,root,root) %{_bpfdir}
-%dir %{_mandir}/man1
 %{_sbindir}/bpftune
 /lib/systemd/system/bpftune.service
 %{_libdir}/libbpftune.so
 %{_libdir}/libbpftune.so.1
-%{_libdir}/bpftune/cong_tuner.so
-%{_libdir}/bpftune/neigh_table_tuner.so
-%{_libdir}/bpftune/sysctl_tuner.so
-%{_mandir}/man8/bpftune.8.gz
-%{_mandir}/man8/bpftune-cong.8.gz
-%{_mandir}/man8/bpftune-neigh-table.8.gz
-%{_mandir}/man8/bpftune-sysctl.8.gz
+%{_libdir}/bpftune/*
+%{_mandir}/*/*
 
 %license LICENSE
 
