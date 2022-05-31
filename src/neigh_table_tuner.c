@@ -42,7 +42,7 @@ void fini(struct bpftuner *tuner)
 	bpftuner_bpf_fini(tuner);
 }
 
-static int set_gc_thresh3(struct tbl_stats *stats)
+static void set_gc_thresh3(struct tbl_stats *stats)
 {
 	char *tbl_name = stats->family == AF_INET ? "arp_cache" : "ndisc_cache";
 	/* Open raw socket for the NETLINK_ROUTE protocol */
@@ -56,7 +56,7 @@ static int set_gc_thresh3(struct tbl_stats *stats)
 
 	if (!sk) {
 		bpftune_log(LOG_ERR, "failed to alloc netlink socket\n");
-		return -1;
+		return;
 	}
 	nl_connect(sk, NETLINK_ROUTE);
 
@@ -102,29 +102,21 @@ out:
 	nl_socket_free(sk);
 
 	if (ret < 0) {
-		bpftune_log(LOG_ERR, "could not change neightbl for '%s': %s\n",
+		bpftune_log(LOG_ERR, "could not change neightbl for %s : %s\n",
 			    stats->dev, strerror(-ret));
 	} else {
-		bpftune_log(LOG_DEBUG, "updated gc_thresh3 for '%s' table, dev '%s' (ifindex %d) from %d to %d\n",
+		bpftune_log(LOG_DEBUG, "updated gc_thresh3 for %s table, dev '%s' (ifindex %d) from %d to %d\n",
 			    tbl_name, stats->dev, stats->ifindex,
 			    stats->max, new_gc_thresh3);
 	}
-
-	return ret < 0 ? ret : 0;
 }		
 
 void event_handler(struct bpftuner *tuner, struct bpftune_event *event,
 		   __attribute__((unused))void *ctx)
 {
 	struct tbl_stats *tbl_stats = (struct tbl_stats *)&event->raw_data;
-	int ret;
 
 	bpftune_log(LOG_DEBUG, "got scenario %d for tuner %s\n",
 		    event->scenario_id, tuner->name);
-	ret = set_gc_thresh3(tbl_stats);
-
-	bpftune_log(LOG_DEBUG,
-		    "neigh_create: dev: %s tbl family %d entries %d (%d gc) max %d ret: %d\n",
-		    tbl_stats->dev, tbl_stats->family, tbl_stats->entries,
-		    tbl_stats->gc_entries, tbl_stats->max, ret);
+	set_gc_thresh3(tbl_stats);
 }
