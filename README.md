@@ -49,6 +49,8 @@ behaviour.  The key benefit it provides are
 
 - congestion tuner: auto-tune choice of congestion control algorithm.
   See bpftune-cong (8).
+- neighbour table tuner: auto-tune neighbour table sizes by growing
+  tables when approaching full. See bpftune-neigh (8).
 - sysctl tuner: monitor sysctl setting and if it collides with an
   auto-tuned sysctl value, disable the associated tuner.  See
   bpftune-sysctl (8).
