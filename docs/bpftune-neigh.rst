@@ -12,7 +12,8 @@ DESCRIPTION
 ===========
         The neighbor table contains layer 3 -> layer 2 mappings and
         reachability information on remote systems.  We look up via
-        layer 3 address (IP address) to find layer 2 address associated.
+        layer 3 address (IP address) to find layer 2 address (MAC address)
+        associated.
 
         The table is populated with both static and garbage-collected values.
         When adding entries we can specify that they should be PERMANENT,
@@ -29,26 +30,23 @@ DESCRIPTION
           Can occur if garbage collection isn't run quickly enough
           or we are full with entries not subject to garbage collection.
 
-          In former case, auto-tune by reducing gc_thresh2 since this
-          will make GC run more quickly.  Algorithm used is to reduce
-          gc_thresh2 by 5% of the value between gc_thresh1 (below which
-          no GC happens) and gc_thresh2 (after which GC kicks in
-          after 5 sec). By doing this, we ensure garbage collection
-          happens well before table becomes full.
+          In former case, we could auto-tune by reducing gc_thresh2 since
+          this makes GC run more quickly.
 
           In the latter case, with a large number (75% or more) of
           exempt from GC entries, garbage collection won't help
           so we have to increase gc_thresh3. This is done on a per-table
           basis via netlink, so the resource costs are limitied rather
-          than setting a system-wide tunable.
+          than setting a system-wide tunable. Size is increased by
+          25% of the current value (so 1024 -> 1280, etc).
 
           Note that by increasing gc_thresh3 only, garbage collection gets
           gets more time to run from table sized gc_thresh2 until we
-          reach gc_thresh3.
+          reach gc_thresh3.  So it effectively helps with both scenarios.
 
         - neighbor table thrashing: too-aggressive GC eviction might lead
           to excessive overhead in re-estabilishing L3->L2 reachability
-          information.
+          information. TBD.
 
         Tunables:
 
