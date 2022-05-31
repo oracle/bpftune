@@ -38,9 +38,9 @@ rm -Rf %{buildroot}
 %files
 %defattr(-,root,root)
 %{_sbindir}/bpftune
-/lib/systemd/system/bpftune.service
+%{_unitdir}/bpftune.service
 %{_libdir}/libbpftune.so
-%{_libdir}/libbpftune.so.1
+%{_libdir}/libbpftune.so.0.1.1
 %{_libdir}/bpftune/*
 %{_mandir}/*/*
 

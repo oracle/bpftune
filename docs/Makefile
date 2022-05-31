@@ -10,7 +10,10 @@ else
   Q = @
 endif
 
-prefix ?= /usr/local
+DESTDIR ?=
+prefix ?= /usr/share
+installprefix = $(DESTDIR)/$(prefix)
+
 mandir ?= $(prefix)/man
 man8dir = $(mandir)/man8
 
