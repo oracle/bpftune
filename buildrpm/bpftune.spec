@@ -12,6 +12,7 @@ Requires:       libbpf >= 0.6
 Requires:       libnl3
 BuildRequires:  libbpf-devel >= 0.6
 BuildRequires:  libnl3-devel
+BuildRequires:  systemd-rpm-macros
 #BuildRequires:  clang >= 11
 #BuildRequires:  clang-libs >= 11
 #BuildRequires:  llvm >= 11
@@ -35,6 +36,15 @@ make
 rm -Rf %{buildroot}
 %make_install
 
+%post
+%systemd_post bpftune.service
+
+%preun
+%systemd_preun bpftune.service
+
+%postun
+%systemd_postun_with_restart bpftune.service
+
 %files
 %defattr(-,root,root)
 %{_sbindir}/bpftune
@@ -45,6 +55,7 @@ rm -Rf %{buildroot}
 %{_mandir}/*/*
 
 %license LICENSE
+
 
 %changelog
 * Mon May 30 2022 Alan Maguire <alan.maguire@oracle.com> - 0.1-1
