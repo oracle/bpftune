@@ -12,10 +12,10 @@ Requires:       libbpf >= 0.6
 Requires:       libnl3
 BuildRequires:  libbpf-devel >= 0.6
 BuildRequires:  libnl3-devel
-BuildRequires:  clang >= 11
-BuildRequires:  clang-libs >= 11
-BuildRequires:  llvm >= 11
-BuildRequires:  llvm-libs >= 11
+#BuildRequires:  clang >= 11
+#BuildRequires:  clang-libs >= 11
+#BuildRequires:  llvm >= 11
+#BuildRequires:  llvm-libs >= 11
 Version:        %{version}
 Release:        %{release}
 Source:         bpftune-%{version}.tar.bz2

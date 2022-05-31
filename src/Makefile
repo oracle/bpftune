@@ -25,9 +25,9 @@ VERSION_SCRIPT  := libbpftune.map
 
 CFLAGS = -fPIC -Wall -Wextra -march=native -g -I../include -std=c99
 
-CFLAGS += -DBPFTUNE_VERSION='"$(BPFTUNE_VERSION)"'
+CFLAGS += -DBPFTUNE_VERSION='"$(BPFTUNE_VERSION)"' $(INCLUDES)
 
-LDLIBS = -lbpf -ldl -lnl-route-3
+LDLIBS = -lbpf -ldl -lnl-3 -lnl-route-3
 
 LDFLAGS += -L.
 
@@ -47,16 +47,18 @@ endif
 
 TUNERS = neigh_table_tuner sysctl_tuner cong_tuner
 
-TUNER_OBJS = $(patsubst %,%.so,$(TUNERS))
+TUNER_OBJS = $(patsubst %,%.o,$(TUNERS))
+TUNER_LIBS = $(patsubst %,%.so,$(TUNERS))
 
-BPF_TUNERS = $(patsubst %,%.bpf,$(TUNERS))
+BPF_TUNERS = $(patsubst %,%.bpf.o,$(TUNERS))
 
 BPF_SKELS = $(patsubst %,%.skel.h,$(TUNERS))
 
 .DELETE_ON_ERROR:
 
-.PHONY: all clean bpftune
-all: bpftune $(TUNERS)
+.PHONY: clean
+
+all: bpftune $(TUNER_LIBS)
 	
 clean:
 	$(call QUIET_CLEAN, bpftune)
@@ -65,50 +67,51 @@ clean:
 	$(Q)$(RM) bpftune
 	$(Q)$(RM) -r .output
 
-install: libbpftune bpftune bpftune.service
+install: libbpftune.so bpftune bpftune.service
 	$(call QUIET_INSTALL, bpftune)
 	$(Q)$(INSTALL) -m 0755 -d $(DESTDIR)$(prefix)/sbin
 	$(Q)$(INSTALL) bpftune $(DESTDIR)$(prefix)/sbin/bpftune
+	$(Q)$(INSTALL) -m 0755 -d $(DESTDIR)$(prefix)/lib64
 	$(Q)$(INSTALL) libbpftune.so* $(DESTDIR)$(prefix)/lib64
+	$(Q)$(INSTALL) -m 0755 -d $(DESTDIR)/lib/systemd/system
 	$(Q)$(INSTALL) bpftune.service $(DESTDIR)/lib/systemd/system
 	$(Q)$(INSTALL) -m 0755 -d $(DESTDIR)$(prefix)/lib64/bpftune
-	$(Q)$(INSTALL) $(TUNER_OBJS) $(DESTDIR)$(prefix)/lib64/bpftune
+	$(Q)$(INSTALL) $(TUNER_LIBS) $(DESTDIR)$(prefix)/lib64/bpftune
 
-bpftune: bpftune.c bpftune.o libbpftune
+bpftune: bpftune.c bpftune.o
 	$(QUIET_LINK)$(CC) $(CFLAGS) bpftune.o -o $@ \
-		$(LDFLAGS) $(LDLIBS) -lbpftune
+	$(LDFLAGS) $(LDLIBS) -lbpftune
 
-libbpftune: bpftune.c libbpftune.o
+libbpftune.so: libbpftune.c libbpftune.o
 	$(CC) $(CFLAGS) -Wl,--version-script=$(VERSION_SCRIPT) \
 			-Wl,--soname,libbpftune.so.$(VERSION) \
-			-shared -o $@.so.$(VERSION) $(@).o \
-			$(LDLIBS) $(LDFLAGS)
-	rm -f libbpftune.so
+			-shared -o $@.$(VERSION) $(patsubst %.so,%.o,$(@)) \
+			$(LDLIBS) $(LDFLAGS) ; \
+	rm -f libbpftune.so ; \
 	ln -s libbpftune.so.$(VERSION) libbpftune.so
 
-$(TUNERS): libbpftune $(TUNERS:%=%.bpf) $(TUNERS:%=%.skel.h)
-	$(CC) $(CFLAGS) -shared $(INCLUDES) -o $(@).so $(@).c \
+$(TUNER_LIBS): libbpftune.so $(BPF_SKELS) $(TUNER_OBJS)
+	$(CC) $(CFLAGS) -shared -o $(@) $(patsubst %.so,%.c,$(@)) \
 		$(LDLIBS) -lbpftune $(LDFLAGS)
 
 libbpftune.o:
-	$(QUIET_CC)$(CC) $(CFLAGS) $(INCLUDES) -c libbpftune.c -o $@
+	$(QUIET_CC)$(CC) $(CFLAGS) -c libbpftune.c -o $@
 
-bpftune.o: libbpftune.o
-	$(QUIET_CC)$(CC) $(CFLAGS) $(INCLUDES) -c bpftune.c -o $@
+bpftune.o: libbpftune.so
+	$(QUIET_CC)$(CC) $(CFLAGS) -c bpftune.c -o $@
 
 %.skel.h: %.bpf.o
 	$(QUIET_GEN)$(BPFTOOL) gen skeleton $< > $@
 
 $(BPF_TUNERS): vmlinux.h
 	$(CLANG) -g -D__TARGET_ARCH_$(SRCARCH) -O2 -target bpf			\
-		$(INCLUDES) -c $(@).c -o $(@).o &&		\
-	$(LLVM_STRIP) -g $(@).o
+		$(INCLUDES) -c $(patsubst %.o,%.c,$(@)) -o $(@)
 
 $(BPF_SKELS): $(BPF_TUNERS)
 	$(BPFTOOL) gen skeleton $(subst .skel.h,.bpf.o,$@) > $@
 
 
-vmlinux.h: $(VMLINUX_BTF_PATH)
+vmlinux.h:
 	if [ ! -e "$(VMLINUX_BTF_PATH)" ] ; then \
 		echo "Couldn't find kernel BTF; set VMLINUX_BTF to"	       \
 			"specify its location." >&2;			       \
