@@ -71,7 +71,8 @@ install: libbpftune bpftune bpftune.service
 	$(Q)$(INSTALL) bpftune $(DESTDIR)$(prefix)/sbin/bpftune
 	$(Q)$(INSTALL) libbpftune.so* $(DESTDIR)$(prefix)/lib64
 	$(Q)$(INSTALL) bpftune.service $(DESTDIR)/lib/systemd/system
-	$(Q)$(INSTALL) $(TUNER_OBJS) $(DESTDIR)$(prefix)/lib64
+	$(Q)$(INSTALL) -m 0755 -d $(DESTDIR)$(prefix)/lib64/bpftune
+	$(Q)$(INSTALL) $(TUNER_OBJS) $(DESTDIR)$(prefix)/lib64/bpftune
 
 bpftune: bpftune.c bpftune.o libbpftune
 	$(QUIET_LINK)$(CC) $(CFLAGS) bpftune.o -o $@ \
