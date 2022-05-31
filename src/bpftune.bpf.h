@@ -79,3 +79,4 @@ unsigned int tuner_id;
 /* 75% full */
 #define NEARLY_FULL(val, limit)	\
 	((val) >= ((limit) - ((limit) >> 2)))
+

@@ -29,6 +29,9 @@
 
 #define BPFTUNE_PROC_SYS		"/proc/sys/"
 
+/* grow by 25% */
+#define BPFTUNE_GROW_BY_QUARTER(val)	((val) + ((val) >> 2))
+
 void bpftune_log(int level, const char *fmt, ...);
 
 void bpftune_log_stderr(void *ctx, int level, const char *fmt, va_list args);

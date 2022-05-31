@@ -52,11 +52,7 @@ int BPF_PROG(bpftune_neigh_create, struct neigh_table *tbl,
 	/* exempt from gc entries are not subject to space constraints, but
  	 * do take up table entries.
  	 */
-
-	__bpf_printk("neigh_create: tbl entries %d (%d gc) %d max\n",
-		     tbl_stats->entries, tbl_stats->gc_entries, tbl->gc_thresh3);
-	//if (NEARLY_FULL(tbl_stats->entries, tbl_stats->max)) {
-	{	
+	if (NEARLY_FULL(tbl_stats->entries, tbl_stats->max)) {
 		event.tuner_id = tuner_id;
 		__builtin_memcpy(&event.raw_data, tbl_stats, sizeof(*tbl_stats));
 		bpf_ringbuf_output(&ringbuf_map, &event, sizeof(event), 0);

@@ -45,51 +45,72 @@ void fini(struct bpftuner *tuner)
 static int set_gc_thresh3(struct tbl_stats *stats)
 {
 	char *tbl_name = stats->family == AF_INET ? "arp_cache" : "ndisc_cache";
-	struct rtnl_neightbl *old = NULL, *new = NULL;
-	struct nl_cache *cache;
 	/* Open raw socket for the NETLINK_ROUTE protocol */
-	struct nl_sock *nl_sock = nl_socket_alloc();
+	struct nl_sock *sk = nl_socket_alloc();
+	struct ndtmsg ndt = {
+                .ndtm_family = stats->family,
+        };
+	struct nl_msg *m = NULL, *parms = NULL;
+	int new_gc_thresh3;
 	int ret;
 
-	if (!nl_sock) {
+	if (!sk) {
 		bpftune_log(LOG_ERR, "failed to alloc netlink socket\n");
 		return -1;
 	}
-	nl_connect(nl_sock, NETLINK_ROUTE);
+	nl_connect(sk, NETLINK_ROUTE);
 
-	ret = rtnl_neightbl_alloc_cache(nl_sock, &cache);
-	if (ret) {
-		bpftune_log(LOG_ERR, "could not alloc neightbl cache: %s\n",
-			    strerror(-ret));
+	/* it would be nice if we could simply call rtnl_neightbl_change()
+	 * here but it has a bug; it doesn't set gc_thresh3 (copy-and-paste
+	 * sets gc_thresh2 twice); instead roll our own...
+	 */
+	m = nlmsg_alloc_simple(RTM_SETNEIGHTBL, 0);
+	if (!m) {
+		ret = -ENOMEM;
 		goto out;
 	}
-	old = rtnl_neightbl_get(cache, tbl_name, stats->ifindex);
-	if (ret) {
-		bpftune_log(LOG_ERR, "could not alloc neightbl cache: %s\n",
-			    strerror(-ret));
+
+	ret = nlmsg_append(m, &ndt, sizeof(ndt), NLMSG_ALIGNTO);
+	if (ret < 0)
+		goto out;
+
+	NLA_PUT_STRING(m, NDTA_NAME, tbl_name);
+
+	new_gc_thresh3 = BPFTUNE_GROW_BY_QUARTER(stats->max);
+	NLA_PUT_U32(m, NDTA_THRESH3, new_gc_thresh3);
+
+	parms = nlmsg_alloc();
+	if (!parms) {
+		ret = -ENOMEM;
 		goto out;
 	}
-	new = rtnl_neightbl_alloc();
-	rtnl_neightbl_set_family(new, stats->family);
-	rtnl_neightbl_set_name(new, tbl_name);
-	rtnl_neightbl_set_dev(new, stats->ifindex);
-	rtnl_neightbl_set_gc_tresh3(new, stats->max + 1);
 
-	ret = rtnl_neightbl_change(nl_sock, old, new);
-	if (ret) {
+	NLA_PUT_U32(parms, NDTPA_IFINDEX, stats->ifindex);
+
+	ret = nla_put_nested(m, NDTA_PARMS, parms);
+	if (ret < 0)
+		goto out;
+
+	ret = nl_send_auto_complete(sk, m);
+
+nla_put_failure:
+out:
+	if (parms)
+		nlmsg_free(parms);
+	if (m)
+		nlmsg_free(m);
+	nl_socket_free(sk);
+
+	if (ret < 0) {
 		bpftune_log(LOG_ERR, "could not change neightbl for '%s': %s\n",
 			    stats->dev, strerror(-ret));
 	} else {
-		bpftune_log(LOG_DEBUG, "updated gc_thresh3 for '%s' table, dev '%s' (ifindex %d)\n",
-			    tbl_name, stats->dev, stats->ifindex);
+		bpftune_log(LOG_DEBUG, "updated gc_thresh3 for '%s' table, dev '%s' (ifindex %d) from %d to %d\n",
+			    tbl_name, stats->dev, stats->ifindex,
+			    stats->max, new_gc_thresh3);
 	}
-	
-out:
-	nl_socket_free(nl_sock);
-	rtnl_neightbl_put(old);
-	rtnl_neightbl_put(new);
 
-	return ret;
+	return ret < 0 ? ret : 0;
 }		
 
 void event_handler(struct bpftuner *tuner, struct bpftune_event *event,
