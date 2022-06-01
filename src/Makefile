@@ -83,7 +83,7 @@ install: libbpftune.so bpftune bpftune.service
 	$(INSTALL) -m 0755 -d $(INSTALLPATH)/lib64/bpftune
 	$(INSTALL) $(TUNER_LIBS) $(INSTALLPATH)/lib64/bpftune
 
-bpftune: bpftune.c bpftune.o
+bpftune: bpftune.c bpftune.o libbpftune.so
 	$(QUIET_LINK)$(CC) $(CFLAGS) bpftune.o -o $@ \
 	$(LDFLAGS) $(LDLIBS) -lbpftune
 

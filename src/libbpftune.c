@@ -375,7 +375,7 @@ int bpftune_sysctl_write(const char *name, __u8 num_values, long *values)
 	bpftune_sysctl_name_to_path(name, path, sizeof(path));
 
 	/* If value is already set to val, do nothing. */
-	old_num_values = bpftune_sysctl_read(path, old_values);
+	old_num_values = bpftune_sysctl_read(name, old_values);
 	if (err)
 		return err;
 	if (num_values == old_num_values) {
