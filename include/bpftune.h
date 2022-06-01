@@ -7,6 +7,9 @@
 /* max # of tunables per tuner */
 #define BPFTUNE_MAX_TUNABLES		10
 
+/* grow by 25% */
+#define BPFTUNE_GROW_BY_QUARTER(val)    ((val) + ((val) >> 2))
+
 enum bpftunable_type {
 	BPFTUNABLE_SYSCTL,
 	BPFTUNABLE_CONGESTION_CONTROL,
@@ -39,18 +42,20 @@ struct bpftunable {
 
 struct bpftunable_update {
 	unsigned int id;
-	__s64 old;
-	__s64 new;
+	__s64 old[BPFTUNE_MAX_VALUES];
+	__s64 new[BPFTUNE_MAX_VALUES];
 };
 
 #define BPFTUNE_MAX_NAME	128
 #define BPFTUNE_MAX_DATA	128
 
+#define BPFTUNE_MAX_UPDATES	4
+
 struct bpftune_event {
 	unsigned int tuner_id;
 	unsigned int scenario_id;
 	union {
-		struct bpftunable_update update[BPFTUNE_MAX_TUNABLES];
+		struct bpftunable_update update[BPFTUNE_MAX_UPDATES];
 		char str[BPFTUNE_MAX_NAME];
 		__u8 raw_data[BPFTUNE_MAX_DATA];
 	};

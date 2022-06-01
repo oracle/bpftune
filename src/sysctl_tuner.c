@@ -85,7 +85,7 @@ void event_handler(struct bpftuner *tuner, struct bpftune_event *event,
 				bpftune_log(LOG_INFO,
 					    "user modified sysctl '%s' that tuner '%s' uses; disabling '%s'!\n",
 					    event->str, t->name, t->name);
-				bpftuner_fini(tuner, BPFTUNE_MANUAL);
+				bpftuner_fini(t, BPFTUNE_MANUAL);
 				break;
 			}
 		}

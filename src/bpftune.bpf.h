@@ -54,6 +54,7 @@ unsigned int tuner_id;
 #define sk_state		__sk_common.skc_state
 #define sk_daddr		__sk_common.skc_daddr
 #define sk_v6_daddr		__sk_common.skc_v6_daddr
+#define sk_net			__sk_common.skc_net
 
 #ifndef s6_addr32
 #define s6_addr32		in6_u.u6_addr32
