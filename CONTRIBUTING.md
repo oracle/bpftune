@@ -73,7 +73,30 @@ global variables.  All tuners should call
 bpftuner_bpf_init(tuner_name, ringbuf_map_fd);
 ```
 
-...since this loads the associated BPF skeleton.
+...since this loads the associated BPF skeleton.  In addition, if
+the tuner auto-tunes any sysctls, an array of "struct bpftunable_desc":
+
+```
+struct bpftunable_desc {
+        unsigned int id;
+        enum bpftunable_type type;
+        const char *name;
+        __u8 num_values;
+};
+```
+
+...should be added naming them, and
+
+```
+	bpftuner_tunables_init(tuner, num_descs, descs);
+```
+
+...should be called.  This informs bpftune so that if the sysctl
+tuner sees a modification of a sysctl that should be auto-tuned,
+we can disable the associated tuner.  So for example if the
+neigh_table_tuner manages sysctl "net.ipv4.neigh.default.gc_thresh3",
+so if the sysctl BPF program sees it being modified, we can disable
+the associated neigh_table_tuner.
 
 If any data structures are common across userspace and BPF, they
 should be added to a tuner_name.h file which both include.
