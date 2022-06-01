@@ -12,9 +12,7 @@ The architecture used is
 
 Tuners are added as plug-in .so objects built as tuner_name.c, and each tuner
 has a BPF program named tuner_name.bpf.c.  To add a new tuner, add these
-files, with tuner_name.bpf.c.
-
-To add a new tuner, simply add tuner_name to TUNERS in src/Makefile.
+files and simply add tuner_name to TUNERS in src/Makefile.
 
 # BPF component (tuner_name.bpf.c)
 
@@ -51,7 +49,7 @@ in that object which identify the tuner source.  The tuner id
 in the ringbuf event allows us to call the event handler callback
 in the appropriate tuner.
 
-# Userspace component - tuner.c
+# Userspace component - tuner_name.c
 
 It should #include <libbpftune.h>, and must consist of the following
 functions
@@ -78,7 +76,7 @@ bpftuner_bpf_init(tuner_name, ringbuf_map_fd);
 ...since this loads the associated BPF skeleton.
 
 If any data structures are common across userspace and BPF, they
-should be added to a tuner.h file which both include.
+should be added to a tuner_name.h file which both include.
 
 # Events
 
@@ -100,4 +98,8 @@ struct bpftune_event {
 The scenario refers to the event type (seen packet loss to remote
 system), and the payload can be a string, a raw data structure etc.
 
+# Overhead
 
+When choosing BPF events to instrument, please try to avoid very
+high-frequency events.  Try to use fentry instead of kprobe,
+tp_btf instead of tracepoint etc as these perform much better.
