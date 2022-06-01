@@ -2,11 +2,11 @@
 
 The architecture used is
 
-- a core daemon, bpftune;
+- a core daemon, src/bpftune.c
 - a library, libbpftune which consists of functions used by core daemon
-  and tuners, such as logging, BPF setup etc;
+  and tuners, such as logging, BPF setup etc, src/libbpftune.c; and
 - a set of plug-in shared object tuners which are loaded when bpftune
-  starts
+  starts; sysctl_tuner.[bpf.]c, neigh_table_tuner.[bpf.]c
 
 # Adding a tuner
 
