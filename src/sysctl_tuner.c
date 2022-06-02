@@ -67,7 +67,7 @@ void fini(struct bpftuner *tuner)
 void event_handler(struct bpftuner *tuner, struct bpftune_event *event,
 		   __attribute__((unused))void *ctx)
 {
-	struct bpftuner *t;
+	struct bpftuner *t = NULL;
 
 	bpftune_log(LOG_DEBUG, "sysctl write for '%s' (scenario %d) for tuner %s\n",
 		    event->str, event->scenario_id, tuner->name);
@@ -75,12 +75,15 @@ void event_handler(struct bpftuner *tuner, struct bpftune_event *event,
 	bpftune_for_each_tuner(t) {
 		struct bpftunable *tunable;
 
+		bpftune_log(LOG_DEBUG, "checking tuner %s\n", tuner->name);
 		bpftuner_for_each_tunable(t, tunable) {
 			char path[512];
 
 			bpftune_sysctl_name_to_path(tunable->desc.name, path,
 						    sizeof(path));
 
+			bpftune_log(LOG_DEBUG, "checking path %s against %s\n",
+				    path, event->str);
 			if (strstr(path, event->str)) {
 				bpftune_log(LOG_INFO,
 					    "user modified sysctl '%s' that tuner '%s' uses; disabling '%s'!\n",

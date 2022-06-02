@@ -7,7 +7,7 @@
 
 struct neigh_table_tuner_bpf *skel;
 
-struct bpftunable_desc descs[] = {
+static struct bpftunable_desc descs[] = {
 { NEIGH_TABLE_IPV4_GC_INTERVAL,		BPFTUNABLE_SYSCTL,
   		"net.ipv4.neigh.default.gc_interval",	1 },
 { NEIGH_TABLE_IPV4_GC_STALE_TIME,	BPFTUNABLE_SYSCTL,

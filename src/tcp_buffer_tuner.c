@@ -4,7 +4,7 @@
 
 struct tcp_buffer_tuner_bpf *skel;
 
-struct bpftunable_desc descs[] = {
+static struct bpftunable_desc descs[] = {
 { TCP_BUFFER_TCP_WMEM,			BPFTUNABLE_SYSCTL,
   		"net.ipv4.tcp_wmem",	3 },
 };

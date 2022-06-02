@@ -126,3 +126,10 @@ system), and the payload can be a string, a raw data structure etc.
 When choosing BPF events to instrument, please try to avoid very
 high-frequency events.  Try to use fentry instead of kprobe,
 tp_btf instead of tracepoint etc as these perform much better.
+
+# Tests
+
+Tests are mandatory for tuners; in the test directory you can see
+lots of examples.  The test framework uses network namespaces to
+support iperf3 runs within the same system.  Tests should validate
+tuning behaviour works, and ideally improves performance.

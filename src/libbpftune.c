@@ -420,6 +420,7 @@ int bpftuner_tunables_init(struct bpftuner *tuner, unsigned int num_descs,
 	for (i = 0; i < num_descs; i++) {
 		int num_values;
 
+		bpftune_log(LOG_DEBUG, "handling desc %ld/%ld\n", i, num_descs);
 		memcpy(&tuner->tunables[i].desc, &descs[i], sizeof(*descs));
 
 		if (descs[i].type != BPFTUNABLE_SYSCTL) {
