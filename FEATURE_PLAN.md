@@ -1,4 +1,4 @@
-# Plan for features, completed and to-do
+# Plan for features, completed, to-do and possible future work
 
 ## Completed tasks (June 3 2022)
 
@@ -7,6 +7,7 @@
  - add support for adding tuners dynamically via shared object
  - add support for adding BPF programs via skeleton
  - add support for specifying tunables associated with tuner
+ - bpftune systemd service specification
 
 ### sysctl tuner
  - add support for dynamically disabling relevant tuner if tunables change
@@ -29,6 +30,9 @@
    tcp_wmem[2] max buffer size; if so increase buffer size to
    accommodate more data since app needs more space. (tested)
  
+### Packaging
+ - added a "make pkg" target which creates rpm
+
 ### Test suite
 
  - tests should validate core features and tunable behaviour
@@ -45,6 +49,8 @@
   design constraints
 
 ## To do tasks
+
+### set up project packaging and signing (end June 2022)
 
 ### container-specific tuning (end June 2022)
 
@@ -84,8 +90,18 @@ as well as the global namespace.
 
 - look at gc frequency and churn; optimize this also?
 
+- should we enable drop_gratuitous_arp if we see a lot of
+  entries added?
+
 ### tcp tuner
  - initial snd buffer sizing; tune by service/remote system
    to optimize?
  - look at SO_[SND|RCV]BPF setting; does that need to be
    overridden?
+
+
+## Future work
+
+- kernel tunables (numa balancing, pid max, threads_max, etc)
+- vm tunables?
+
