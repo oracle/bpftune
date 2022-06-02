@@ -1,6 +1,6 @@
-# Features to add
+# Plan for features, completed and to-do
 
-## Completed tasks
+## Completed tasks (June 3 2022)
 
 ### Basic bpftune framework support
  - add configurable logging support syslog/stdout (tested)
@@ -29,10 +29,24 @@
    tcp_wmem[2] max buffer size; if so increase buffer size to
    accommodate more data since app needs more space. (tested)
  
+### Test suite
+
+ - tests should validate core features and tunable behaviour
+
+ - tests should run quickly (<5min)
+
+ - tests should not require remote system to run (use netns)
+
+### Documentation
+
+- document bpftune + options with manual page
+- document each tuner with manual page
+- add CONTRIBUTING.md to describe how to contribute, goals and key
+  design constraints
 
 ## To do tasks
 
-### container-specific tuning
+### container-specific tuning (end June 2022)
 
 We want bpftune to be able to handle auto-tuning for containers
 as well as the global namespace.
@@ -63,7 +77,10 @@ as well as the global namespace.
  - need infrastructure to set tunables on a per-netns basis,
    both netlink and sysctl.
 
-### neigh table tuner
+ - catch namespace creation, pair to cgroup and create bpftune
+   instance automatically
+
+### neigh table tuner (end July 2022)
 
 - look at gc frequency and churn; optimize this also?
 
