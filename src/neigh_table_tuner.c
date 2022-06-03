@@ -111,12 +111,11 @@ out:
 	}
 }		
 
-void event_handler(struct bpftuner *tuner, struct bpftune_event *event,
+void event_handler(__attribute__((unused))struct bpftuner *tuner,
+		   struct bpftune_event *event,
 		   __attribute__((unused))void *ctx)
 {
 	struct tbl_stats *tbl_stats = (struct tbl_stats *)&event->raw_data;
 
-	bpftune_log(LOG_DEBUG, "got scenario %d for tuner %s\n",
-		    event->scenario_id, tuner->name);
 	set_gc_thresh3(tbl_stats);
 }

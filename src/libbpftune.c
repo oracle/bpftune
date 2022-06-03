@@ -272,8 +272,10 @@ static int bpftune_ringbuf_event_read(void *ctx, void *data, size_t size)
 		bpftune_log(LOG_ERR, "no tuner for id %d\n", event->tuner_id);
 		return 0;
 	}
-	bpftune_log(LOG_DEBUG, "event[%d] for tuner %s[%d]\n",
-		    event->tuner_id, tuner->name, tuner->id);
+	bpftune_log(LOG_DEBUG,
+		    "event scenario [%d] for tuner %s[%d] netns %ld\n",
+		    event->scenario_id, tuner->name, tuner->id,
+		    event->netns_cookie);
 	tuner->event_handler(tuner, event, ctx);
 
 	return 0;
@@ -496,18 +498,18 @@ static int bpftune_netns_fd(int netns_pid)
 /* returns original netns fd */
 int bpftune_netns_set(int fd)
 {
-	int ret;
+	int ret, err;
 
 	if (!fd)
 		return 0;
-	ret = setns(fd, CLONE_NEWNET);
-	if (ret) {
+	ret = open("/proc/self/ns/net", O_RDONLY);
+	if (ret < 0) {
 		ret = -errno;
-		bpftune_log(LOG_ERR, "could not setns(%d): %s\n",
+		bpftune_log(LOG_ERR, "could not get current netns fd(%d): %s\n",
 			    fd, strerror(-ret));
 	} else {
-		ret = open("/proc/self/ns/net", O_RDONLY);
-		if (ret < 0) {
+		err = setns(fd, CLONE_NEWNET);
+		if (err < 0) {
 			ret = -errno;
 			bpftune_log(LOG_ERR, "could not setns(%d): %s\n",
 				    fd, strerror(-ret));
@@ -581,8 +583,9 @@ int bpftune_netns_info(int pid, int *fd, unsigned long *cookie)
 	return ret;
 }
 
-int bpftune_netns_fd_from_cookie(unsigned long cookie)
+static int bpftune_netns_find(unsigned long cookie)
 {
+	struct bpftuner *t;
 	struct mntent *ent;
         FILE *mounts;
 	struct dirent *dirent;
@@ -606,6 +609,13 @@ int bpftune_netns_fd_from_cookie(unsigned long cookie)
 			continue;
 		if (bpftune_netns_info(pid, &netns_fd, &netns_cookie))
 			continue;
+
+		if (cookie == 0) {
+			close(netns_fd);
+			bpftune_for_each_tuner(t)
+				bpftuner_netns_init(t, netns_cookie);
+			continue;
+		}
 		if (netns_cookie == cookie) {
 			ret = netns_fd;
 			break;
@@ -642,6 +652,13 @@ int bpftune_netns_fd_from_cookie(unsigned long cookie)
 		}
 		bpftune_log(LOG_DEBUG, "found netns fd via mnt %s\n",
 			    ent->mnt_dir);
+		if (cookie == 0) {
+			close(mntfd);
+			bpftune_for_each_tuner(t)
+                                bpftuner_netns_init(t, cookie);
+			ret = 0;
+			continue;
+		}
 		ret = mntfd;
 		break;
 	}
@@ -650,9 +667,22 @@ int bpftune_netns_fd_from_cookie(unsigned long cookie)
         return ret;
 }
 
-void bpftuner_netns_init(struct bpftuner *tuner, int fd, unsigned long cookie)
+int bpftune_netns_fd_from_cookie(unsigned long cookie)
+{
+	return bpftune_netns_find(cookie);
+}
+
+int bpftune_netns_init_all(void)
+{
+	return bpftune_netns_find(0);
+}
+
+void bpftuner_netns_init(struct bpftuner *tuner, unsigned long cookie)
 {
 	struct bpftuner_netns *netns, *new = NULL;
+
+	if (bpftuner_netns_from_cookie(tuner->id, cookie))
+		return;
 
 	for (netns = &tuner->netns; netns->next != NULL; netns = netns->next) {}
 
@@ -662,7 +692,6 @@ void bpftuner_netns_init(struct bpftuner *tuner, int fd, unsigned long cookie)
 			    strerror(errno));
 	} else {
 		new->netns_cookie = cookie;
-		new->netns_fd = fd;
 		netns->next = new;
 	}
 }
@@ -677,7 +706,6 @@ void bpftuner_netns_fini(struct bpftuner *tuner, unsigned long cookie)
 				prev->next = netns->next;
 			else
 				tuner->netns.next = netns->next;
-			close(netns->netns_fd);
 			return;
 		}
 		prev = netns;

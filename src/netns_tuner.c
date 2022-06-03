@@ -19,15 +19,13 @@ void fini(struct bpftuner *tuner)
 	bpftuner_bpf_fini(tuner);
 }
 
-void event_handler(struct bpftuner *tuner, struct bpftune_event *event,
+void event_handler(__attribute__((unused))struct bpftuner *tuner,
+		   struct bpftune_event *event,
 		   __attribute__((unused))void *ctx)
 {
 	unsigned long netns_cookie;
 	int netns_fd = 0, ret;
 	struct bpftuner *t;
-
-	bpftune_log(LOG_DEBUG, "got scenario %d for tuner %s\n",
-		    event->scenario_id, tuner->name);
 
 	switch (event->scenario_id) {
 	case NETNS_SCENARIO_CREATE:
@@ -48,7 +46,8 @@ void event_handler(struct bpftuner *tuner, struct bpftune_event *event,
 		bpftune_log(LOG_DEBUG, "got netns fd %d for cookie %ld\n",
 			    netns_fd, event->netns_cookie);
 		bpftune_for_each_tuner(t)
-			bpftuner_netns_init(t, netns_fd, event->netns_cookie);
+			bpftuner_netns_init(t, event->netns_cookie);
+		close(netns_fd);
 		break;
 	case NETNS_SCENARIO_DESTROY:
 		bpftune_log(LOG_INFO, "netns destroyed (cookie %ld)\n",

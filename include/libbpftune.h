@@ -98,7 +98,8 @@ int bpftune_sysctl_write(int netns_fd, const char *name, __u8 num_values, long *
 
 int bpftune_netns_set(int fd);
 int bpftune_netns_info(int pid, int *fd, unsigned long *cookie);
-void bpftuner_netns_init(struct bpftuner *tuner, int fd, unsigned long cookie);
+int bpftune_netns_init_all(void);
+void bpftuner_netns_init(struct bpftuner *tuner, unsigned long cookie);
 void bpftuner_netns_fini(struct bpftuner *tuner, unsigned long cookie);
 struct bpftuner_netns *bpftuner_netns_from_cookie(unsigned long tuner_id, unsigned long cookie);
 int bpftune_netns_fd_from_cookie(unsigned long cookie);

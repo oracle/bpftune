@@ -66,7 +66,6 @@ struct bpftune_event {
 struct bpftuner_netns {
 	struct bpftuner_netns *next;	
 	unsigned long netns_cookie;
-	int netns_fd;
 	enum bpftune_state state;
 };
 

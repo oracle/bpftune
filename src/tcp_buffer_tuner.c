@@ -21,13 +21,11 @@ void fini(struct bpftuner *tuner)
 	bpftuner_bpf_fini(tuner);
 }
 
-void event_handler(struct bpftuner *tuner, struct bpftune_event *event,
+void event_handler(__attribute__((unused))struct bpftuner *tuner,
+		   struct bpftune_event *event,
 		   __attribute__((unused))void *ctx)
 {
 	long newvals[3];
-
-	bpftune_log(LOG_DEBUG, "got scenario %d for tuner %s\n",
-		    event->scenario_id, tuner->name);
 
 	newvals[0] = event->update[0].new[0];
 	newvals[1] = event->update[0].new[1];
