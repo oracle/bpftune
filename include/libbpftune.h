@@ -93,9 +93,10 @@ int bpftune_ring_buffer_poll(void *ring_buffer, int interval);
 void bpftune_ring_buffer_fini(void *ring_buffer);
 
 void bpftune_sysctl_name_to_path(const char *name, char *path, size_t path_sz);
-int bpftune_sysctl_read(const char *name, long *values);
-int bpftune_sysctl_write(const char *name, __u8 num_values, long *values);
+int bpftune_sysctl_read(int netns_fd, const char *name, long *values);
+int bpftune_sysctl_write(int netns_fd, const char *name, __u8 num_values, long *values);
 
+int bpftune_netns_set(int fd);
 int bpftune_netns_info(int pid, int *fd, unsigned long *cookie);
 void bpftuner_netns_init(struct bpftuner *tuner, int fd, unsigned long cookie);
 void bpftuner_netns_fini(struct bpftuner *tuner, unsigned long cookie);

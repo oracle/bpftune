@@ -33,5 +33,5 @@ void event_handler(struct bpftuner *tuner, struct bpftune_event *event,
 	newvals[1] = event->update[0].new[1];
 	newvals[2] = event->update[0].new[2];
 
-	bpftune_sysctl_write("net.ipv4.tcp_wmem", 3, newvals);
+	bpftune_sysctl_write(0, "net.ipv4.tcp_wmem", 3, newvals);
 }

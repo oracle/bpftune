@@ -330,21 +330,25 @@ void bpftune_sysctl_name_to_path(const char *name, char *path, size_t path_sz)
 			path[i] = '/';
 }
 
-int bpftune_sysctl_read(const char *name, long *values)
+int bpftune_sysctl_read(int netns_fd, const char *name, long *values)
 {
-	int i, num_values = 0;
+	int orig_netns_fd, i, num_values = 0;
 	char path[512];
 	int err = 0;	
 	FILE *fp;
 
 	bpftune_sysctl_name_to_path(name, path, sizeof(path));
 
+	orig_netns_fd = bpftune_netns_set(netns_fd);
+	if (orig_netns_fd < 0)
+		return orig_netns_fd;
+
 	fp = fopen(path, "r");
 	if (!fp) {
 		err = -errno;
 		bpftune_log(LOG_ERR, "could not open %s for reading: %s\n",
 			    path, strerror(-err));
-		return err;
+		goto out;
 	}
 	num_values = fscanf(fp, "%ld %ld %ld",
 			    &values[0], &values[1], &values[2]);
@@ -357,7 +361,7 @@ int bpftune_sysctl_read(const char *name, long *values)
 	if (err) {
 		bpftune_log(LOG_ERR, "could not read from %s: %s\n", path,
 			    strerror(-err));
-		return err;
+		goto out;
 	}
 
 	for (i = 0; i < num_values; i++) {
@@ -365,23 +369,31 @@ int bpftune_sysctl_read(const char *name, long *values)
 			    name, i, values[i]);
 	}
 
+out:
+	bpftune_netns_set(orig_netns_fd);
 	return num_values;
 }
 
-int bpftune_sysctl_write(const char *name, __u8 num_values, long *values)
+int bpftune_sysctl_write(int netns_fd, const char *name, __u8 num_values, long *values)
 {
-	long old_values[BPFTUNE_MAX_VALUES];
-	__u8 old_num_values;
+	long old_values[BPFTUNE_MAX_VALUES];	
+	int i, err = 0, orig_netns_fd;
+	int old_num_values;
 	char path[512];
-	int i, err = 0;
 	FILE *fp;
 
 	bpftune_sysctl_name_to_path(name, path, sizeof(path));
 
+	orig_netns_fd = bpftune_netns_set(netns_fd);
+	if (orig_netns_fd < 0)
+		return orig_netns_fd;
+
 	/* If value is already set to val, do nothing. */
-	old_num_values = bpftune_sysctl_read(name, old_values);
-	if (err)
-		return err;
+	old_num_values = bpftune_sysctl_read(0, name, old_values);
+	if (old_num_values < 0) {
+		err = old_num_values;
+		goto out;
+	}
 	if (num_values == old_num_values) {
 		for (i = 0; i < num_values; i++) {
 			if (old_values[i] != values[i])
@@ -395,7 +407,7 @@ int bpftune_sysctl_write(const char *name, __u8 num_values, long *values)
                 err = -errno;
                 bpftune_log(LOG_DEBUG, "could not open %s for writing: %s\n",
 			    path, strerror(-err));
-                return err;
+		goto out;
         }
 
 	for (i = 0; i < num_values; i++)
@@ -406,6 +418,8 @@ int bpftune_sysctl_write(const char *name, __u8 num_values, long *values)
 		bpftune_log(LOG_DEBUG, "Wrote %s[%d] = %ld\n",
 			    name, i, values[i]);
 	}
+out:
+	bpftune_netns_set(orig_netns_fd);
         return 0;
 }
 
@@ -432,7 +446,7 @@ int bpftuner_tunables_init(struct bpftuner *tuner, unsigned int num_descs,
 				    descs[i].name);
 			return -EINVAL;
 		}
-		num_values = bpftune_sysctl_read(descs[i].name,
+		num_values = bpftune_sysctl_read(0, descs[i].name,
 				tuner->tunables[i].current_values);
 		if (num_values < 0) {
 			bpftune_log(LOG_ERR, "error reading tunable '%s': %s\n",
@@ -479,6 +493,29 @@ static int bpftune_netns_fd(int netns_pid)
 	return netns_fd;
 }
 
+/* returns original netns fd */
+int bpftune_netns_set(int fd)
+{
+	int ret;
+
+	if (!fd)
+		return 0;
+	ret = setns(fd, CLONE_NEWNET);
+	if (ret) {
+		ret = -errno;
+		bpftune_log(LOG_ERR, "could not setns(%d): %s\n",
+			    fd, strerror(-ret));
+	} else {
+		ret = open("/proc/self/ns/net", O_RDONLY);
+		if (ret < 0) {
+			ret = -errno;
+			bpftune_log(LOG_ERR, "could not setns(%d): %s\n",
+				    fd, strerror(-ret));
+		}
+	}
+	return ret;
+}
+
 /* get fd, cookie (if non-NULL) from pid, or if pid is 0, use passed in
  * *pid to get cookie.
  */
@@ -489,21 +526,17 @@ int bpftune_netns_info(int pid, int *fd, unsigned long *cookie)
 	bool fdnew = true;
 	int ret;
 
-	orig_netns_fd = bpftune_netns_fd(getpid());
-	if (orig_netns_fd < 0)
-		return orig_netns_fd;
 	if (pid == 0 && fd && *fd > 0) {
 		fdnew = false;
 		new_netns_fd = *fd;
 	} else {
 		new_netns_fd = bpftune_netns_fd(pid);
+		if (new_netns_fd < 0)
+			return new_netns_fd;
 	}
-	if (new_netns_fd < 0) {
-		close(orig_netns_fd);
-		return new_netns_fd;
-	}
-	ret = setns(new_netns_fd, CLONE_NEWNET);
-	if (ret == 0) {
+
+	orig_netns_fd = bpftune_netns_set(new_netns_fd);
+	if (orig_netns_fd > 0) {
 		int s = socket(AF_INET, SOCK_STREAM, 0);
 
 		if (s < 0) {
@@ -528,7 +561,7 @@ int bpftune_netns_info(int pid, int *fd, unsigned long *cookie)
 			
 			close(s);
 		}
-		setns(orig_netns_fd, CLONE_NEWNET);
+		bpftune_netns_set(orig_netns_fd);
 
 		if (ret == 0) {
 			if (fdnew)
@@ -539,10 +572,12 @@ int bpftune_netns_info(int pid, int *fd, unsigned long *cookie)
 	} else {
 		bpftune_log(LOG_DEBUG, "setns failed for for fd %d\n",
 			    new_netns_fd);
+		ret = orig_netns_fd;
 	}
 	if (fdnew)
 		close(new_netns_fd);
-	close(orig_netns_fd);
+	if (orig_netns_fd > 0)
+		close(orig_netns_fd);
 	return ret;
 }
 
