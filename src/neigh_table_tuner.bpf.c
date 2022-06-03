@@ -54,6 +54,8 @@ int BPF_PROG(bpftune_neigh_create, struct neigh_table *tbl,
  	 */
 	if (NEARLY_FULL(tbl_stats->entries, tbl_stats->max)) {
 		event.tuner_id = tuner_id;
+		if (n->parms && n->parms->net.net)
+			event.netns_cookie = get_netns_cookie(n->parms->net.net);
 		__builtin_memcpy(&event.raw_data, tbl_stats, sizeof(*tbl_stats));
 		bpf_ringbuf_output(&ringbuf_map, &event, sizeof(event), 0);
 	}

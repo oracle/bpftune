@@ -19,12 +19,17 @@ LIBBPFTUNE_0.1.1 {
 		bpftuner_fini;
 		bpftuner_bpf_fini;
 		bpftuner_tunables_fini;
+		bpftuner_netns_init;
+		bpftuner_netns_fini;
+		bpftuner_netns_from_cookie;
 		bpftune_ring_buffer_init;
 		bpftune_ring_buffer_poll;
 		bpftune_ring_buffer_fini;
 		bpftune_sysctl_name_to_path;
 		bpftune_sysctl_read;
 		bpftune_sysctl_write;
+		bpftune_netns_info;
+		bpftune_netns_fd_from_cookie;
 	local:
 		*;
 };

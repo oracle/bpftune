@@ -81,3 +81,7 @@ unsigned int tuner_id;
 #define NEARLY_FULL(val, limit)	\
 	((val) >= ((limit) - ((limit) >> 2)))
 
+static __always_inline long get_netns_cookie(struct net *net)
+{
+	return net->net_cookie;
+}

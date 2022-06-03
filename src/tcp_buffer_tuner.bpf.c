@@ -5,6 +5,17 @@
 #include "tcp_buffer_tuner.h"
 
 
+/* By instrumenting tcp_sndbuf_expand() we know the following, due to the
+ * fact tcp_should_expand_sndbuf() has returned true:
+ *
+ * - the socket is not locked (SOCK_SNDBUF_LOCKED);
+ * - we are not under global TCP memory pressure; and
+ * - not under soft global TCP memory pressure; and
+ * - we have not filled the congestion window.
+ *
+ * However, all that said, we may soon run out of sndbuf space, so
+ * if it is nearly exhausted (>75% full), expand by 25%.
+ */
 SEC("fentry/tcp_sndbuf_expand")
 int BPF_PROG(bpftune_sndbuf_expand, struct sock *sk)
 {
@@ -23,6 +34,7 @@ int BPF_PROG(bpftune_sndbuf_expand, struct sock *sk)
 		long wmem1 = net->ipv4.sysctl_tcp_wmem[1];
 
 		event.tuner_id = tuner_id;
+		event.netns_cookie = get_netns_cookie(net);
 		event.update[0].id = TCP_BUFFER_TCP_WMEM;
 		event.update[0].old[0] = wmem0;
 		event.update[0].new[0] = wmem0;

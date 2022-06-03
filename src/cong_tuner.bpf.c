@@ -147,6 +147,7 @@ int cong_sockops(struct bpf_sock_ops *ops)
 				     &bbr, sizeof(bbr));
 		event.tuner_id = tuner_id;
 		event.scenario_id = 0;
+		event.netns_cookie = bpf_get_netns_cookie(ops);
 		__bpf_printk("remote host %x (srtt_us %d), cong bbr result %d\n",
 			     key->s6_addr32[0], ops->srtt_us, ret);
 		bpf_ringbuf_output(&ringbuf_map, &event, sizeof(event), 0);

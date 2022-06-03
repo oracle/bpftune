@@ -1,3 +1,4 @@
+#define _GNU_SOURCE  
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdlib.h>
@@ -17,6 +18,9 @@
 #include <linux/limits.h>
 #include <linux/types.h>
 #include <sys/mount.h>
+#include <sys/socket.h>
+#include <sched.h>
+#include <mntent.h>
 
 #include "libbpftune.h"
 
@@ -461,4 +465,209 @@ void bpftuner_tunables_fini(struct bpftuner *tuner)
 {
 	tuner->num_tunables = 0;
 	free(tuner->tunables);
+}
+
+static int bpftune_netns_fd(int netns_pid)
+{
+	char netns_path[256];
+	int netns_fd;
+
+	snprintf(netns_path, sizeof(netns_path), "/proc/%d/ns/net", netns_pid);
+	netns_fd = open(netns_path, O_RDONLY);
+	if (netns_fd < 0)
+		netns_fd = -errno;
+	return netns_fd;
+}
+
+/* get fd, cookie (if non-NULL) from pid, or if pid is 0, use passed in
+ * *pid to get cookie.
+ */
+int bpftune_netns_info(int pid, int *fd, unsigned long *cookie)
+{
+	int new_netns_fd, orig_netns_fd;
+	unsigned long netns_cookie;
+	bool fdnew = true;
+	int ret;
+
+	orig_netns_fd = bpftune_netns_fd(getpid());
+	if (orig_netns_fd < 0)
+		return orig_netns_fd;
+	if (pid == 0 && fd && *fd > 0) {
+		fdnew = false;
+		new_netns_fd = *fd;
+	} else {
+		new_netns_fd = bpftune_netns_fd(pid);
+	}
+	if (new_netns_fd < 0) {
+		close(orig_netns_fd);
+		return new_netns_fd;
+	}
+	ret = setns(new_netns_fd, CLONE_NEWNET);
+	if (ret == 0) {
+		int s = socket(AF_INET, SOCK_STREAM, 0);
+
+		if (s < 0) {
+			ret = -errno;
+			bpftune_log(LOG_ERR, "could not open socket in netns: %s\n",
+				    strerror(errno)); 
+		} else {
+			socklen_t cookie_sz = sizeof(netns_cookie);
+
+			ret = getsockopt(s, SOL_SOCKET, SO_NETNS_COOKIE, &netns_cookie,
+					 &cookie_sz);
+			if (ret < 0) {
+				ret = -errno;
+				bpftune_log(LOG_ERR,
+					    "could not get SO_NETNS_COOKIE: %s\n",
+					   strerror(-ret));
+			} else {
+				bpftune_log(LOG_DEBUG,
+					    "got netns cookie %ld\n",
+					    netns_cookie);
+			}
+			
+			close(s);
+		}
+		setns(orig_netns_fd, CLONE_NEWNET);
+
+		if (ret == 0) {
+			if (fdnew)
+				*fd = new_netns_fd;
+			if (cookie)
+				*cookie = netns_cookie;
+		}
+	} else {
+		bpftune_log(LOG_DEBUG, "setns failed for for fd %d\n",
+			    new_netns_fd);
+	}
+	if (fdnew)
+		close(new_netns_fd);
+	close(orig_netns_fd);
+	return ret;
+}
+
+int bpftune_netns_fd_from_cookie(unsigned long cookie)
+{
+	struct mntent *ent;
+        FILE *mounts;
+	struct dirent *dirent;
+	int ret = -ENOENT;
+	DIR *dir;
+
+	dir = opendir("/proc");
+	if (!dir) { 
+		ret = -errno;   
+		bpftune_log(LOG_ERR, "could not open /proc: %s\n", strerror(-ret));
+		return ret;
+	}
+	while ((dirent = readdir(dir)) != NULL) {
+		unsigned long netns_cookie;
+		char *endptr;
+		int netns_fd;
+		long pid;
+
+		pid = strtol(dirent->d_name, &endptr, 10);
+		if (!endptr || *endptr != '\0')
+			continue;
+		if (bpftune_netns_info(pid, &netns_fd, &netns_cookie))
+			continue;
+		if (netns_cookie == cookie) {
+			ret = netns_fd;
+			break;
+		} else {
+			close(netns_fd);
+		}
+	}
+	closedir(dir);
+
+	if (ret >= 0)
+		return ret;
+
+	/* No luck with processes; try bind mounts */
+	mounts = setmntent("/proc/mounts", "r");
+	if (mounts == NULL) {
+		ret = -errno;
+		bpftune_log(LOG_ERR, "cannot setmntent() for /proc/mounts\n",
+			    strerror(-ret));
+		return ret;
+	}
+	while ((ent = getmntent(mounts)) != NULL) {
+		int mntfd;
+
+		if (strcmp(ent->mnt_type, "nsfs") != 0)
+			continue;
+		bpftune_log(LOG_DEBUG, "checking nsfs mnt %s\n",
+			    ent->mnt_dir);
+		mntfd = open(ent->mnt_dir, O_RDONLY);
+		if (mntfd < 0)
+			continue;
+		if (bpftune_netns_info(0, &mntfd, &cookie)) {
+			close(mntfd);
+			continue;
+		}
+		bpftune_log(LOG_DEBUG, "found netns fd via mnt %s\n",
+			    ent->mnt_dir);
+		ret = mntfd;
+		break;
+	}
+	endmntent(mounts);
+
+        return ret;
+}
+
+void bpftuner_netns_init(struct bpftuner *tuner, int fd, unsigned long cookie)
+{
+	struct bpftuner_netns *netns, *new = NULL;
+
+	for (netns = &tuner->netns; netns->next != NULL; netns = netns->next) {}
+
+	new = calloc(1, sizeof(struct bpftuner_netns));
+	if (!new) {
+		bpftune_log(LOG_ERR, "unable to allocate netns for bpftuner: %s\n",
+			    strerror(errno));
+	} else {
+		new->netns_cookie = cookie;
+		new->netns_fd = fd;
+		netns->next = new;
+	}
+}
+
+void bpftuner_netns_fini(struct bpftuner *tuner, unsigned long cookie)
+{
+	struct bpftuner_netns *netns, *prev = NULL;
+
+	for (netns = &tuner->netns; netns != NULL; netns = netns->next) {
+		if (netns->netns_cookie == cookie) {
+			if (prev)
+				prev->next = netns->next;
+			else
+				tuner->netns.next = netns->next;
+			close(netns->netns_fd);
+			return;
+		}
+		prev = netns;
+	}
+	bpftune_log(LOG_DEBUG, "netns_fini: could not find netns for cookie %ld\n",
+		    cookie);
+}
+
+struct bpftuner_netns *bpftuner_netns_from_cookie(unsigned long tuner_id,
+						  unsigned long cookie)
+{
+	struct bpftuner *tuner;
+	struct bpftuner_netns *netns;
+
+	bpftune_for_each_tuner(tuner) {
+		if (tuner->id != tuner_id)
+			continue;
+		if (cookie == 0)
+			return &tuner->netns;
+		bpftuner_for_each_netns(tuner, netns) {
+			if (cookie == netns->netns_cookie)
+				return netns;
+		}
+	}
+	bpftune_log(LOG_DEBUG, "no tuner netns found for tuner %d, cookie %ld\n",
+		    tuner_id, cookie);
+	return NULL;
 }

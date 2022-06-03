@@ -1,0 +1,61 @@
+#include <libbpftune.h>
+#include "netns_tuner.h"
+#include "netns_tuner.skel.h"
+
+struct netns_tuner_bpf *skel;
+
+int init(struct bpftuner *tuner, int ringbuf_map_fd)
+{
+	bpftuner_bpf_init(netns, tuner, ringbuf_map_fd);
+
+	/* get initial list of netns */
+
+	return 0;
+}
+
+void fini(struct bpftuner *tuner)
+{
+	bpftune_log(LOG_DEBUG, "calling fini for %s\n", tuner->name);
+	bpftuner_bpf_fini(tuner);
+}
+
+void event_handler(struct bpftuner *tuner, struct bpftune_event *event,
+		   __attribute__((unused))void *ctx)
+{
+	unsigned long netns_cookie;
+	int netns_fd = 0, ret;
+	struct bpftuner *t;
+
+	bpftune_log(LOG_DEBUG, "got scenario %d for tuner %s\n",
+		    event->scenario_id, tuner->name);
+
+	switch (event->scenario_id) {
+	case NETNS_SCENARIO_CREATE:
+		bpftune_log(LOG_INFO, "netns created (cookie %ld)\n",
+			    event->netns_cookie);
+		ret = bpftune_netns_info(event->pid, &netns_fd, &netns_cookie);
+		if (ret || netns_cookie != event->netns_cookie) {
+			
+			bpftune_log(LOG_DEBUG, "netns cookie from pid %d %ld != %ld (cookie from event)\n",
+				    event->pid, netns_cookie, event->netns_cookie);
+			netns_fd = bpftune_netns_fd_from_cookie(event->netns_cookie);
+			if (netns_fd < 0) {
+				bpftune_log(LOG_DEBUG, "netns fd not found for cookie %ld: %s\n",
+					    event->netns_cookie, strerror(-netns_fd));
+				return;
+			}
+		}
+		bpftune_log(LOG_DEBUG, "got netns fd %d for cookie %ld\n",
+			    netns_fd, event->netns_cookie);
+		bpftune_for_each_tuner(t)
+			bpftuner_netns_init(t, netns_fd, event->netns_cookie);
+		break;
+	case NETNS_SCENARIO_DESTROY:
+		bpftune_log(LOG_INFO, "netns destroyed (cookie %ld)\n",
+			    event->netns_cookie);
+		bpftune_for_each_tuner(t)
+			bpftuner_netns_fini(t, event->netns_cookie);
+		break;
+
+	}
+}

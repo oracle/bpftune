@@ -96,4 +96,13 @@ void bpftune_sysctl_name_to_path(const char *name, char *path, size_t path_sz);
 int bpftune_sysctl_read(const char *name, long *values);
 int bpftune_sysctl_write(const char *name, __u8 num_values, long *values);
 
+int bpftune_netns_info(int pid, int *fd, unsigned long *cookie);
+void bpftuner_netns_init(struct bpftuner *tuner, int fd, unsigned long cookie);
+void bpftuner_netns_fini(struct bpftuner *tuner, unsigned long cookie);
+struct bpftuner_netns *bpftuner_netns_from_cookie(unsigned long tuner_id, unsigned long cookie);
+int bpftune_netns_fd_from_cookie(unsigned long cookie);
+
+#define bpftuner_for_each_netns(tuner, netns)				\
+	for (netns = &tuner->netns; netns != NULL; netns = netns->next)
+
 #endif /* __LIBBPFTUNE_H */
