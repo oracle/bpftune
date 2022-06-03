@@ -513,6 +513,7 @@ int bpftune_netns_set(int fd)
 	} else {
 		err = setns(fd, CLONE_NEWNET);
 		if (err < 0) {
+			close(ret);
 			ret = -errno;
 			bpftune_log(LOG_ERR, "could not setns(%d): %s\n",
 				    fd, strerror(-ret));
@@ -577,7 +578,7 @@ int bpftune_netns_info(int pid, int *fd, unsigned long *cookie)
 	} else {
 		bpftune_log(LOG_DEBUG, "setns failed for for fd %d\n",
 			    new_netns_fd);
-		ret = orig_netns_fd;
+		ret = -errno;
 	}
 	if (fdnew)
 		close(new_netns_fd);
