@@ -386,6 +386,9 @@ int bpftune_sysctl_write(int netns_fd, const char *name, __u8 num_values, long *
 
 	bpftune_sysctl_name_to_path(name, path, sizeof(path));
 
+	bpftune_log(LOG_DEBUG, "writing sysctl '%s' for netns_fd %d\n",
+		    path, netns_fd);
+
 	orig_netns_fd = bpftune_netns_set(netns_fd);
 	if (orig_netns_fd < 0)
 		return orig_netns_fd;
