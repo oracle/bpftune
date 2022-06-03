@@ -566,7 +566,7 @@ int bpftune_netns_info(int pid, int *fd, unsigned long *cookie)
 		bpftune_netns_set(orig_netns_fd);
 
 		if (ret == 0) {
-			if (fdnew)
+			if (fdnew && fd)
 				*fd = new_netns_fd;
 			if (cookie)
 				*cookie = netns_cookie;
@@ -583,6 +583,8 @@ int bpftune_netns_info(int pid, int *fd, unsigned long *cookie)
 	return ret;
 }
 
+unsigned long global_netns_cookie;
+
 static int bpftune_netns_find(unsigned long cookie)
 {
 	struct bpftuner *t;
@@ -591,6 +593,9 @@ static int bpftune_netns_find(unsigned long cookie)
 	struct dirent *dirent;
 	int ret = -ENOENT;
 	DIR *dir;
+
+	if (global_netns_cookie && cookie == global_netns_cookie)
+		return 0;
 
 	dir = opendir("/proc");
 	if (!dir) { 
@@ -674,6 +679,13 @@ int bpftune_netns_fd_from_cookie(unsigned long cookie)
 
 int bpftune_netns_init_all(void)
 {
+	unsigned long cookie;
+
+	if (!bpftune_netns_info(getpid(), NULL, &cookie)) {
+		global_netns_cookie = cookie;
+		bpftune_log(LOG_DEBUG, "global netns cookie is %ld\n",
+			    global_netns_cookie);
+	}
 	return bpftune_netns_find(0);
 }
 

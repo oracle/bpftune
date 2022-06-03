@@ -8,8 +8,6 @@ int init(struct bpftuner *tuner, int ringbuf_map_fd)
 {
 	bpftuner_bpf_init(netns, tuner, ringbuf_map_fd);
 
-	/* get initial list of netns */
-
 	return 0;
 }
 

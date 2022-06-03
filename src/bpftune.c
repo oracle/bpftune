@@ -89,6 +89,8 @@ int init(const char *cgroup_dir, const char *library_dir)
 		bpftune_log(LOG_ERR, "no ringbuf events to watch, exiting.\n");
 		return -ENOENT;
 	}
+	bpftune_netns_init_all();
+
 	return 0;
 }
 

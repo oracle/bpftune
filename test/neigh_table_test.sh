@@ -15,9 +15,10 @@ SLEEPTIME=0.5
 
 for TUNER in neigh_table ; do
 
- for TBL in arp_cache ndisc_cache ; do
+ for NS in global $NETNS ; do
+  for TBL in arp_cache ndisc_cache ; do
  
-   test_start "$0|neigh table test: does filling $TBL make it grow?"
+   test_start "$0|neigh table test ($NS netns): does filling $TBL make it grow?"
 
    test_setup "true"
 
@@ -25,7 +26,14 @@ for TUNER in neigh_table ; do
 
    sleep $SLEEPTIME
 
-   ip ntable change name $TBL dev $VETH2 thresh3 128
+   if [[ $NETNS != "global" ]]; then
+	PREFIX_CMD="ip netns exec $NETS "
+        INTF=$VETH1
+   else
+	PREFIX_CMD=""
+	INTF=$VETH2
+   fi	
+   $PREFIX_CMD ip ntable change name $TBL dev $INTF thresh3 128
 
    for ((i=3; i < 255; i++ ))
    do
@@ -34,15 +42,14 @@ for TUNER in neigh_table ; do
       ip6addr="fd::${ih}"
       macaddr="de:ad:be:ef:de:${ih}"
       if [[ $TBL == "arp_cache" ]]; then
-	ip neigh add $ipaddr lladdr $macaddr dev $VETH2
+	$PREFIX_CMD ip neigh add $ipaddr lladdr $macaddr dev $INTF
       else
-	ip neigh add $ip6addr lladdr $macaddr dev $VETH2
+	$PREFIX_CMD ip neigh add $ip6addr lladdr $macaddr dev $INTF
       fi
    done
-   ip neigh show dev $VETH2
    grep "updated gc_thresh3 for $TBL" $TESTLOG_LAST
    test_pass
-
+  done
  done
 done
 

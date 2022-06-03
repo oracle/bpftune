@@ -30,6 +30,7 @@ struct bpftunable_desc {
 	unsigned int id;
 	enum bpftunable_type type;
 	const char *name;
+	bool namespaced;	/* settable in non-global namespace? */
 	__u8 num_values;
 };
 

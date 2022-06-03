@@ -31,9 +31,13 @@ for FAMILY in ipv4 ipv6 ; do
    test_start "$0|wmem test to $ADDR:$PORT $FAMILY opts $CLIENT_OPTS $LATENCY"
 
    wmem_orig=($(sysctl -n net.ipv4.tcp_wmem))
+
    test_setup true
 
+   wmem_orig_netns=($(ip netns exec $NETNS sysctl -n net.ipv4.tcp_wmem))
+
    sysctl -w net.ipv4.tcp_wmem="${wmem_orig[0]} ${wmem_orig[1]} ${wmem_orig[1]}"
+   ip netns exec $NETNS sysctl -w net.ipv4.tcp_wmem="${wmem_orig_netns[0]} ${wmem_orig_netns[1]} ${wmem_orig_netns[1]}"
 
    declare -A results
    for MODE in baseline test ; do
@@ -41,7 +45,7 @@ for FAMILY in ipv4 ipv6 ; do
 	echo "Running ${MODE}..."
 	test_run_cmd_local "ip netns exec $NETNS $IPERF3 -s -1 &"
 	if [[ $MODE != "baseline" ]]; then
-		test_run_cmd_local "$BPFTUNE &"
+		test_run_cmd_local "$BPFTUNE -d &"
 	else
 		LOGSZ=$(wc -l $LOGFILE | awk '{print $1}')
 		LOGSZ=$(expr $LOGSZ + 1)
@@ -66,10 +70,18 @@ for FAMILY in ipv4 ipv6 ; do
    done
 
    wmem_post=($(sysctl -n net.ipv4.tcp_wmem))
+   wmem_post_netns=($(ip netns exec $NETNS sysctl -n net.ipv4.tcp_wmem))
    sysctl -w net.ipv4.tcp_wmem="${wmem_orig[0]} ${wmem_orig[1]} ${wmem_orig[2]}"
    if [[ $MODE == "test" ]]; then
 	if [[ "${wmem_post[2]}" -gt ${wmem_orig[1]} ]]; then
 		echo "wmem before ${wmem_orig[1]} ; after ${wmem_post[2]}"
+
+		if [[ "${wmem_post_netns[2]}" -gt ${wmem_orig_netns[1]} ]]; then
+			echo "netns wmem before ${wmem_orig_netns[1]} ; after ${wmem_post_netns[2]}"
+		else
+			echo "netns wmem before ${wmem_orig_netns[1]} ; after ${wmem_post_netns[2]}"
+			test_cleanup
+		fi
 	else
 		test_cleanup
 	fi
