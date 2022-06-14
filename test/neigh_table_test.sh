@@ -15,7 +15,9 @@ SLEEPTIME=0.5
 
 for TUNER in neigh_table ; do
 
- for NS in global $NETNS ; do
+ # gc_thresh3 is not namespaced...
+
+ for NS in global ; do
   for TBL in arp_cache ndisc_cache ; do
  
    test_start "$0|neigh table test ($NS netns): does filling $TBL make it grow?"
@@ -26,8 +28,8 @@ for TUNER in neigh_table ; do
 
    sleep $SLEEPTIME
 
-   if [[ $NETNS != "global" ]]; then
-	PREFIX_CMD="ip netns exec $NETS "
+   if [[ $NS != "global" ]]; then
+	PREFIX_CMD="ip netns exec $NETNS "
         INTF=$VETH1
    else
 	PREFIX_CMD=""

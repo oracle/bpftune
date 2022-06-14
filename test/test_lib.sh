@@ -198,6 +198,9 @@ test_cleanup_local()
 	fi
 
 	ip --all netns del ${NETNS_PREFIX}\*
+	set +e
+	ip link del $VETH2 2>/dev/null
+	set -e
 
 	if [[ $EXIT -ne 0 ]]; then
 		if [[ -f $TESTLOG_LAST ]]; then
