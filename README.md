@@ -22,9 +22,22 @@ behaviour.  The key benefit it provides are
   disable auto-tuning of the related feature set.
 - Don't replace tunables with more tunables! bpftune is designed to
   be zero configuration; there are no options, and we try to avoid
-  magic numbers where possible.  Where a threshold value is used,
-  reinforcement learning techniques will be applied to it to allow
-  it to float to the optimal value (TBD).
+  magic numbers where possible.
+- Use push-pull approaches. For example, with tcp buffer sizing,
+  we often want to get out of the way of applications and bump
+  up tcp sndbuf and rcvbuf, but at a certain point we run the
+  risk of exhausting TCP memory.  We can however monitor if we
+  are approaching TCP memory pressure and if so we can tune down
+  values that we've tuned up.  In this way, we can let the system
+  find a balance between providing resources and exhausting them.
+  In some cases, we won't need to tune up values; they may be fine
+  as they are. But in other cases limits block optimal performance,
+  and if they are raised safely - with awareness of global memory
+  limits - we can get out the way of improved performance.  Note
+  that in the case of socket buffer sizing, we don't really need
+  to worry about bufferbloat effects by increasing buffer size
+  since the alternative - where we drop a packet or send an
+  error back up to userspace - is likely to be worse.
 
 # Architecture
 
@@ -54,11 +67,12 @@ behaviour.  The key benefit it provides are
 - sysctl tuner: monitor sysctl setting and if it collides with an
   auto-tuned sysctl value, disable the associated tuner.  See
   bpftune-sysctl (8).
-- TCP buffer tuner: auto-tune max and initial buffer sizes. TBD
+- TCP buffer tuner: auto-tune max and initial buffer sizes.  See
+  bpftune-tcp-buffer (8).
 - netns tuner: notices addition and removal of network namespaces,
   which helps power namespace awareness for bpftune as a whole.
   Namespace awareness is important as we want to be able to auto-tune
-  containers also.
+  containers also.  See bpftune-netns (8).
 
 # Code organization
 
