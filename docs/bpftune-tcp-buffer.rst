@@ -18,3 +18,6 @@ DESCRIPTION
         the max, and we can adjust it up appropriately to allow for additional
         buffer space.
 
+        Similarly, for net.ipv4.tcp_rmem we monitor and increase the limit
+        when expansion is close to hitting the limit.
+
