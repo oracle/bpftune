@@ -30,6 +30,11 @@
    tcp_wmem[2] max buffer size; if so increase buffer size to
    accommodate more data since app needs more space. (tested)
  
+### netns tuner
+ - tuner iterates over network namespaces at init and watches
+   for netns add/remove events so that we can maintain tuner
+   state for non-global network namespaces also.
+
 ### Packaging
  - added a "make pkg" target which creates rpm
 
@@ -51,40 +56,6 @@
 ## To do tasks
 
 ### set up project packaging and signing (end June 2022)
-
-### container-specific tuning (end June 2022)
-
-We want bpftune to be able to handle auto-tuning for containers
-as well as the global namespace.
-
- - Rework framework to support per-namespace bpftune, so tuners
-   can associate with a specific bpftune instance which consists
-   of a specific cgroup, net namespace id etc.  This would allow
-   us to auto-tune on a container-level granularity.  Tuner init
-   will be passed a "struct bpftune" containing ring buffer fd
-   for events, cgroup path, net namespace id, etc.  BPF programs
-   may need to be multiply attached for each bpftune instance
-   (each cgroup).  BPF programs will contain a bpftune id also;
-   this allows bpfune to figure out which bpftune instance a
-   per-cgroup event is destined for.
-
- - Need to enhance fentry/tp-based programs that attach globally
-   to do per-namespace events. The associated BPF programs could
-   set netns id in events such that bpftune can map from netns
-   to the bpftune instance (and associated tuner) that should
-   handle the event
-
- - so event is sent containing either a bpftune id (cgroup bpf)
-   or a netns id (tp/fentry); in the latter case we map
-   netns id to bpftune id to find the bpftune instance associated
-   with the entry, then we can handle tunables on a per-netns
-   basis.
-
- - need infrastructure to set tunables on a per-netns basis,
-   both netlink and sysctl.
-
- - catch namespace creation, pair to cgroup and create bpftune
-   instance automatically
 
 ### neigh table tuner (end July 2022)
 

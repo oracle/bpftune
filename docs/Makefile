@@ -18,7 +18,7 @@ mandir ?= $(prefix)/man
 man8dir = $(mandir)/man8
 
 MAN8_RST = bpftune.rst bpftune-sysctl.rst bpftune-cong.rst bpftune-neigh.rst \
-	   bpftune-tcp-buffer.rst
+	   bpftune-tcp-buffer.rst bpftune-netns.rst
 
 _DOC_MAN8 = $(patsubst %.rst,%.8,$(MAN8_RST))
 DOC_MAN8 = $(addprefix $(OUTPUT),$(_DOC_MAN8))
