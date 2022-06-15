@@ -2,5 +2,6 @@
 
 enum tcp_buffer_tunables {
 	TCP_BUFFER_TCP_WMEM,
+	TCP_BUFFER_TCP_RMEM,
 	TCP_BUFFER_NUM_TUNABLES,
 };

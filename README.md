@@ -55,6 +55,10 @@ behaviour.  The key benefit it provides are
   auto-tuned sysctl value, disable the associated tuner.  See
   bpftune-sysctl (8).
 - TCP buffer tuner: auto-tune max and initial buffer sizes. TBD
+- netns tuner: notices addition and removal of network namespaces,
+  which helps power namespace awareness for bpftune as a whole.
+  Namespace awareness is important as we want to be able to auto-tune
+  containers also.
 
 # Code organization
 

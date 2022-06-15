@@ -6,6 +6,7 @@ struct tcp_buffer_tuner_bpf *skel;
 
 static struct bpftunable_desc descs[] = {
 { TCP_BUFFER_TCP_WMEM,	BPFTUNABLE_SYSCTL, "net.ipv4.tcp_wmem", true, 3 },
+{ TCP_BUFFER_TCP_RMEM,	BPFTUNABLE_SYSCTL, "net.ipv4.tcp_rmem", true, 3 },
 };
 
 int init(struct bpftuner *tuner, int ringbuf_map_fd)
@@ -39,7 +40,15 @@ void event_handler(__attribute__((unused))struct bpftuner *tuner,
 			return;
 		}
 	}
-	bpftune_sysctl_write(netns_fd, "net.ipv4.tcp_wmem", 3, newvals);
+	switch (event->update[0].id) {
+	case TCP_BUFFER_TCP_WMEM:
+		bpftune_sysctl_write(netns_fd, "net.ipv4.tcp_wmem", 3, newvals);
+		break;
+	case TCP_BUFFER_TCP_RMEM:
+		bpftune_sysctl_write(netns_fd, "net.ipv4.tcp_rmem", 3, newvals);
+		break;
+	}
+
 	if (netns_fd)
 		close(netns_fd);
 }

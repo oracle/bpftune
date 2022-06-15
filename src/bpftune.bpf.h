@@ -34,6 +34,13 @@ unsigned int tuner_id;
 #define SO_RCVBUF       	8
 #endif
 
+#ifndef SOCK_SNDBUF_LOCK
+#define SOCK_SNDBUF_LOCK	1
+#endif
+#ifndef SOCK_RCVBUF_LOCK
+#define SOCK_RCVBUF_LOCK	2
+#endif
+
 #ifndef SOL_TCP
 #define SOL_TCP        		6
 #endif

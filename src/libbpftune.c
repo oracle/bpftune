@@ -541,21 +541,21 @@ int bpftune_netns_set(int new_fd, int *orig_fd)
  */
 int bpftune_netns_info(int pid, int *fd, unsigned long *cookie)
 {
-	int new_netns_fd, orig_netns_fd;
+	int netns_fd, orig_netns_fd;
 	unsigned long netns_cookie;
 	bool fdnew = true;
 	int ret, err;
 
 	if (pid == 0 && fd && *fd > 0) {
 		fdnew = false;
-		new_netns_fd = *fd;
+		netns_fd = *fd;
 	} else {
-		new_netns_fd = bpftune_netns_fd(pid);
-		if (new_netns_fd <= 0)
-			return new_netns_fd;
+		netns_fd = bpftune_netns_fd(pid);
+		if (netns_fd <= 0)
+			return netns_fd;
 	}
 
-	err = bpftune_netns_set(new_netns_fd, &orig_netns_fd);
+	err = bpftune_netns_set(netns_fd, &orig_netns_fd);
 	if (!err) {
 		int s = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -581,17 +581,17 @@ int bpftune_netns_info(int pid, int *fd, unsigned long *cookie)
 
 		if (ret == 0) {
 			if (fdnew && fd)
-				*fd = new_netns_fd;
+				*fd = netns_fd;
 			if (cookie)
 				*cookie = netns_cookie;
 		}
 	} else {
 		bpftune_log(LOG_DEBUG, "setns failed for for fd %d\n",
-			    new_netns_fd);
+			    netns_fd);
 		ret = -errno;
 	}
-	if (fdnew)
-		close(new_netns_fd);
+	if (fdnew && !fd)
+		close(netns_fd);
 	if (orig_netns_fd > 0)
 		close(orig_netns_fd);
 	return ret;

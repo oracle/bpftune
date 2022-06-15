@@ -9,7 +9,8 @@
 
 PERF_TESTS = iperf3_test qperf_test
 
-TUNER_TESTS = sysctl_test log_test cong_test wmem_test neigh_table_test
+TUNER_TESTS =	sysctl_test log_test wmem_test rmem_test neigh_table_test \
+		cong_test
 
 DEFAULT_TESTS = $(TUNER_TESTS) $(PERF_TESTS)
 
@@ -45,4 +46,4 @@ install: $(INSTALLFILES)
 $(TESTS): %:%.sh
 	bash $<
 
-.PHONY: clean
+PHONY: clean
