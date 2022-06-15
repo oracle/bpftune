@@ -82,7 +82,6 @@ int BPF_PROG(cong_retransmit, struct sock *sk, struct sk_buff *skb)
 	struct remote_host *remote_host;
 	int ret;
 
-	__bpf_printk("got retransmit!!!\n");
 
 	switch (sk->sk_family) {
 	case AF_INET:
@@ -104,10 +103,8 @@ int BPF_PROG(cong_retransmit, struct sock *sk, struct sk_buff *skb)
 		bpf_map_update_elem(&remote_host_map, &key, &new_remote_host, BPF_ANY);
 		remote_host = bpf_map_lookup_elem(&remote_host_map, &key);
 	}
-	if (remote_host) {
-		__bpf_printk("retransmit for remote host!!\n");
+	if (remote_host)
 		remote_host_retransmit(remote_host);
-	}
 	
 	return 0;
 }
@@ -135,11 +132,8 @@ int cong_sockops(struct bpf_sock_ops *ops)
 
 	key = &sin6->sin6_addr;
 	remote_host = bpf_map_lookup_elem(&remote_host_map, key);
-	if (!remote_host) {
-		__bpf_printk("remote host not found!\n");
+	if (!remote_host)
 		return 0;
-	}
-	__bpf_printk("remote host found!!\n");
 
 	/* We have retransmitted to this host, so use BBR as congestion algorithm */
 	if (remote_host_retransmit_threshold(remote_host)) {
@@ -148,8 +142,6 @@ int cong_sockops(struct bpf_sock_ops *ops)
 		event.tuner_id = tuner_id;
 		event.scenario_id = 0;
 		event.netns_cookie = bpf_get_netns_cookie(ops);
-		__bpf_printk("remote host %x (srtt_us %d), cong bbr result %d\n",
-			     key->s6_addr32[0], ops->srtt_us, ret);
 		bpf_ringbuf_output(&ringbuf_map, &event, sizeof(event), 0);
 	}
 	return 0;

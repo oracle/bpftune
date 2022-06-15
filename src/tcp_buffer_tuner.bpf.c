@@ -5,6 +5,36 @@
 #include "tcp_buffer_tuner.h"
 
 bool under_memory_pressure = false;
+bool near_memory_exhaustion = false;
+
+long page_size = 4096;
+long page_shift = 12;
+
+static __always_inline bool tcp_nearly_out_of_memory(struct sock *sk)
+{
+	long allocated, limit_sk_mem_quantum = 0;
+
+	if (!sk->sk_prot)
+		return false;
+
+	allocated = sk->sk_prot->memory_allocated->counter;
+	if (bpf_probe_read(&limit_sk_mem_quantum,
+			   sizeof(limit_sk_mem_quantum),
+			   sk->sk_prot->sysctl_mem + 2) ||
+			   !limit_sk_mem_quantum)
+		return 0;
+				
+	if (page_size > SK_MEM_QUANTUM)
+		limit_sk_mem_quantum <<= page_shift - SK_MEM_QUANTUM_SHIFT;
+	else if (page_size < SK_MEM_QUANTUM)
+		limit_sk_mem_quantum >>= SK_MEM_QUANTUM_SHIFT - page_shift;
+
+	//__bpf_printk("allocated %ld, memory pressure %ld\n", allocated, limit_sk_mem_quantum);
+
+	near_memory_exhaustion = NEARLY_FULL(allocated, limit_sk_mem_quantum);
+
+	return near_memory_exhaustion;
+}
 
 SEC("fentry/tcp_enter_memory_pressure")
 int BPF_PROG(bpftune_enter_memory_pressure, struct sock *sk)
@@ -38,7 +68,7 @@ int BPF_PROG(bpftune_sndbuf_expand, struct sock *sk)
 	struct net *net = sk->sk_net.net;
 	int sndbuf, wmem2;
 
-	if (!sk || !net || under_memory_pressure)
+	if (!sk || !net || under_memory_pressure || near_memory_exhaustion)
 		return 0;
 
 	sndbuf = sk->sk_sndbuf;
@@ -47,6 +77,9 @@ int BPF_PROG(bpftune_sndbuf_expand, struct sock *sk)
 	if (NEARLY_FULL(sndbuf, wmem2)) {
 		long wmem0 = net->ipv4.sysctl_tcp_wmem[0];
 		long wmem1 = net->ipv4.sysctl_tcp_wmem[1];
+
+		if (tcp_nearly_out_of_memory(sk))
+			return 0;
 
 		event.tuner_id = tuner_id;
 		event.netns_cookie = get_netns_cookie(net);
@@ -62,8 +95,6 @@ int BPF_PROG(bpftune_sndbuf_expand, struct sock *sk)
 	return 0;
 }
 
-extern bool tcp_under_memory_pressure(struct sock *sk) __ksym;
-
 /* sadly tcp_rcv_space_adjust() has checks internal to it so it is called
  * regardless of if we are under memory pressure or not; so use the variable
  * we set when memory pressure is triggered.
@@ -78,7 +109,8 @@ int BPF_PROG(bpftune_rcvbuf_adjust, struct sock *sk)
 	if (!sk || !net)
 		return 0;
 
-	if ((sk->sk_userlocks & SOCK_RCVBUF_LOCK) || under_memory_pressure)
+	if ((sk->sk_userlocks & SOCK_RCVBUF_LOCK) || under_memory_pressure ||
+	    near_memory_exhaustion)
 		return 0;
 
 	rcvbuf = sk->sk_rcvbuf;
@@ -87,6 +119,9 @@ int BPF_PROG(bpftune_rcvbuf_adjust, struct sock *sk)
 	if (NEARLY_FULL(rcvbuf, rmem2)) {
 		long rmem0 = net->ipv4.sysctl_tcp_rmem[0];
 		long rmem1 = net->ipv4.sysctl_tcp_rmem[1];
+
+		if (tcp_nearly_out_of_memory(sk))
+			return 0;
 
 		event.tuner_id = tuner_id;
 		event.netns_cookie = get_netns_cookie(net);
