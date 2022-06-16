@@ -2,6 +2,8 @@
 #include "tcp_buffer_tuner.h"
 #include "tcp_buffer_tuner.skel.h"
 
+#include <unistd.h>
+
 struct tcp_buffer_tuner_bpf *skel;
 
 static struct bpftunable_desc descs[] = {
@@ -11,7 +13,26 @@ static struct bpftunable_desc descs[] = {
 
 int init(struct bpftuner *tuner, int ringbuf_map_fd)
 {
-	bpftuner_bpf_init(tcp_buffer, tuner, ringbuf_map_fd);
+	struct tcp_buffer_tuner_bpf *skel;
+	int pagesize;
+
+	bpftuner_bpf_open(tcp_buffer, tuner, ringbuf_map_fd);
+	bpftuner_bpf_load(tcp_buffer, tuner, ringbuf_map_fd);
+
+	skel = tuner->skel;
+
+	pagesize = sysconf(_SC_PAGESIZE);
+	if (pagesize < 0)
+		pagesize = 4096;
+	skel->bss->kernel_page_size = pagesize;
+	skel->bss->kernel_page_shift = ilog2(pagesize);
+	skel->bss->sk_mem_quantum = SK_MEM_QUANTUM;
+	skel->bss->sk_mem_quantum_shift = ilog2(SK_MEM_QUANTUM);
+	bpftune_log(LOG_DEBUG,
+		    "set pagesize/shift to %d/%d; sk_mem_quantum/shift %d/%d\n",
+		    pagesize, skel->bss->kernel_page_shift, SK_MEM_QUANTUM,
+		    skel->bss->sk_mem_quantum_shift);
+	bpftuner_bpf_attach(tcp_buffer, tuner, ringbuf_map_fd);
 	return bpftuner_tunables_init(tuner, TCP_BUFFER_NUM_TUNABLES, descs);
 }
 

@@ -148,7 +148,7 @@ void bpftune_cgroup_fini(void)
 		close(__bpftune_cgroup_fd);
 }
 
-int __bpftuner_bpf_init(struct bpftuner *tuner, int ring_buffer_fd)
+int __bpftuner_bpf_load(struct bpftuner *tuner, int ring_buffer_fd)
 {
 	int err;	
 
@@ -164,8 +164,13 @@ int __bpftuner_bpf_init(struct bpftuner *tuner, int ring_buffer_fd)
 		bpftune_log_bpf_err(err, "could not load skeleton: %s\n");      
 		return err;
 	}
-	/* may need to attach cgroup later, don't fail */
-	err = bpf_object__attach_skeleton(tuner->skeleton);
+
+	return 0;
+}
+
+int __bpftuner_bpf_attach(struct bpftuner *tuner, int ring_buffer_fd)
+{
+	int err = bpf_object__attach_skeleton(tuner->skeleton);
 	if (err) {
 		bpftune_log_bpf_err(err, "could not attach skeleton: %s\n");
 		return err;

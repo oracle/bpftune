@@ -46,7 +46,9 @@ int bpftune_cgroup_fd(void);
 void bpftune_cgroup_fini(void);
 
 struct bpftuner *bpftuner_init(const char *path, int ringbuf_map_fd);
-int __bpftuner_bpf_init(struct bpftuner *tuner, int ringbuf_map_fd);
+int __bpftuner_bpf_load(struct bpftuner *tuner, int ringbuf_map_fd);
+int __bpftuner_bpf_attach(struct bpftuner *tuner, int ringbuf_map_fd);
+int __bpftuner_bpf_load_and_attach(struct bpftuner *tuner, int ringbuf_map_fd);
 int bpftuner_tunables_init(struct bpftuner *tuner, unsigned int num_descs,
 			   struct bpftunable_desc *descs);
 struct bpftunable *bpftuner_tunable(struct bpftuner *tuner, unsigned int index);
@@ -64,28 +66,55 @@ void bpftuner_bpf_fini(struct bpftuner *tuner);
 void bpftuner_tunables_fini(struct bpftuner *tuner);
 
 /* need a macro in order to generate code for skeleton-specific struct */
-#define bpftuner_bpf_init(tuner_name, tuner, ringbuf_map_fd)		     \
+
+#define bpftuner_bpf_open(tuner_name, tuner, ringbuf_map_fd)		     \
 	do {								     \
-		struct tuner_name##_tuner_bpf *__skel;			     \
+		struct tuner_name##_tuner_bpf *__skel;                       \
+                int __err;                                                   \
+                                                                             \
+                tuner->name = #tuner_name;                                   \
+                __skel = tuner_name##_tuner_bpf__open();                     \
+                __err = libbpf_get_error(__skel);                            \
+                if (__err) {                                                 \
+                        bpftune_log_bpf_err(__err,                           \
+                                            #tuner_name " open bpf: %s\n");  \
+                        return __err;                                        \
+                }                                                            \
+                tuner->skel = __skel;                                        \
+                tuner->skeleton = __skel->skeleton;                          \
+                tuner->ringbuf_map = __skel->maps.ringbuf_map;               \
+	} while (0)
+
+#define bpftuner_bpf_load(tuner_name, tuner, ringbuf_map_fd)		     \
+	do {								     \
+		struct tuner_name##_tuner_bpf *__skel = tuner->skel;	     \
 		int __err;						     \
 									     \
-		tuner->name = #tuner_name;				     \
-		__skel = tuner_name##_tuner_bpf__open();		     \
-		__err = libbpf_get_error(__skel);			     \
-		if (__err) {						     \
-			bpftune_log_bpf_err(__err,			     \
-					    #tuner_name " open bpf: %s\n");  \
-			return __err;					     \
-		}							     \
-		tuner->skel = __skel;				  	     \
-		tuner->skeleton = __skel->skeleton;			     \
-		tuner->ringbuf_map = __skel->maps.ringbuf_map;		     \
-		__err = __bpftuner_bpf_init(tuner, ringbuf_map_fd);	     \
+		__err = __bpftuner_bpf_load(tuner, ringbuf_map_fd);          \
 		if (__err) {						     \
 			tuner_name##_tuner_bpf__destroy(__skel);	     \
 			return __err;					     \
 		}							     \
 		__skel->bss->tuner_id = bpftune_tuner_num();		     \
+	} while (0)
+
+#define bpftuner_bpf_attach(tuner_name, tuner, ringbuf_map_fd)		     \
+	do {								     \
+		struct tuner_name##_tuner_bpf *__skel = tuner->skel;         \
+                int __err;                                                   \
+                                                                             \
+                __err = __bpftuner_bpf_attach(tuner, ringbuf_map_fd);        \
+                if (__err) {                                                 \
+                        tuner_name##_tuner_bpf__destroy(__skel);             \
+                        return __err;                                        \
+		}							     \
+	} while (0)
+
+#define bpftuner_bpf_init(tuner_name, tuner, ringbuf_map_fd)		     \
+	do {								     \
+		bpftuner_bpf_open(tuner_name, tuner, ringbuf_map_fd);	     \
+		bpftuner_bpf_load(tuner_name, tuner, ringbuf_map_fd);	     \
+		bpftuner_bpf_attach(tuner_name, tuner, ringbuf_map_fd);	     \
 	} while (0)
 
 void *bpftune_ring_buffer_init(int ringbuf_map_fd, void *ctx);

@@ -1,5 +1,9 @@
 #include <bpftune.h>
 
+#ifndef SK_MEM_QUANTUM
+#define SK_MEM_QUANTUM          4096
+#endif
+
 enum tcp_buffer_tunables {
 	TCP_BUFFER_TCP_WMEM,
 	TCP_BUFFER_TCP_RMEM,
