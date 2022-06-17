@@ -21,3 +21,17 @@ DESCRIPTION
         Similarly, for net.ipv4.tcp_rmem we monitor and increase the limit
         when expansion is close to hitting the limit.
 
+        In both cases, we want to avoid the situation that increasing these
+        limits leads to TCP memory exhaustion.  The BPF programs that detect
+        approach to those limits will not request increases if we close to
+        either TCP memory pressure or TCP memory exhaustion.
+
+        net.ipv4.tcp_mem represents the min, pressure, max values for overall
+        TCP memory use in pages.
+
+        When in TCP memory pressure mode, we reclaim socket memory more
+        aggressively until we fall below the tcp_mem min value.  We reclaim
+        the forward-allocated memory for example.  On startup, TCP mem values
+        are initialized as ~4.6%, 6.25% and 9.37% of nr_free_buffer_pages().
+        nr_free_buffer_pages() counts the number of pages beyond the high
+        watermark in ZONE_DMA and ZONE_NORMAL.
