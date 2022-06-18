@@ -27,7 +27,7 @@ void event_handler(__attribute__((unused))struct bpftuner *tuner,
 
 	switch (event->scenario_id) {
 	case NETNS_SCENARIO_CREATE:
-		bpftune_log(LOG_INFO, "netns created (cookie %ld)\n",
+		bpftune_log(LOG_DEBUG, "netns created (cookie %ld)\n",
 			    event->netns_cookie);
 		ret = bpftune_netns_info(event->pid, &netns_fd, &netns_cookie);
 		if (ret || netns_cookie != event->netns_cookie) {
@@ -48,7 +48,7 @@ void event_handler(__attribute__((unused))struct bpftuner *tuner,
 		close(netns_fd);
 		break;
 	case NETNS_SCENARIO_DESTROY:
-		bpftune_log(LOG_INFO, "netns destroyed (cookie %ld)\n",
+		bpftune_log(LOG_DEBUG, "netns destroyed (cookie %ld)\n",
 			    event->netns_cookie);
 		bpftune_for_each_tuner(t)
 			bpftuner_netns_fini(t, event->netns_cookie);
