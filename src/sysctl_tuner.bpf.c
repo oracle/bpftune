@@ -30,5 +30,3 @@ int sysctl_write(struct bpf_sysctl *ctx)
 		bpf_ringbuf_output(&ringbuf_map, &event, sizeof(event), 0);
 	return 1;
 }
-
-char _license[] SEC("license") = "GPL";

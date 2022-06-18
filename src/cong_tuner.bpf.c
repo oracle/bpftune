@@ -146,5 +146,3 @@ int cong_sockops(struct bpf_sock_ops *ops)
 	}
 	return 0;
 }
-
-char _license[] SEC("license") = "Dual BSD/GPL";

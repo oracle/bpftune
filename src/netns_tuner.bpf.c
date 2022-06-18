@@ -4,7 +4,6 @@
 #include "bpftune.bpf.h"
 #include "netns_tuner.h"
 
-
 extern const void init_net __ksym;
 
 SEC("fexit/setup_net")
@@ -40,5 +39,3 @@ int BPF_PROG(bpftune_net_free, struct net *net)
 
 	return 0;
 }
-
-char _license[] SEC("license") = "GPL";

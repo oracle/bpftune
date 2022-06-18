@@ -101,3 +101,5 @@ static __always_inline long get_netns_cookie(struct net *net)
 {
 	return net->net_cookie;
 }
+
+char _license[] SEC("license") = "Dual BSD/GPL";

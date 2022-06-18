@@ -62,4 +62,3 @@ int BPF_PROG(bpftune_neigh_create, struct neigh_table *tbl,
 	return 0;
 }
 
-char _license[] SEC("license") = "GPL";

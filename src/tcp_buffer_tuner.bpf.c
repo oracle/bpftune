@@ -58,15 +58,13 @@ static __always_inline bool tcp_nearly_out_of_memory(struct sock *sk,
 
 	if (NEARLY_FULL(allocated, limit_sk_mem_quantum[1])) {
 		if (!near_memory_pressure) {
-
-
+			/* send approaching memory pressure event */
 		}
 		near_memory_pressure = true;
 	}
 	if (NEARLY_FULL(allocated, limit_sk_mem_quantum[2])) {
 		if (!near_memory_exhaustion) {
-
-
+			/* send approaching memory exhaustion event */
 		}
 		near_memory_exhaustion = true;
 	}
@@ -159,5 +157,3 @@ int BPF_PROG(bpftune_rcvbuf_adjust, struct sock *sk)
 	}
 	return 0;
 }
-
-char _license[] SEC("license") = "GPL";
