@@ -35,3 +35,8 @@ DESCRIPTION
         are initialized as ~4.6%, 6.25% and 9.37% of nr_free_buffer_pages().
         nr_free_buffer_pages() counts the number of pages beyond the high
         watermark in ZONE_DMA and ZONE_NORMAL.
+
+        As with watermark scaling, if we enter TCP memory pressure, bpftune
+        will scale up min/pressure/max as required.  If we enter memory
+        exhaustion it will scale up max since systems are often unstable
+        in memory exhaustion mode.

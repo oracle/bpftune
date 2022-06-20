@@ -211,8 +211,8 @@ struct bpftuner *bpftuner_init(const char *path, int ringbuf_map_fd)
 		free(tuner);
 		return NULL;
 	}
-	/* If we have a perf map fd from any tuner, use its fd to be re-used
- 	 * for other perf maps (so we can use the same perf buffer for all
+	/* If we have a ringbuf fd from any tuner, use its fd to be re-used
+ 	 * for other ringbuf maps (so we can use the same ring buffer for all
  	 * BPF events.
  	 */
 	if (ringbuf_map_fd > 0)

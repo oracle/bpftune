@@ -9,7 +9,82 @@ struct tcp_buffer_tuner_bpf *skel;
 static struct bpftunable_desc descs[] = {
 { TCP_BUFFER_TCP_WMEM,	BPFTUNABLE_SYSCTL, "net.ipv4.tcp_wmem", true, 3 },
 { TCP_BUFFER_TCP_RMEM,	BPFTUNABLE_SYSCTL, "net.ipv4.tcp_rmem", true, 3 },
+{ TCP_BUFFER_TCP_MEM,	BPFTUNABLE_SYSCTL, "net.ipv4.tcp_mem", false, 3 },
 };
+
+/* When TCP starts up, it calls nr_free_buffer_pages() and uses it to estimate
+ * the values for tcp_mem[0-2].  The equivalent of this estimate can be
+ * retrieved via /proc/zoneinfo; in the Normal zone the number of managed
+ * pages less the high watermark:
+ *
+ * Node 0, zone   Normal
+ *   pages free     145661
+ *         min      13560
+ *         low      16950
+ *         high     20340
+ *         spanned  3282944
+ *         present  3282944
+ *         managed  3199514
+ * 
+ * In this case, we have 3199514 (managed) - 20340 (high watermark) = 3179174
+ *
+ * On startup tcp_mem[0-2] are ~4.6%,  6.25%  and  9.37% of nr_free_buffer_pages.
+ * Calculating these values for the above we get
+ *
+ * 127166 198698 297888
+ *
+ * ...versus initial values
+ *
+ * 185565 247423 371130
+ *
+ */
+
+int get_from_file(FILE *fp, const char *fmt, ...)
+{
+	char line[256];
+	va_list ap;
+	int ret;
+
+	va_start(ap, fmt);
+	while (fgets(line, sizeof(line), fp)) {
+		ret = vsscanf(line, fmt, ap);
+		if (ret >= 1)
+			break;
+		else
+			ret = -ENOENT;
+	}
+	va_end(ap);
+	return ret;
+}
+
+long nr_free_buffer_pages(void)
+{
+	FILE *fp = fopen("/proc/zoneinfo", "r");
+	unsigned long nr_pages = 0;
+
+	if (!fp) {
+		bpftune_log(LOG_DEBUG, "could not open /proc/zoneinfo: %s\n", strerror(errno));
+		return 0;
+	}	
+	while (!feof(fp)) {
+		long managed = 0, high = 0, node;
+		char zone[128] = {};
+
+		if (get_from_file(fp, "Node %d, zone %s", &node, zone) < 0)
+			break;
+		if (strcmp(zone, "Normal") != 0)
+			continue;
+		if (get_from_file(fp, " high\t%ld", &high) < 0)
+			continue;	
+		if (get_from_file(fp, " managed\t%ld", &managed) < 0)
+			continue;
+		if (managed > high)
+			nr_pages += managed - high;
+	}
+	fclose(fp);
+
+	return nr_pages;
+}
 
 int init(struct bpftuner *tuner, int ringbuf_map_fd)
 {
@@ -28,10 +103,13 @@ int init(struct bpftuner *tuner, int ringbuf_map_fd)
 	skel->bss->kernel_page_shift = ilog2(pagesize);
 	skel->bss->sk_mem_quantum = SK_MEM_QUANTUM;
 	skel->bss->sk_mem_quantum_shift = ilog2(SK_MEM_QUANTUM);
+	skel->bss->nr_free_buffer_pages = nr_free_buffer_pages();
 	bpftune_log(LOG_DEBUG,
 		    "set pagesize/shift to %d/%d; sk_mem_quantum/shift %d/%d\n",
 		    pagesize, skel->bss->kernel_page_shift, SK_MEM_QUANTUM,
 		    skel->bss->sk_mem_quantum_shift);
+	bpftune_log(LOG_DEBUG,
+		    "set nr_free_buffer_pages to %ld\n", skel->bss->nr_free_buffer_pages);
 	bpftuner_bpf_attach(tcp_buffer, tuner, ringbuf_map_fd);
 	return bpftuner_tunables_init(tuner, TCP_BUFFER_NUM_TUNABLES, descs);
 }
@@ -62,6 +140,9 @@ void event_handler(__attribute__((unused))struct bpftuner *tuner,
 		}
 	}
 	switch (event->update[0].id) {
+	case TCP_BUFFER_TCP_MEM:
+		bpftune_sysctl_write(netns_fd, "net.ipv4.tcp_mem", 3, newvals);
+		break;
 	case TCP_BUFFER_TCP_WMEM:
 		bpftune_sysctl_write(netns_fd, "net.ipv4.tcp_wmem", 3, newvals);
 		break;

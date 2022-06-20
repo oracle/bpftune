@@ -9,7 +9,9 @@
 
 PERF_TESTS = iperf3_test qperf_test
 
-TUNER_TESTS =	sysctl_test log_test wmem_test rmem_test neigh_table_test \
+TUNER_TESTS =	sysctl_test log_test \
+		mem_test wmem_test rmem_test \
+		neigh_table_test \
 		cong_test
 
 DEFAULT_TESTS = $(TUNER_TESTS) $(PERF_TESTS)
@@ -17,6 +19,10 @@ DEFAULT_TESTS = $(TUNER_TESTS) $(PERF_TESTS)
 TESTS = $(DEFAULT_TESTS)
 
 LIBS = test_lib.sh
+
+PROGS = conn_bomb
+
+OBJS = conn_bomb.o
 
 INSTALLFILES = $(DEFAULT_TESTS:%=%.sh) $(LIBS)
 
@@ -29,10 +35,13 @@ INSTALLPATH = $(installprefix)/lib/tcptune_test/
 install_sh_PROGRAM = install
 install_sh_DIR = install -dv
 
-all:
+all: $(PROGS)
 	
 PHONY: clean
 	
+clean:
+	rm -f $(PROGS)
+
 test: $(TESTS)
 	
 test_perf: $(PERF_TESTS)

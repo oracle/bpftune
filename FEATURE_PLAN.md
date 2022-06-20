@@ -1,6 +1,6 @@
 # Plan for features, completed, to-do and possible future work
 
-## Completed tasks (June 3 2022)
+## Completed tasks (June 20 2022)
 
 ### Basic bpftune framework support
  - add configurable logging support syslog/stdout (tested)
@@ -29,6 +29,12 @@
  - tuner watches for tcp_expand_sndbuf() and checks if we approach
    tcp_wmem[2] max buffer size; if so increase buffer size to
    accommodate more data since app needs more space. (tested)
+ - tuner watches for tcp_rcv_space_adjust() and if we approach
+   tcp_wmem[2] increase buffer size to accommodate more space. (tested)
+ - tuner watches for tcp memory pressure/exhaustion.  For the former
+   we scale up all tcp_mem values (min/pressure/max), for the latter
+   just tcp_mem[2], since we want to avoid memory exhaustion if
+   possible (tested)
  
 ### netns tuner
  - tuner iterates over network namespaces at init and watches
@@ -57,6 +63,12 @@
 
 ### set up project packaging and signing (end June 2022)
 
+### TCP buffer tuner
+- look at pulling buffer values back down based on easing
+  memory pressure (tcp_mem) or approaching memory pressure
+  (tune down [rw]mem)
+- initial buffer sizing
+
 ### neigh table tuner (end July 2022)
 
 - look at gc frequency and churn; optimize this also?
@@ -69,7 +81,6 @@
    to optimize?
  - look at SO_[SND|RCV]BPF setting; does that need to be
    overridden?
-
 
 ## Future work
 

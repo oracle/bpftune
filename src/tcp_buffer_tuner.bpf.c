@@ -14,14 +14,17 @@ int kernel_page_size;
 int kernel_page_shift;
 int sk_mem_quantum;
 int sk_mem_quantum_shift;
+unsigned long nr_free_buffer_pages;
 
-static __always_inline void send_sysctl_event(struct sock *sk, int event_id,
+static __always_inline void send_sysctl_event(struct sock *sk,
+					      int scenario_id, int event_id,
 					      long *old, long *new,
 					      struct bpftune_event *event)
 {
 	struct net *net = sk->sk_net.net;
 
 	event->tuner_id = tuner_id;
+	event->scenario_id = scenario_id;
 	event->netns_cookie = get_netns_cookie(net);
 	event->update[0].id = event_id;
 	event->update[0].old[0] = old[0];	
@@ -36,37 +39,61 @@ static __always_inline void send_sysctl_event(struct sock *sk, int event_id,
 static __always_inline bool tcp_nearly_out_of_memory(struct sock *sk,
 						     struct bpftune_event *event)
 {
-	long allocated, limit_sk_mem_quantum[3] = { };
+	long allocated, limit_sk_mem_quantum[3] = {};
+	long tcp_mem[3] = {}, tcp_mem_new[3] = {};
 	struct net *net;
+	int i;
 
 	if (!sk->sk_prot)
 		return false;
 
 	allocated = sk->sk_prot->memory_allocated->counter;
-	if (bpf_probe_read(limit_sk_mem_quantum,
-			   sizeof(limit_sk_mem_quantum),
+	if (bpf_probe_read(tcp_mem,
+			   sizeof(tcp_mem),
 			   sk->sk_prot->sysctl_mem))
 		return false;
 
-	if (!limit_sk_mem_quantum[2])
+	if (!tcp_mem[2])
 		return false;
 
-	if (kernel_page_size > sk_mem_quantum)
-		limit_sk_mem_quantum[2] <<= kernel_page_shift - sk_mem_quantum_shift;
-	else if (kernel_page_size < sk_mem_quantum)
-		limit_sk_mem_quantum[2] >>= sk_mem_quantum_shift - kernel_page_shift;
+	for (i = 0; i < 3; i++) {
+		limit_sk_mem_quantum[i] = tcp_mem[i];
 
+		if (kernel_page_size > limit_sk_mem_quantum[i])
+			limit_sk_mem_quantum[i] <<= kernel_page_shift -
+						    sk_mem_quantum_shift;
+		else if (kernel_page_size < limit_sk_mem_quantum[i])
+			limit_sk_mem_quantum[i] >>= sk_mem_quantum_shift -
+						    kernel_page_shift;
+	}	
+
+	//__bpf_printk("memory allocated %ld, mem pressure/high %ld %ld\n",
+	//	     allocated, limit_sk_mem_quantum[1],
+	//	     limit_sk_mem_quantum[2]);
 	if (NEARLY_FULL(allocated, limit_sk_mem_quantum[1])) {
-		if (!near_memory_pressure) {
-			/* send approaching memory pressure event */
-		}
+		/* send approaching memory pressure event */
+		tcp_mem_new[0] = BPFTUNE_GROW_BY_QUARTER(tcp_mem[0]);
+		tcp_mem_new[1] = BPFTUNE_GROW_BY_QUARTER(tcp_mem[1]);
+		tcp_mem_new[2] = BPFTUNE_GROW_BY_QUARTER(tcp_mem[2]);
+		send_sysctl_event(sk, TCP_MEM_PRESSURE,
+				  TCP_BUFFER_TCP_MEM, tcp_mem,
+				  tcp_mem_new, event);
 		near_memory_pressure = true;
+	} else {
+		near_memory_pressure = false;
 	}
+
 	if (NEARLY_FULL(allocated, limit_sk_mem_quantum[2])) {
-		if (!near_memory_exhaustion) {
-			/* send approaching memory exhaustion event */
-		}
+		/* send approaching memory exhaustion event */
+		tcp_mem_new[0] = tcp_mem[0];
+		tcp_mem_new[1] = tcp_mem[1];
+		tcp_mem_new[2] = BPFTUNE_GROW_BY_QUARTER(tcp_mem[2]);
+		send_sysctl_event(sk, TCP_MEM_EXHAUSTION,
+				  TCP_BUFFER_TCP_MEM, tcp_mem,
+				  tcp_mem_new, event);
 		near_memory_exhaustion = true;
+	} else {
+		near_memory_exhaustion = false;
 	}
 
 	return near_memory_pressure || near_memory_exhaustion;
@@ -119,7 +146,8 @@ int BPF_PROG(bpftune_sndbuf_expand, struct sock *sk)
 		wmem[1] = wmem_new[1] = net->ipv4.sysctl_tcp_wmem[1];
 		wmem_new[2] = BPFTUNE_GROW_BY_QUARTER(wmem[2]);
 
-		send_sysctl_event(sk, TCP_BUFFER_TCP_WMEM, wmem, wmem_new, &event);
+		send_sysctl_event(sk, TCP_BUFFER_INCREASE, TCP_BUFFER_TCP_WMEM,
+				  wmem, wmem_new, &event);
 	}
 	return 0;
 }
@@ -153,7 +181,18 @@ int BPF_PROG(bpftune_rcvbuf_adjust, struct sock *sk)
 		rmem[0] = rmem_new[0] = net->ipv4.sysctl_tcp_rmem[0];
 		rmem[1] = rmem_new[1] = net->ipv4.sysctl_tcp_rmem[1];
 		rmem_new[2] = BPFTUNE_GROW_BY_QUARTER(rmem[2]);
-		send_sysctl_event(sk, TCP_BUFFER_TCP_RMEM, rmem, rmem_new, &event);
+		send_sysctl_event(sk, TCP_BUFFER_INCREASE, TCP_BUFFER_TCP_RMEM,
+				  rmem, rmem_new, &event);
 	}
+	return 0;
+}
+
+SEC("fentry/tcp_init_sock")
+int BPF_PROG(bpftune_tcp_init_sock, struct sock *sk)
+{
+	struct bpftune_event event = {};
+
+	if (sk)
+		(void) tcp_nearly_out_of_memory(sk, &event);
 	return 0;
 }
