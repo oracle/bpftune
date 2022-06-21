@@ -32,7 +32,7 @@ for FAMILY in ipv4 ipv6 ; do
 
    mem_orig=($(sysctl -n net.ipv4.tcp_mem))
 
-   mem_test=($(echo 500 600 1000))
+   mem_test=($(echo 50 100 2000))
    test_setup true
 
    sysctl -w net.ipv4.tcp_mem="${mem_test[0]} ${mem_test[1]} ${mem_test[2]}"

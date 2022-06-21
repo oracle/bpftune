@@ -10,30 +10,28 @@
 
 struct cong_tuner_bpf *skel;
 
+int tcp_iter_fd;
+
 int init(struct bpftuner *tuner, int ringbuf_map_fd)
 {
-	int prog_fd, cgroup_fd, err;
-	const char *cgroup_dir;
+	struct bpf_link *link;
+	int err;
 
 	bpftuner_bpf_init(cong, tuner, ringbuf_map_fd);
 
 	skel = tuner->skel;
-	/* attach to root cgroup */
-	cgroup_dir = bpftune_cgroup_name();
-
-	if (!cgroup_dir) {
-		bpftune_log(LOG_ERR, "cannot get cgroup_dir\n");
+	link = bpf_program__attach_iter(skel->progs.bpftune_iter_cong, NULL);
+	if (!link) {
+		err = -errno;
+		bpftune_log(LOG_ERR, "cannot attach iter : %s\n",
+			    strerror(-err));
 		return 1;
 	}
-	cgroup_fd = bpftune_cgroup_fd();
-
-	prog_fd = bpf_program__fd(skel->progs.cong_sockops);
-
-	if (bpf_prog_attach(prog_fd, cgroup_fd,
-			    BPF_CGROUP_SOCK_OPS, BPF_F_ALLOW_MULTI)) {
+	tcp_iter_fd = bpf_iter_create(bpf_link__fd(link));
+	if (tcp_iter_fd < 0) {
 		err = -errno;
-		bpftune_log(LOG_ERR, "cannot attach to cgroup '%s': %s\n",
-			    cgroup_dir, strerror(-err));
+		bpftune_log(LOG_ERR, "cannot create iter fd: %s\n",
+			    strerror(-err));
 		return 1;
 	}
 
@@ -43,12 +41,8 @@ int init(struct bpftuner *tuner, int ringbuf_map_fd)
 void fini(struct bpftuner *tuner)
 {
 	bpftune_log(LOG_DEBUG, "calling fini for %s\n", tuner->name);
-	if (skel->progs.cong_sockops) {
-		int prog_fd = bpf_program__fd(skel->progs.cong_sockops);
-		int cgroup_fd = bpftune_cgroup_fd();
-
-		bpf_prog_detach2(prog_fd, cgroup_fd, BPF_CGROUP_SOCK_OPS);
-	}
+	if (tcp_iter_fd)
+		close(tcp_iter_fd);
 	bpftuner_bpf_fini(tuner);
 }
 
@@ -57,9 +51,15 @@ void event_handler(struct bpftuner *tuner, struct bpftune_event *event,
 {
 	struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)&event->raw_data;
 	char buf[INET6_ADDRSTRLEN];
+	char iterbuf;
 
 	inet_ntop(sin6->sin6_family, &sin6->sin6_addr, buf, sizeof(buf));
 	bpftune_log(LOG_INFO,
 		    "due to loss events for %s, specified 'bbr' congestion control algorithm: (scenario %d) for tuner %s\n",
 		    buf, event->scenario_id, tuner->name);
+
+	/* kick existing connections by running iterator over them... */
+	while (read(tcp_iter_fd, &iterbuf, sizeof(iterbuf)) == -1 && errno == EAGAIN)
+		;
+
 }

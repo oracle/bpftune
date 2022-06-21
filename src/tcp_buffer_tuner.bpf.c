@@ -16,26 +16,6 @@ int sk_mem_quantum;
 int sk_mem_quantum_shift;
 unsigned long nr_free_buffer_pages;
 
-static __always_inline void send_sysctl_event(struct sock *sk,
-					      int scenario_id, int event_id,
-					      long *old, long *new,
-					      struct bpftune_event *event)
-{
-	struct net *net = sk->sk_net.net;
-
-	event->tuner_id = tuner_id;
-	event->scenario_id = scenario_id;
-	event->netns_cookie = get_netns_cookie(net);
-	event->update[0].id = event_id;
-	event->update[0].old[0] = old[0];	
-	event->update[0].old[1] = old[1];
-	event->update[0].old[2] = old[2];
-	event->update[0].new[0] = new[0];
-	event->update[0].new[1] = new[1];
-	event->update[0].new[2] = new[2];
-	bpf_ringbuf_output(&ringbuf_map, event, sizeof(*event), 0);
-}
-
 static __always_inline bool tcp_nearly_out_of_memory(struct sock *sk,
 						     struct bpftune_event *event)
 {

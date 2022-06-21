@@ -6,6 +6,7 @@
 struct remote_host {
 	__u64 retransmits;
 	__u64 last_retransmit;
+	int sent_event;
 };
 
 struct {
@@ -15,36 +16,6 @@ struct {
 	__type(value, struct remote_host);
 } remote_host_map SEC(".maps");
 
-
-static __always_inline int tcpbpf_get_addr(struct bpf_sock_ops *ops,
-					   struct sockaddr_in6 *sin6)
-{
-	__u32 *addr = (__u32 *)&sin6->sin6_addr;
-
-	sin6->sin6_family = ops->family;
-
-	/* NB; the order of assignment matters here. Why? Because
-	 * the BPF verifier will optimize a load of two adjacent
-	 * __u32s as a __u64 load; and the verifier will duly
-	 * complain since it verifies that loads for various fields
-	 * are only 32 bits in size.
-	 */
-	switch (ops->family) {
-	case AF_INET6:
-		addr[3] = ops->remote_ip6[3];
-		addr[1] = ops->remote_ip6[1];
-		addr[0] = ops->remote_ip6[0];
-		addr[2] = ops->remote_ip6[2];
-		break;
-	case AF_INET:
-		addr[0] = ops->remote_ip4;
-		break;
-	default:
-		return -EINVAL;
-	}
-
-        return 0;
-}
 
 #define RETRANSMIT_THRESH       500
 
@@ -56,6 +27,9 @@ remote_host_retransmit_threshold(struct remote_host *remote_host)
 {
 	__u64 now;
 
+	if (!remote_host)
+		return false;
+
 	if (remote_host->retransmits < RETRANSMIT_THRESH)
 		return false;
 
@@ -65,6 +39,7 @@ remote_host_retransmit_threshold(struct remote_host *remote_host)
 		return true;
 
 	remote_host->retransmits = 0;
+	remote_host->sent_event = 0;
 
 	return false;
 }
@@ -75,74 +50,100 @@ static void remote_host_retransmit(struct remote_host *remote_host)
 	remote_host->last_retransmit = bpf_ktime_get_ns();
 }
 
+static __always_inline int get_sk_key(struct sock *sk, struct in6_addr *key)
+{
+	switch (sk->sk_family) {
+	case AF_INET:
+		return bpf_probe_read(key, sizeof(sk->sk_daddr),
+				      &sk->sk_daddr);
+		
+	case AF_INET6:
+		return bpf_probe_read(key, sizeof(*key),
+				      &sk->sk_v6_daddr);
+	default:
+		return -EINVAL;
+	}
+}
+
+static __always_inline struct remote_host *get_remote_host(struct sock *sk,
+							   struct in6_addr *key)
+{
+	struct remote_host *remote_host = NULL;
+
+	if (get_sk_key(sk, key))
+		return NULL;
+
+	remote_host = bpf_map_lookup_elem(&remote_host_map, key);
+        if (!remote_host) {
+		struct remote_host new_remote_host = {};
+
+		bpf_map_update_elem(&remote_host_map, key, &new_remote_host, BPF_ANY);
+		remote_host = bpf_map_lookup_elem(&remote_host_map, key);
+        }
+	return remote_host;
+}
+
+/* count retransmits here per remote addr here... */
 SEC("tp_btf/tcp_retransmit_skb")
 int BPF_PROG(cong_retransmit, struct sock *sk, struct sk_buff *skb)
 {
-	struct in6_addr key = {};
 	struct remote_host *remote_host;
-	int ret;
+	struct bpftune_event event = {};
+	struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)&event.raw_data;
+	struct in6_addr *key = &sin6->sin6_addr;
 
-
-	switch (sk->sk_family) {
-	case AF_INET:
-		ret = bpf_probe_read(&key, sizeof(sk->sk_daddr),
-				     &sk->sk_daddr);
-		break;
-	case AF_INET6:
-		ret = bpf_probe_read(&key, sizeof(key),
-				     &sk->sk_v6_daddr);
-		break;
-	default:
+	remote_host = get_remote_host(sk, key);
+	if (!remote_host)
 		return 0;
-	}
-	if (ret < 0)
-		return 0;
-	remote_host = bpf_map_lookup_elem(&remote_host_map, &key);
-	if (!remote_host) {
-		struct remote_host new_remote_host = {};
-		bpf_map_update_elem(&remote_host_map, &key, &new_remote_host, BPF_ANY);
-		remote_host = bpf_map_lookup_elem(&remote_host_map, &key);
-	}
-	if (remote_host)
-		remote_host_retransmit(remote_host);
+	remote_host_retransmit(remote_host);
 	
+	if (!remote_host_retransmit_threshold(remote_host) ||
+	    remote_host->sent_event)
+		return 0;
+
+	sin6->sin6_family = sk->sk_family;
+
+	event.tuner_id = tuner_id;
+	event.scenario_id = 0;
+	event.netns_cookie = get_netns_cookie(sk->sk_net.net);
+	bpf_ringbuf_output(&ringbuf_map, &event, sizeof(event), 0);
+	remote_host->sent_event = 1;
+
 	return 0;
 }
 
-SEC("sockops")
-int cong_sockops(struct bpf_sock_ops *ops)
+/* specify BBR congestion control algorithm here via iterator (to catch
+ * existing + new TCP connections) for connections to remote hosts which
+ * have seen retransmits in the past.  The event sent from the retransmit
+ * threshold being surpassed will trigger the iterator.
+ */
+SEC("iter/tcp")
+int bpftune_iter_cong(struct bpf_iter__tcp *ctx)
 {
-	struct bpftune_event event = {};
+	struct sock_common *skc = ctx->sk_common;
 	char bbr[TCP_CA_NAME_MAX] = "bbr";
 	struct remote_host *remote_host;
-	struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)&event.raw_data;
-	struct in6_addr *key;
-	void *ctx;
-	int ret = 0;
+	struct in6_addr key = {};
+	struct tcp_sock *tp;
+        struct sock *sk;
 
-	switch (ops->op) {
-	case BPF_SOCK_OPS_ACTIVE_ESTABLISHED_CB:
-	case BPF_SOCK_OPS_PASSIVE_ESTABLISHED_CB:
-		if (tcpbpf_get_addr(ops, sin6))
-			return 0;
-		break;
-	default:
+	if (skc) {
+		tp = bpf_skc_to_tcp_sock(skc);
+		sk = (struct sock *)tp;
+	}	
+	if (!tp || !sk)
 		return 0;
-	}
 
-	key = &sin6->sin6_addr;
-	remote_host = bpf_map_lookup_elem(&remote_host_map, key);
+	remote_host = get_remote_host(sk, &key);
 	if (!remote_host)
 		return 0;
 
-	/* We have retransmitted to this host, so use BBR as congestion algorithm */
-	if (remote_host_retransmit_threshold(remote_host)) {
-		ret = bpf_setsockopt(ops, SOL_TCP, TCP_CONGESTION,
-				     &bbr, sizeof(bbr));
-		event.tuner_id = tuner_id;
-		event.scenario_id = 0;
-		event.netns_cookie = bpf_get_netns_cookie(ops);
-		bpf_ringbuf_output(&ringbuf_map, &event, sizeof(event), 0);
-	}
+	if (!remote_host_retransmit_threshold(remote_host))
+		return 0;
+		
+	bpf_setsockopt(tp, SOL_TCP, TCP_CONGESTION,
+		       &bbr, sizeof(bbr));
+	remote_host->retransmits = 0;
+
 	return 0;
 }

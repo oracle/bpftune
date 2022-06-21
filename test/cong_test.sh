@@ -44,11 +44,11 @@ for DROP_PERCENT in 10 0 ; do
 	echo "Running ${MODE}..."
 	test_run_cmd_local "ip netns exec $NETNS $IPERF3 -s -1 &"
 	# run bpftune in baseline so it sees drops and reacts for test
-	if [[ $MODE == "baseline" ]]; then
+	if [[ $MODE != "baseline" ]]; then
 		test_run_cmd_local "$BPFTUNE &"
 	else
 		LOGSZ=$(wc -l $LOGFILE | awk '{print $1}')
-		LOGSZ=$(expr $LOGSZ + 1)
+		#LOGSZ=$(expr $LOGSZ + 1)
 	fi
 	sleep $SLEEPTIME
 	test_run_cmd_local "$IPERF3 -fm $CLIENT_OPTS -c $ADDR" true
