@@ -11,9 +11,18 @@ struct {
 	__type(value, struct tbl_stats);
 } tbl_map SEC(".maps");
 
-static __always_inline struct tbl_stats *get_tbl_stats(struct neigh_table *tbl, struct net_device *dev)
+SEC("tp_btf/neigh_create")
+int BPF_PROG(bpftune_neigh_create, struct neigh_table *tbl,
+	     struct net_device *dev, const void *pkey,
+	     struct neighbour *n, bool exempt_from_gc)
 {
-	struct tbl_stats *tbl_stats = bpf_map_lookup_elem(&tbl_map, &tbl);
+	
+	struct tbl_stats *tbl_stats;
+	struct bpftune_event event = {};
+	__u64 key = (__u64)tbl;
+
+	tbl_stats = bpf_map_lookup_elem(&tbl_map, &key);
+
 	if (!tbl_stats) {
 		struct tbl_stats new_tbl_stats = {};
 
@@ -24,8 +33,8 @@ static __always_inline struct tbl_stats *get_tbl_stats(struct neigh_table *tbl, 
 			__builtin_memcpy(&new_tbl_stats.dev, dev->name, sizeof(new_tbl_stats.dev));
 			new_tbl_stats.ifindex = dev->ifindex;
 		}
-		bpf_map_update_elem(&tbl_map, &tbl, &new_tbl_stats, BPF_ANY);
-		tbl_stats = bpf_map_lookup_elem(&tbl_map, &tbl);
+		bpf_map_update_elem(&tbl_map, &key, &new_tbl_stats, BPF_ANY);
+		tbl_stats = bpf_map_lookup_elem(&tbl_map, &key);
 		if (!tbl_stats)
 			return 0;
 	}
@@ -33,21 +42,6 @@ static __always_inline struct tbl_stats *get_tbl_stats(struct neigh_table *tbl, 
 	tbl_stats->gc_entries = tbl->gc_entries.counter;
 
 	tbl_stats->max = tbl->gc_thresh3;
-
-	return tbl_stats;
-}
-
-SEC("tp_btf/neigh_create")
-int BPF_PROG(bpftune_neigh_create, struct neigh_table *tbl,
-	     struct net_device *dev, const void *pkey,
-	     struct neighbour *n, bool exempt_from_gc)
-{
-	struct tbl_stats *tbl_stats, new_tbl_stats = {};
-	struct bpftune_event event = {};
-
-	tbl_stats = get_tbl_stats(tbl, dev);
-	if (!tbl_stats)
-		return 0;
 
 	/* exempt from gc entries are not subject to space constraints, but
  	 * do take up table entries.
