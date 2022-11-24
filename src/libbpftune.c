@@ -27,6 +27,10 @@
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
 
+#ifndef SO_NETNS_COOKIE
+#define SO_NETNS_COOKIE 71
+#endif
+
 int bpftune_loglevel = LOG_INFO;
 void *bpftune_log_ctx;
 
