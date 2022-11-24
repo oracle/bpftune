@@ -42,7 +42,7 @@ for DROP_PERCENT in 10 0 ; do
    for MODE in baseline test ; do
 
 	echo "Running ${MODE}..."
-	test_run_cmd_local "ip netns exec $NETNS $IPERF3 -s -1 &"
+	test_run_cmd_local "ip netns exec $NETNS $IPERF3 -p $PORT -s -1 -D"
 	# run bpftune in baseline so it sees drops and reacts for test
 	if [[ $MODE != "baseline" ]]; then
 		test_run_cmd_local "$BPFTUNE &"
@@ -51,7 +51,7 @@ for DROP_PERCENT in 10 0 ; do
 		#LOGSZ=$(expr $LOGSZ + 1)
 	fi
 	sleep $SLEEPTIME
-	test_run_cmd_local "$IPERF3 -fm $CLIENT_OPTS -c $ADDR" true
+	test_run_cmd_local "$IPERF3 -fm $CLIENT_OPTS -p $PORT -c $ADDR" true
 
 	sresults=$(grep -E "sender" ${CMDLOG} | awk '{print $7}')
 	rresults=$(grep -E "receiver" ${CMDLOG} | awk '{print $7}')

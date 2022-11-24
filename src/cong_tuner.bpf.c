@@ -125,7 +125,7 @@ int bpftune_iter_cong(struct bpf_iter__tcp *ctx)
 	struct remote_host *remote_host;
 	struct in6_addr key = {};
 	struct tcp_sock *tp;
-        struct sock *sk;
+        struct sock *sk = NULL;
 
 	if (skc) {
 		tp = bpf_skc_to_tcp_sock(skc);

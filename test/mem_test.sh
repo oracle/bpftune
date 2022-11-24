@@ -41,7 +41,7 @@ for FAMILY in ipv4 ipv6 ; do
    for MODE in baseline test ; do
 
 	echo "Running ${MODE}..."
-	test_run_cmd_local "ip netns exec $NETNS $IPERF3 -s &"
+	test_run_cmd_local "ip netns exec $NETNS $IPERF3 -s -p $PORT -1 -D"
 	if [[ $MODE != "baseline" ]]; then
 		test_run_cmd_local "$BPFTUNE -d &"
 	else
@@ -49,7 +49,7 @@ for FAMILY in ipv4 ipv6 ; do
 		LOGSZ=$(expr $LOGSZ + 1)
 	fi
 	set +e
-	test_run_cmd_local "$IPERF3 -fm -P $MAX_CONN -c $ADDR " true
+	test_run_cmd_local "$IPERF3 -fm -P $MAX_CONN -p $PORT -c $ADDR " true
 	set -e
 
 	sleep $SLEEPTIME
