@@ -53,6 +53,14 @@ int bpftuner_tunables_init(struct bpftuner *tuner, unsigned int num_descs,
 			   struct bpftunable_desc *descs);
 struct bpftunable *bpftuner_tunable(struct bpftuner *tuner, unsigned int index);
 unsigned int bpftuner_tunable_num(struct bpftuner *tuner);
+
+static inline const char *bpftuner_tunable_name(struct bpftuner *tuner,
+						unsigned int index)
+{
+	struct bpftunable *t = bpftuner_tunable(tuner, index);
+	return t ? t->desc.name : NULL;
+}
+
 #define bpftuner_for_each_tunable(tuner, tunable)			     \
 	for (unsigned int __itun = 0; (tunable = bpftuner_tunable(tuner, __itun)); __itun++)
 

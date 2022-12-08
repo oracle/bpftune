@@ -43,7 +43,6 @@ for DROP_PERCENT in 10 0 ; do
 
 	echo "Running ${MODE}..."
 	test_run_cmd_local "ip netns exec $NETNS $IPERF3 -p $PORT -s -1 -D"
-	# run bpftune in baseline so it sees drops and reacts for test
 	if [[ $MODE != "baseline" ]]; then
 		test_run_cmd_local "$BPFTUNE &"
 	else
@@ -52,7 +51,7 @@ for DROP_PERCENT in 10 0 ; do
 	fi
 	sleep $SLEEPTIME
 	test_run_cmd_local "$IPERF3 -fm $CLIENT_OPTS -p $PORT -c $ADDR" true
-
+	sleep $SLEEPTIME
 	sresults=$(grep -E "sender" ${CMDLOG} | awk '{print $7}')
 	rresults=$(grep -E "receiver" ${CMDLOG} | awk '{print $7}')
 	units=$(grep -E "sender|receiver" ${CMDLOG} | awk '{print $8}' |head -1)
@@ -69,7 +68,6 @@ for DROP_PERCENT in 10 0 ; do
 				tail -n +${LOGSZ} $LOGFILE | grep 'bbr'
 			fi
 		fi
-
         fi
 	sleep $SLEEPTIME
    done

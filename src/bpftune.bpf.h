@@ -89,17 +89,9 @@ unsigned int tuner_id;
 #define NTF_EXT_LEARNED	0x10
 #endif
 
-#define SECOND	((__u64)1000000000)
-
-#define HOUR	(3600 * SECOND)
-
-/* 75% full */
-#define NEARLY_FULL(val, limit)	\
-	((val) >= ((limit) - ((limit) >> 2)))
-
 static __always_inline long get_netns_cookie(struct net *net)
 {
-	return net->net_cookie;
+	return net ? net->net_cookie : 0;
 }
 
 static __always_inline void send_sysctl_event(struct sock *sk,
@@ -107,11 +99,11 @@ static __always_inline void send_sysctl_event(struct sock *sk,
 					      long *old, long *new,
 					      struct bpftune_event *event)
 {
-	struct net *net = sk->sk_net.net;
+	struct net *net = sk ? sk->sk_net.net : 0;
 
 	event->tuner_id = tuner_id;
 	event->scenario_id = scenario_id;
-	event->netns_cookie = get_netns_cookie(net);
+	event->netns_cookie = net ? get_netns_cookie(net) : 0;
 	event->update[0].id = event_id;
 	event->update[0].old[0] = old[0];
 	event->update[0].old[1] = old[1];

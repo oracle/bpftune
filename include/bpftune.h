@@ -9,6 +9,22 @@
 
 /* grow by 25% */
 #define BPFTUNE_GROW_BY_QUARTER(val)    ((val) + ((val) >> 2))
+#define BPFTUNE_GROW_BY_HALF(val)	((val) + ((val) >> 1))
+
+/* shrink by 25% */
+#define BPFTUNE_SHRINK_BY_QUARTER(val)	((val) - ((val) >> 2))
+#define BPFTUNE_SHRINK_BY_HALF(val)	((val) - ((val) >> 1))
+
+#define SECOND				((__u64)1000000000)
+#define MINUTE				(60 * SECOND)
+#define HOUR				(3600 * SECOND)
+
+/* 75% full */
+#define NEARLY_FULL(val, limit) \
+	((val) >= (limit) || (val) + ((limit) >> 2) >= (limit))
+
+#define min(a, b)       ((a) < (b) ? (a) : (b))
+
 
 enum bpftunable_type {
 	BPFTUNABLE_SYSCTL,

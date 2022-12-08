@@ -17,7 +17,7 @@ struct {
 } remote_host_map SEC(".maps");
 
 
-#define RETRANSMIT_THRESH       500
+#define RETRANSMIT_THRESH       100
 
 /* If we retransmitted to this host in the last hour, we've surpassed
  * retransmit threshold.

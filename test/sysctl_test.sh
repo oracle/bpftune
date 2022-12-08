@@ -27,6 +27,7 @@ for TUNER in neigh_table ; do
 	val=$(sysctl -qn $SYSCTL)
 	sysctl -qw ${SYSCTL}=${val}
    done
+   sleep $SLEEPTIME
    grep "modified sysctl" $TESTLOG_LAST
    test_pass
 

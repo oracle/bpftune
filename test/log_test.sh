@@ -39,6 +39,7 @@ for TUNER in neigh_table ; do
 	val=$(sysctl -qn $SYSCTL)
 	sysctl -qw ${SYSCTL}=${val}
    done
+   sleep $SLEEPTIME
    grep "modified sysctl" $LOGFILE
    if [[ "$OPTIONS" == "-ds" ]]; then
 	# should see multiple lines for debug

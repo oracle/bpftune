@@ -108,7 +108,7 @@ bpftune.o: libbpftune.so
 %.skel.h: %.bpf.o
 	$(QUIET_GEN)$(BPFTOOL) gen skeleton $< > $@
 
-$(BPF_TUNERS): vmlinux.h
+$(BPF_TUNERS): $(patsubst %.o,%.c,$(BPF_TUNERS)) vmlinux.h
 	$(CLANG) -g -D__TARGET_ARCH_$(SRCARCH) -O2 -target bpf			\
 		$(INCLUDES) -c $(patsubst %.o,%.c,$(@)) -o $(@)
 

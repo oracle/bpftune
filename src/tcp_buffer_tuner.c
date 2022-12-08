@@ -7,9 +7,14 @@
 struct tcp_buffer_tuner_bpf *skel;
 
 static struct bpftunable_desc descs[] = {
-{ TCP_BUFFER_TCP_WMEM,	BPFTUNABLE_SYSCTL, "net.ipv4.tcp_wmem", true, 3 },
-{ TCP_BUFFER_TCP_RMEM,	BPFTUNABLE_SYSCTL, "net.ipv4.tcp_rmem", true, 3 },
-{ TCP_BUFFER_TCP_MEM,	BPFTUNABLE_SYSCTL, "net.ipv4.tcp_mem", false, 3 },
+{ TCP_BUFFER_TCP_WMEM,	BPFTUNABLE_SYSCTL, "net.ipv4.tcp_wmem",	true, 3 },
+{ TCP_BUFFER_TCP_RMEM,	BPFTUNABLE_SYSCTL, "net.ipv4.tcp_rmem",	true, 3 },
+{ TCP_BUFFER_TCP_MEM,	BPFTUNABLE_SYSCTL, "net.ipv4.tcp_mem",	false, 3 },
+{ TCP_BUFFER_TCP_MAX_ORPHANS,
+			BPFTUNABLE_SYSCTL, "net.ipv4.tcp_max_orphans",
+								false, 1 },
+{ NETDEV_MAX_BACKLOG,	BPFTUNABLE_SYSCTL, "net.core.netdev_max_backlog",
+								false, 1 },
 };
 
 /* When TCP starts up, it calls nr_free_buffer_pages() and uses it to estimate
@@ -57,7 +62,7 @@ int get_from_file(FILE *fp, const char *fmt, ...)
 	return ret;
 }
 
-long nr_free_buffer_pages(void)
+long nr_free_buffer_pages(bool initial)
 {
 	FILE *fp = fopen("/proc/zoneinfo", "r");
 	unsigned long nr_pages = 0;
@@ -67,7 +72,7 @@ long nr_free_buffer_pages(void)
 		return 0;
 	}	
 	while (!feof(fp)) {
-		long managed = 0, high = 0, node;
+		long managed = 0, high = 0, free = 0, node;
 		char zone[128] = {};
 
 		if (get_from_file(fp, "Node %d, zone %s", &node, zone) < 0)
@@ -76,10 +81,15 @@ long nr_free_buffer_pages(void)
 			continue;
 		if (get_from_file(fp, " high\t%ld", &high) < 0)
 			continue;	
-		if (get_from_file(fp, " managed\t%ld", &managed) < 0)
-			continue;
-		if (managed > high)
-			nr_pages += managed - high;
+		if (initial) {
+			if (get_from_file(fp, " managed\t%ld", &managed) < 0)
+				continue;
+			if (managed > high)
+				nr_pages += managed - high;
+		} else {
+			if (get_from_file(fp, " nr_free_pages\t%ld", &free))
+				nr_pages += free;
+		}
 	}
 	fclose(fp);
 
@@ -103,7 +113,7 @@ int init(struct bpftuner *tuner, int ringbuf_map_fd)
 	skel->bss->kernel_page_shift = ilog2(pagesize);
 	skel->bss->sk_mem_quantum = SK_MEM_QUANTUM;
 	skel->bss->sk_mem_quantum_shift = ilog2(SK_MEM_QUANTUM);
-	skel->bss->nr_free_buffer_pages = nr_free_buffer_pages();
+	skel->bss->nr_free_buffer_pages = nr_free_buffer_pages(true);
 	bpftune_log(LOG_DEBUG,
 		    "set pagesize/shift to %d/%d; sk_mem_quantum/shift %d/%d\n",
 		    pagesize, skel->bss->kernel_page_shift, SK_MEM_QUANTUM,
@@ -120,10 +130,14 @@ void fini(struct bpftuner *tuner)
 	bpftuner_bpf_fini(tuner);
 }
 
-void event_handler(__attribute__((unused))struct bpftuner *tuner,
+void event_handler(struct bpftuner *tuner,
 		   struct bpftune_event *event,
 		   __attribute__((unused))void *ctx)
 {
+	struct tcp_buffer_tuner_bpf *skel = tuner->skel;
+	int scenario = event->scenario_id;
+	const char *lowmem = NULL;
+	const char *tunable;
 	int netns_fd = 0;
 	long newvals[3];
 
@@ -139,15 +153,65 @@ void event_handler(__attribute__((unused))struct bpftuner *tuner,
 			return;
 		}
 	}
+	tunable = bpftuner_tunable_name(tuner, event->update[0].id);
+	if (!tunable) {
+		bpftune_log(LOG_DEBUG, "unknown tunable [%d] for tcp_buffer_tuner\n",
+				       event->update[0].id);
+		return;
+	}
+	if (skel->bss->near_memory_pressure)
+		lowmem = "near memory pressure";
+	else if (skel->bss->under_memory_pressure)
+		lowmem = "under memory pressure";
+	else if (skel->bss->near_memory_exhaustion)
+		lowmem = "near memory exhaustion";
+
 	switch (event->update[0].id) {
 	case TCP_BUFFER_TCP_MEM:
-		bpftune_sysctl_write(netns_fd, "net.ipv4.tcp_mem", 3, newvals);
+		switch (scenario) {
+		case TCP_MEM_PRESSURE:
+		case TCP_MEM_EXHAUSTION:
+			bpftune_log(LOG_INFO,
+"%s; since this is a highly unstable state "
+"for the TCP/IP stack, increase %s[2] limit from %d -> %d.\n",
+				     lowmem, tunable, event->update[0].old[2], newvals[2]);
+			break;
+		}
+		bpftune_sysctl_write(netns_fd, tunable, 3, newvals);
 		break;
 	case TCP_BUFFER_TCP_WMEM:
-		bpftune_sysctl_write(netns_fd, "net.ipv4.tcp_wmem", 3, newvals);
-		break;
 	case TCP_BUFFER_TCP_RMEM:
-		bpftune_sysctl_write(netns_fd, "net.ipv4.tcp_rmem", 3, newvals);
+		switch (scenario) {
+		case TCP_BUFFER_INCREASE:
+			bpftune_log(LOG_INFO,
+"A socket needs to increase max buffer size (%s[2]) to maximize throughput. "
+"Increasing it from %d -> %d, as we are not experiencing memory shortages.\n",
+				    tunable, event->update[0].old[2], newvals[2]); 
+			break;
+		case TCP_BUFFER_DECREASE:
+			bpftune_log(LOG_INFO,
+"As we are %s, decrease max buffer size (%s[2]) to reduce per-socket memory utilization."
+"Decreasing from %d -> %d\n",
+	 			    lowmem, tunable, event->update[0].old[2], newvals[2]);
+			break;
+		}
+		bpftune_sysctl_write(netns_fd, tunable, 3, newvals);
+		break;
+	case NETDEV_MAX_BACKLOG:
+		switch (scenario) {
+		case NETDEV_MAX_BACKLOG_INCREASE:
+			bpftune_log(LOG_INFO,
+"Dropped more than 1/4 of the backlog queue size (%d) in last minute; "
+"Increase backlog queue size from %d -> %d to support faster network device.\n",
+				    event->update[0].old[0],
+				    event->update[0].old[0], newvals[0]);
+			break;
+		case NETDEV_MAX_BACKLOG_DECREASE:
+			break;
+		}
+		bpftune_sysctl_write(netns_fd, tunable, 1, newvals);
+		break;
+	case TCP_BUFFER_TCP_MAX_ORPHANS:
 		break;
 	}
 

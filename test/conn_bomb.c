@@ -44,9 +44,11 @@
 #include <linux/types.h>
 #include <linux/rds.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
@@ -54,7 +56,7 @@ static int usage(const char *prog)
 {
 	fprintf(stderr,
 		"Usage: %s -l localIP -p localPort -r remoteIP -P remotePort\n"
-		"	   -m msg -c count\n",
+		"	   -m msg -c count [-o]\n",
 		prog);
 	return 1;
 }
@@ -75,6 +77,7 @@ int main(int argc, char **argv)
 	int isserver = 0;
 	int conn_num = 0;
 	int c, ret = 0;
+	int orphan = 0;
 	int gotmsg = 0;
 	int child = 0;
 	int quiet = 0;
@@ -83,7 +86,7 @@ int main(int argc, char **argv)
 	memset(&laddr, 0, sizeof(laddr));
 	memset(&raddr, 0, sizeof(raddr));
 
-	while ((c = getopt(argc, argv, "C:c:l:m:r:p:P:qs:")) != -1) {
+	while ((c = getopt(argc, argv, "C:c:l:m:o:r:p:P:qs:")) != -1) {
 		switch (c) {
 		case 'C':
 			conn_count = atoi(optarg);
@@ -108,6 +111,9 @@ int main(int argc, char **argv)
 			}
 			laddr.ss_family = family;
 			isserver = 1;
+			break;
+		case 'o':
+			orphan = atoi(optarg);
 			break;
 		case 'r':
 			sin = (struct sockaddr_in *)&raddr;
@@ -183,19 +189,22 @@ int main(int argc, char **argv)
 		}
 	}
 
+	if (isserver) {
+		if (!quiet)
+                        printf("listening...\n");
+                if (listen(sock, conn_count) < 0) {
+                        perror("listen");
+                        ret = 1;
+                        goto out;
+		}
+	}
+
 	for (i = 0; i < conn_count; i++) {
 		int newsock, pid;
 
 		++conn_num;
 
 		if (isserver) {
-			if (!quiet)
-			printf("listening...\n");
-			if (listen(sock, conn_count) < 0) {
-	                        perror("listen");
-				ret = 1;
-				goto out;
-                	}
 			newsock = accept(sock, (struct sockaddr *)&raddr, &addrlen);
 			if (newsock < 0) {
 				perror("accept");
@@ -203,22 +212,30 @@ int main(int argc, char **argv)
 			}
 			pid = fork();
 			if (pid != 0) {
-				close(newsock);
+				if (pid < 0)
+					perror("fork");
+				if (!orphan)
+					close(newsock);
 				continue;
 			}
 			child = 1;
 		} else {
 			pid = fork();
-			if (pid != 0)
+			if (pid != 0) {
+				if (pid < 0)
+					perror("fork");
 				continue;
+			}
 
 			sock = socket(family, SOCK_STREAM, 0);
 	                if (sock < 0) {
         	                perror("socket");
 				exit(1);	
 			}
-			if (connect(sock, (struct sockaddr *)&raddr, addrlen) < 0)
+			if (connect(sock, (struct sockaddr *)&raddr, addrlen) < 0) {
+				perror("connect");
 				exit(1);
+			}
 		}
 		/* In child process context now... */
 		for (i = 1; i <= count; i++) {
@@ -249,6 +266,8 @@ int main(int argc, char **argv)
 				printf("conn# %d: %s\n", conn_num, recvbuf);
 			}
 		}
+		if (!isserver && orphan)
+			sleep(orphan);
 		exit(0);
 	}
 
