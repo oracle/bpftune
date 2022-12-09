@@ -66,7 +66,7 @@ static __always_inline bool tcp_nearly_out_of_memory(struct sock *sk,
 	if (NEARLY_FULL(allocated, limit_sk_mem_quantum[2])) {
 		/* approaching memory exhaustion event; dial down wmem/rmem
  		 * buffer limits to limit per-socket costs.
- 		 */
+		 */
 		near_memory_exhaustion = true;
 		near_memory_pressure = true;
 		mem_new[0] = mem[0];

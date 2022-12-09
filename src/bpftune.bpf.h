@@ -101,6 +101,7 @@ static __always_inline void send_sysctl_event(struct sock *sk,
 {
 	struct net *net = sk ? sk->sk_net.net : 0;
 
+	__builtin_memset(event, 0, sizeof(*event));
 	event->tuner_id = tuner_id;
 	event->scenario_id = scenario_id;
 	event->netns_cookie = net ? get_netns_cookie(net) : 0;
