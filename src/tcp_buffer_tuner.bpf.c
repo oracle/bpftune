@@ -54,8 +54,8 @@ static __always_inline bool tcp_nearly_out_of_memory(struct sock *sk,
 	}
 
 #pragma clang loop unroll(full)
-	for (i = 0; i <= 2; i++) {
-		limit_sk_mem_quantum[i] = mem[i] & 0xffffffff;
+	for (i = 0; i < 3; i++) {
+		limit_sk_mem_quantum[i] = mem[i];
 		if (shift_left)
 			limit_sk_mem_quantum[i] <<= shift_left;
 		if (shift_right)
@@ -72,43 +72,46 @@ static __always_inline bool tcp_nearly_out_of_memory(struct sock *sk,
 		near_memory_pressure = true;
 		mem_new[0] = mem[0];
 		mem_new[1] = mem[1];
-		mem_new[2] = BPFTUNE_GROW_BY_QUARTER(mem[2]);
-		//	min(nr_free_buffer_pages >> 2,
-		//		     BPFTUNE_GROW_BY_QUARTER(mem[2]));
+		mem_new[2] = min(nr_free_buffer_pages >> 2,
+				 BPFTUNE_GROW_BY_QUARTER(mem[2]));
 		send_sysctl_event(sk, TCP_MEM_EXHAUSTION,
 				  TCP_BUFFER_TCP_MEM, mem, mem_new, event);
 		/* XXX fix */
 		return true;
-		if (!net)
-			return true;
-		mem[0] = mem_new[0] = net->ipv4.sysctl_tcp_wmem[0];
-                mem[1] = mem_new[1] = net->ipv4.sysctl_tcp_wmem[1];
-		mem[2] = mem_new[2] = net->ipv4.sysctl_tcp_wmem[2];
-                mem_new[2] = BPFTUNE_SHRINK_BY_QUARTER(mem[2]);
-                send_sysctl_event(sk, TCP_BUFFER_DECREASE, TCP_BUFFER_TCP_WMEM,
-                                  mem, mem_new, event);
-		mem[0] = mem_new[0] = net->ipv4.sysctl_tcp_rmem[0];
-                mem[1] = mem_new[1] = net->ipv4.sysctl_tcp_rmem[1];
-		mem[2] = mem_new[2] = net->ipv4.sysctl_tcp_rmem[2];
-                mem_new[2] = BPFTUNE_SHRINK_BY_QUARTER(mem[2]);
-		send_sysctl_event(sk, TCP_BUFFER_DECREASE, TCP_BUFFER_TCP_RMEM,
-				  mem, mem_new, event);
+		if (net) {
+			mem[0] = mem_new[0] = net->ipv4.sysctl_tcp_wmem[0];
+			mem[1] = mem_new[1] = net->ipv4.sysctl_tcp_wmem[1];
+			mem[2] = net->ipv4.sysctl_tcp_wmem[2];
+			mem_new[2] = BPFTUNE_SHRINK_BY_QUARTER(mem[2]);
+			send_sysctl_event(sk, TCP_BUFFER_DECREASE,
+					  TCP_BUFFER_TCP_WMEM, 
+					  mem, mem_new, event);
+			mem[0] = mem_new[0] = net->ipv4.sysctl_tcp_rmem[0];
+			mem[1] = mem_new[1] = net->ipv4.sysctl_tcp_rmem[1];
+			mem[2] = net->ipv4.sysctl_tcp_rmem[2];
+			mem_new[2] = BPFTUNE_SHRINK_BY_QUARTER(mem[2]);
+			send_sysctl_event(sk, TCP_BUFFER_DECREASE,
+					  TCP_BUFFER_TCP_RMEM,
+					  mem, mem_new, event);
+		}
 		return true;
 	} else if (NEARLY_FULL(allocated, limit_sk_mem_quantum[1])) {
 		/* send approaching memory pressure event; we also increase
 		 * memory exhaustion limit as it tends to lead to
 		 * pathological tcp behaviour.
 		 */
-                mem_new[0] = mem[0];
-                mem_new[1] = mem[1];
-                mem_new[2] = BPFTUNE_GROW_BY_QUARTER(mem[2]);
-			//min(nr_free_buffer_pages >> 2,
-                         //        BPFTUNE_GROW_BY_QUARTER(mem[2]));
-                send_sysctl_event(sk, TCP_MEM_PRESSURE,
+		if (!mem[0] || !mem[1] || !mem[2])
+			return false;
+
+		mem_new[0] = mem[0];
+		mem_new[1] = mem[1];
+		mem_new[2] = min(nr_free_buffer_pages >> 2,
+				 BPFTUNE_GROW_BY_QUARTER(mem[2]));
+		send_sysctl_event(sk, TCP_MEM_PRESSURE,
 				  TCP_BUFFER_TCP_MEM, mem, mem_new, event);
-                near_memory_pressure = true;
+		near_memory_pressure = true;
 		return true;
-        }
+	}
 	near_memory_exhaustion = false;
 	near_memory_pressure = false;
 
