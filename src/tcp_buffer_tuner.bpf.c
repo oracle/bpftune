@@ -53,7 +53,6 @@ static __always_inline bool tcp_nearly_out_of_memory(struct sock *sk,
 			return false;
 	}
 
-#pragma clang loop unroll(full)
 	for (i = 0; i < 3; i++) {
 		limit_sk_mem_quantum[i] = mem[i];
 		if (shift_left)
