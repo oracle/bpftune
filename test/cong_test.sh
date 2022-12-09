@@ -50,7 +50,9 @@ for DROP_PERCENT in 10 0 ; do
 		#LOGSZ=$(expr $LOGSZ + 1)
 	fi
 	sleep $SLEEPTIME
+	set +e
 	test_run_cmd_local "$IPERF3 -fm $CLIENT_OPTS -p $PORT -c $ADDR" true
+	set -e
 	sleep $SLEEPTIME
 	sresults=$(grep -E "sender" ${CMDLOG} | awk '{print $7}')
 	rresults=$(grep -E "receiver" ${CMDLOG} | awk '{print $7}')
