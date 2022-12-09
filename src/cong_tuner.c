@@ -20,7 +20,7 @@ int init(struct bpftuner *tuner, int ringbuf_map_fd)
 	bpftuner_bpf_init(cong, tuner, ringbuf_map_fd);
 
 	skel = tuner->skel;
-	link = bpf_program__attach_iter(skel->progs.bpftune_iter_cong, NULL);
+	link = bpf_program__attach_iter(skel->progs.bpftune_cong_iter, NULL);
 	if (!link) {
 		err = -errno;
 		bpftune_log(LOG_ERR, "cannot attach iter : %s\n",
@@ -55,7 +55,7 @@ void event_handler(struct bpftuner *tuner, struct bpftune_event *event,
 
 	inet_ntop(sin6->sin6_family, &sin6->sin6_addr, buf, sizeof(buf));
 	bpftune_log(LOG_INFO,
-		    "due to loss events for %s, specified 'bbr' congestion control algorithm: (scenario %d) for tuner %s\n",
+		    "due to loss events for %s, we will specify 'bbr' congestion control algorithm: (scenario %d) for tuner %s\n",
 		    buf, event->scenario_id, tuner->name);
 
 	/* kick existing connections by running iterator over them... */

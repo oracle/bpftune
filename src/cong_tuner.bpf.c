@@ -4,9 +4,9 @@
 #include "bpftune.bpf.h"
 
 struct remote_host {
-	__u64 retransmits;
 	__u64 last_retransmit;
-	int sent_event;
+	__u64 retransmits;
+	bool retransmit_threshold;
 };
 
 struct {
@@ -17,9 +17,7 @@ struct {
 } remote_host_map SEC(".maps");
 
 
-#define RETRANSMIT_THRESH       100
-
-/* If we retransmitted to this host in the last hour, we've surpassed
+/* If we surpassed the retransmit threshold to host in the last hour?
  * retransmit threshold.
  */
 static __always_inline bool
@@ -30,36 +28,26 @@ remote_host_retransmit_threshold(struct remote_host *remote_host)
 	if (!remote_host)
 		return false;
 
-	if (remote_host->retransmits < RETRANSMIT_THRESH)
-		return false;
-
 	now = bpf_ktime_get_ns();
 
-	if (now - remote_host->last_retransmit < HOUR)
-		return true;
+	if (now - remote_host->last_retransmit > HOUR) {
+		remote_host->retransmits = 0;
+		remote_host->retransmit_threshold = false;
+	}
 
-	remote_host->retransmits = 0;
-	remote_host->sent_event = 0;
-
-	return false;
-}
-
-static void remote_host_retransmit(struct remote_host *remote_host)
-{
-	remote_host->retransmits++;
-	remote_host->last_retransmit = bpf_ktime_get_ns();
+	return remote_host->retransmit_threshold;
 }
 
 static __always_inline int get_sk_key(struct sock *sk, struct in6_addr *key)
 {
 	switch (sk->sk_family) {
 	case AF_INET:
-		return bpf_probe_read(key, sizeof(sk->sk_daddr),
-				      &sk->sk_daddr);
+		return bpf_probe_read_kernel(key, sizeof(sk->sk_daddr),
+					     &sk->sk_daddr);
 		
 	case AF_INET6:
-		return bpf_probe_read(key, sizeof(*key),
-				      &sk->sk_v6_daddr);
+		return bpf_probe_read_kernel(key, sizeof(*key),
+					     &sk->sk_v6_daddr);
 	default:
 		return -EINVAL;
 	}
@@ -77,7 +65,8 @@ static __always_inline struct remote_host *get_remote_host(struct sock *sk,
         if (!remote_host) {
 		struct remote_host new_remote_host = {};
 
-		bpf_map_update_elem(&remote_host_map, key, &new_remote_host, BPF_ANY);
+		bpf_map_update_elem(&remote_host_map, key, &new_remote_host,
+				    BPF_ANY);
 		remote_host = bpf_map_lookup_elem(&remote_host_map, key);
         }
 	return remote_host;
@@ -91,23 +80,37 @@ int BPF_PROG(cong_retransmit, struct sock *sk, struct sk_buff *skb)
 	struct bpftune_event event = {};
 	struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)&event.raw_data;
 	struct in6_addr *key = &sin6->sin6_addr;
+	__u64 segs_out = 0, retrans_out = 0;
 
 	remote_host = get_remote_host(sk, key);
 	if (!remote_host)
 		return 0;
-	remote_host_retransmit(remote_host);
-	
-	if (!remote_host_retransmit_threshold(remote_host) ||
-	    remote_host->sent_event)
+
+	remote_host->retransmits++;
+	remote_host->last_retransmit = bpf_ktime_get_ns();
+
+	if (remote_host->retransmit_threshold)
+		return 0;
+
+	if (bpf_probe_read_kernel(&segs_out, sizeof(segs_out),
+				  sk + offsetof(struct tcp_sock, segs_out)) ||
+	    bpf_probe_read_kernel(&retrans_out, sizeof(retrans_out),
+				  sk + offsetof(struct tcp_sock, retrans_out)))
+		return 0;
+
+	/* with a retransmission rate of > 1%, BBR performs much better; let's
+	 * be conservative and look for a > 2% retransmission rate...
+	 */
+	if (segs_out >> 5 > 1 && retrans_out > segs_out >> 5)
+		remote_host->retransmit_threshold = true;
+	else
 		return 0;
 
 	sin6->sin6_family = sk->sk_family;
-
 	event.tuner_id = tuner_id;
 	event.scenario_id = 0;
 	event.netns_cookie = get_netns_cookie(sk->sk_net.net);
 	bpf_ringbuf_output(&ringbuf_map, &event, sizeof(event), 0);
-	remote_host->sent_event = 1;
 
 	return 0;
 }
@@ -118,7 +121,7 @@ int BPF_PROG(cong_retransmit, struct sock *sk, struct sk_buff *skb)
  * threshold being surpassed will trigger the iterator.
  */
 SEC("iter/tcp")
-int bpftune_iter_cong(struct bpf_iter__tcp *ctx)
+int bpftune_cong_iter(struct bpf_iter__tcp *ctx)
 {
 	struct sock_common *skc = ctx->sk_common;
 	char bbr[TCP_CA_NAME_MAX] = "bbr";
@@ -143,7 +146,6 @@ int bpftune_iter_cong(struct bpf_iter__tcp *ctx)
 		
 	bpf_setsockopt(tp, SOL_TCP, TCP_CONGESTION,
 		       &bbr, sizeof(bbr));
-	remote_host->retransmits = 0;
 
 	return 0;
 }
