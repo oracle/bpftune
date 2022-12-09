@@ -7,9 +7,9 @@
 # as published by the Free Software Foundation.
 #
 
-# run iperf3 test
-
 PORT=5201
+
+LOGFILE=/var/log/messages
 
 . ./test_lib.sh
 
