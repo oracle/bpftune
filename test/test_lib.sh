@@ -249,6 +249,10 @@ test_cleanup()
 
 test_cleanup_exit()
 {
+	BC=${BASH_COMMAND}
+        if [[ -n "$BC" ]]; then
+                echo "Last command executed: '$BC'"
+        fi
 	if [[ $SKIP_CLEANUP -ne 0 ]]; then
 		echo "skipping cleanup as requested"
 		if [ $EXITCODE -ne 0 ]; then

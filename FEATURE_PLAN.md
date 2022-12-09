@@ -63,7 +63,25 @@
 
 ### set up project packaging and signing
 
-### TCP buffer tuner
+### add a configurable learning rate
+- currently we check for limit approach and up values based
+  on a 25% value; i.e. within 25% of limit, adjust up by 25%.
+  This is computed efficiently via (limit - (limit >> 2)). We
+  could make the bitshift configurable, ranging from a learning
+  rate that works like this:
+
+	- 1; equivalent to limit >> 6, i.e. 1.5625% learning rate
+	- 2; equivalent to limit >> 5, i.e. 3.125% learning rate
+	- 3; equivlanet to limit >> 4, i.e. 6.25% learning rate
+	- 4; equivalent to limit >> 3, i.e  12.5% learning rate
+	- 5; equivalent to limit >> 2, i.e. 25% learning rate
+
+At the lower end of the scale, change would be more frequent but
+also more gradual, so probably better for the risk-averse; we
+would only update buffer sizes for example if we came within
+1.5% of buffer limit, and only increase buffer size by 1.5%.
+
+### TCP buffer tuner improvements
 - look at pulling buffer values back down based on longer latency
   (potential bufferbloat)
 - look at netdev_max_backlog; tune that too?
@@ -72,11 +90,15 @@
   this could devolve into simply setting [wr]mem[1] = [wr]mem[2].
   Pole balancing problem?  Set by well-know service history?
   If we stash the buffer sizes on connection destroy, we can
-  learn.
+  learn and use sockops prog to set initial buffer size.
+  use BPF_SOCK_OPS_RWND_INIT to set default recieve buffer size
+  and bpf_setsockopt(.., TCP_BPF_IW, ..) to set send buffer size.
 - look at SO_[SND|RCV]BPF setting; does that need to be
   overridden? If we can trace cases where more buffer would
   help maybe we can learn which well-known ports do buffer
-  sizing wrong?
+  sizing wrong? Perhaps at a minimum we should catch cases
+  where SO_[SND|RCV]BUF is not honoured do to [wr]mem_max
+  settings and adjust [wr]mem_max?
 
 ### neigh table tuner (end July 2022)
 
