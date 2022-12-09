@@ -21,17 +21,19 @@ DESCRIPTION
         to potential bandwitdh.
 
         With the above in mind, we count retransmission events by remote host,
-        and if we see > 500 in the last hour, we utilize BBR as the congestion
-        algorithm instead, anticipating these sorts of losses may result in
-        us under-estimating bandwitdh potential.
+        and if we see >1% retransmits to the host in the last hour, we utilize
+        BBR as the congestion algorithm instead, anticipating these sorts of
+        losses may result in us under-estimating bandwidth potential.
 
         Note that BBR retransmits more than other algorithms, so if we switch
         to it we will likely see more retransmits, and potentially stay with
         it for a length of time until such losses shake out.
 
         We use the tracepoint tcp_retransmit_skb to count retransmits by
-        remote host, and a TCP-BPF sockops program to set congestion control
-        algorithm on connect/accept.
+        remote host, and a BPF iterator program to set congestion control
+        algorithm, since it allows us to update congestion control for
+        existing connections such as an iSCSI connection, which may exist
+        prior to bpftune starting.
 
         Reference: https://blog.apnic.net/2020/01/10/when-to-use-and-not-use-bbr
 
