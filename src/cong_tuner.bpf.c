@@ -101,7 +101,7 @@ int BPF_PROG(cong_retransmit, struct sock *sk, struct sk_buff *skb)
 	/* with a retransmission rate of > 1%, BBR performs much better;
 	 * below translates to ~ 1.5%.
 	 */
-	if (segs_out >> 6 > 1 && retrans_out > segs_out >> 6)
+	if ((segs_out >> 6) > 0 && retrans_out > (segs_out >> 6))
 		remote_host->retransmit_threshold = true;
 	else
 		return 0;
