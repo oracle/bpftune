@@ -30,10 +30,10 @@
    tcp_wmem[2] max buffer size; if so increase buffer size to
    accommodate more data since app needs more space. (tested)
  - tuner watches for tcp_rcv_space_adjust() and if we approach
-   tcp_wmem[2] increase buffer size to accommodate more space. (tested)
+   tcp_rmem[2] increase buffer size to accommodate more space. (tested)
  - tuner watches for tcp memory pressure/exhaustion.  For the former
-   we scale up all tcp_mem values (min/pressure/max), for the latter
-   just tcp_mem[2], since we want to avoid memory exhaustion if
+   we scale up all tcp_mem[2] value, for the latter we reduce
+   tcp_[wr]mem[2], since we want to avoid memory exhaustion if
    possible (tested)
  
 ### netns tuner
@@ -61,13 +61,22 @@
 
 ## To do tasks
 
-### set up project packaging and signing (end June 2022)
+### set up project packaging and signing
 
 ### TCP buffer tuner
-- look at pulling buffer values back down based on easing
-  memory pressure (tcp_mem) or approaching memory pressure
-  (tune down [rw]mem)
-- initial buffer sizing
+- look at pulling buffer values back down based on longer latency
+  (potential bufferbloat)
+- look at netdev_max_backlog; tune that too?
+- initial buffer sizing: can we find a heuristic to minimize an
+  error signal (number of updates to buffer size?).  Problem:
+  this could devolve into simply setting [wr]mem[1] = [wr]mem[2].
+  Pole balancing problem?  Set by well-know service history?
+  If we stash the buffer sizes on connection destroy, we can
+  learn.
+- look at SO_[SND|RCV]BPF setting; does that need to be
+  overridden? If we can trace cases where more buffer would
+  help maybe we can learn which well-known ports do buffer
+  sizing wrong?
 
 ### neigh table tuner (end July 2022)
 
@@ -75,12 +84,6 @@
 
 - should we enable drop_gratuitous_arp if we see a lot of
   entries added?
-
-### tcp tuner
- - initial snd buffer sizing; tune by service/remote system
-   to optimize?
- - look at SO_[SND|RCV]BPF setting; does that need to be
-   overridden?
 
 ## Future work
 

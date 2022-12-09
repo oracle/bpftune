@@ -52,6 +52,7 @@ for FAMILY in ipv4 ipv6 ; do
 	fi
 	sleep $SLEEPTIME
 	test_run_cmd_local "$IPERF3 -fm $CLIENT_OPTS -c $PORT -c $ADDR" true
+	sleep $SLEEPTIME
 
 	sresults=$(grep -E "sender" ${CMDLOG} | awk '{print $7}')
 	rresults=$(grep -E "receiver" ${CMDLOG} | awk '{print $7}')
