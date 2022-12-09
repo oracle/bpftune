@@ -80,7 +80,7 @@ int BPF_PROG(cong_retransmit, struct sock *sk, struct sk_buff *skb)
 	struct bpftune_event event = {};
 	struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)&event.raw_data;
 	struct in6_addr *key = &sin6->sin6_addr;
-	__u64 segs_out = 0, retrans_out = 0;
+	__u64 segs_out = 0, total_retrans = 0;
 
 	remote_host = get_remote_host(sk, key);
 	if (!remote_host)
@@ -94,14 +94,14 @@ int BPF_PROG(cong_retransmit, struct sock *sk, struct sk_buff *skb)
 
 	if (bpf_probe_read_kernel(&segs_out, sizeof(segs_out),
 				  sk + offsetof(struct tcp_sock, segs_out)) ||
-	    bpf_probe_read_kernel(&retrans_out, sizeof(retrans_out),
-				  sk + offsetof(struct tcp_sock, retrans_out)))
+	    bpf_probe_read_kernel(&total_retrans, sizeof(total_retrans),
+				  sk + offsetof(struct tcp_sock, total_retrans)))
 		return 0;
 
 	/* with a retransmission rate of > 1%, BBR performs much better;
 	 * below translates to ~ 1.5%.
 	 */
-	if ((segs_out >> 6) > 0 && retrans_out > (segs_out >> 6))
+	if (total_retrans > (segs_out >> 6))
 		remote_host->retransmit_threshold = true;
 	else
 		return 0;
