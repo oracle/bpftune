@@ -11,10 +11,13 @@
 
 . ./test_lib.sh
 
+LOGFILE=$TESTLOG_LAST
 
 for FAMILY in ipv4 ipv6 ; do
 
 SLEEPTIME=0.5
+
+DROP=0
 
 for LATENCY in "" "latency 20ms" ; do
 
@@ -38,7 +41,7 @@ for LATENCY in "" "latency 20ms" ; do
 	echo "Running ${MODE}..."
 	test_run_cmd_local "ip netns exec $NETNS $QPERF &"
 	if [[ $MODE == "test" ]]; then
-		test_run_cmd_local "$BPFTUNE &"
+		test_run_cmd_local "$BPFTUNE -s &" true
 	fi
 	test_run_cmd_local \
 	    "$QPERF -v $ADDR -uu -oo msg_size:1:64k:*4 -vu ${CLIENT_OPTS}" true
@@ -74,6 +77,11 @@ for LATENCY in "" "latency 20ms" ; do
 		;;	
 	esac
    done
+
+   echo "Following changes were made:"
+   set +e
+   grep "bpftune" $LOGFILE
+   set -e
 
    test_pass
 
