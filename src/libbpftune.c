@@ -42,7 +42,7 @@ void bpftune_log_stderr(__attribute__((unused)) void *ctx,
 			const char *fmt, va_list args)
 {
 	if (level <= bpftune_loglevel) {
-		fprintf(stderr, "bpftune: "
+		fprintf(stderr, "bpftune: ");
 		vfprintf(stderr, fmt, args);
 	}
 }

@@ -83,7 +83,7 @@ for LATENCY in "" "latency 20ms" ; do
    done 
    echo "Following changes were made:"
    set +e
-   grep "bpftune" $LOGFILE
+   grep bpftune $LOGFILE
    set -e
    test_pass
 
