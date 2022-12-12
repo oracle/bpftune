@@ -22,21 +22,22 @@ export SKIP_CLEANUP=${SKIP_CLEANUP:-0}
 
 check_prog()
 {
-	PROGNAME=$1
-	PKGNAME=$2
+	PROGPATH=$1
+	PROGNAME=$2
+	PKGNAME=$3
 
-	if [ -z "$PROGNAME" ]; then
+	if [ -z "$PROGPATH" ]; then
 		echo "no '$PROGNAME'; install $PKGNAME"
 		exit 1
 	fi
 }
 
 export NC=$(which nc 2>/dev/null)
-check_prog nc nmap-ncat
+check_prog "$NC" nc nmap-ncat
 export IPERF3=$(which iperf3 2>/dev/null)
-check_prog iperf3 iperf3
+check_prog "$IPERF3" iperf3 iperf3
 export QPERF=$(which qperf 2>/dev/null)
-check_prog qperf qperf
+check_prog "$QPERF" qperf qperf
 export FIREWALL_CMD=$(which firewall-cmd 2>/dev/null)
 export LOGFILE=${LOGFILE:-"/var/log/messages"}
 
