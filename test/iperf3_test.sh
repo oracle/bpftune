@@ -13,8 +13,12 @@ PORT=5201
 
 . ./test_lib.sh
 
+LOGFILE=$TESTLOG_LAST
+
 SLEEPTIME=0.5
 TIMEOUT=30
+
+DROP=0
 
 for FAMILY in ipv4 ipv6 ; do
 
@@ -39,7 +43,7 @@ for LATENCY in "" "latency 20ms" ; do
 	echo "Running ${MODE}..."
 	test_run_cmd_local "ip netns exec $NETNS $IPERF3 -s -p $PORT -1 &"
 	if [[ $MODE == "test" ]]; then
-		test_run_cmd_local "$BPFTUNE &"
+		test_run_cmd_local "$BPFTUNE -s &" true
 	fi
 	sleep $SLEEPTIME
 	test_run_cmd_local "$IPERF3 -fm $CLIENT_OPTS -p $PORT -c $ADDR" true
@@ -77,8 +81,10 @@ for LATENCY in "" "latency 20ms" ; do
 		echo "baseline (${rbaseline_results[$i]}) < test (${rtest_results[$i]})"
 	fi      
    done 
-
-
+   echo "Following changes were made:"
+   set +e
+   grep "bpftune" $LOGFILE
+   set -e
    test_pass
 
    test_cleanup
