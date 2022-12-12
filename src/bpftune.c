@@ -28,6 +28,7 @@
 
 void *ring_buffer;
 int ringbuf_map_fd;
+bool use_stderr;
 
 char *bin_name;
 
@@ -35,6 +36,8 @@ static void cleanup(int sig)
 {
 	bpftune_log(LOG_DEBUG, "cleaning up, got signal %d\n", sig);
 	bpftune_ring_buffer_fini(ring_buffer);
+	if (use_stderr)
+		fflush(stderr);
 }
 
 void fini(void)
@@ -132,7 +135,6 @@ int main(int argc, char *argv[])
 	char *library_dir = BPFTUNER_LIB_DIR;
 	int log_level = LOG_INFO;
 	bool is_daemon = false;
-	bool use_stderr = false;
 	int interval = 100;
 	int err, opt;
 

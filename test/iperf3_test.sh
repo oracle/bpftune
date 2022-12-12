@@ -37,7 +37,7 @@ for LATENCY in "" "latency 20ms" ; do
    for MODE in baseline test ; do
 
 	echo "Running ${MODE}..."
-	test_run_cmd_local "ip netns exec $NETNS $IPERF3 -s -p $PORT -1 -D"
+	test_run_cmd_local "ip netns exec $NETNS $IPERF3 -s -p $PORT -1 &"
 	if [[ $MODE == "test" ]]; then
 		test_run_cmd_local "$BPFTUNE &"
 	fi

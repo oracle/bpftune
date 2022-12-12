@@ -17,8 +17,8 @@ struct {
 } remote_host_map SEC(".maps");
 
 
-/* If we surpassed the retransmit threshold to host in the last hour?
- * retransmit threshold.
+/* If last time we surpassed the retransmit threshold is greater than an hour,
+ * reset.
  */
 static __always_inline bool
 remote_host_retransmit_threshold(struct remote_host *remote_host)
@@ -80,31 +80,34 @@ int BPF_PROG(cong_retransmit, struct sock *sk, struct sk_buff *skb)
 	struct bpftune_event event = {};
 	struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)&event.raw_data;
 	struct in6_addr *key = &sin6->sin6_addr;
-	__u64 segs_out = 0, total_retrans = 0;
+	__u32 segs_out = 0, total_retrans = 0;
 
 	remote_host = get_remote_host(sk, key);
 	if (!remote_host)
 		return 0;
 
 	remote_host->retransmits++;
-	remote_host->last_retransmit = bpf_ktime_get_ns();
 
 	if (remote_host->retransmit_threshold)
 		return 0;
 
 	if (bpf_probe_read_kernel(&segs_out, sizeof(segs_out),
-				  sk + offsetof(struct tcp_sock, segs_out)) ||
+				  (void *)sk + offsetof(struct tcp_sock, segs_out)) ||
 	    bpf_probe_read_kernel(&total_retrans, sizeof(total_retrans),
-				  sk + offsetof(struct tcp_sock, total_retrans)))
+				  (void *)sk + offsetof(struct tcp_sock, total_retrans)))
 		return 0;
 
 	/* with a retransmission rate of > 1%, BBR performs much better;
-	 * below translates to ~ 1.5%.
+	 * below translates to ~ 3.125%.
 	 */
-	if (total_retrans >= (segs_out >> 6))
+	if (total_retrans > (segs_out >> 5)) {
 		remote_host->retransmit_threshold = true;
-	else
+		remote_host->last_retransmit = bpf_ktime_get_ns();
+		__bpf_printk("exceeded retrans threshold with %u/%u\n",
+			     total_retrans, segs_out);
+	} else {
 		return 0;
+	}
 
 	sin6->sin6_family = sk->sk_family;
 	event.tuner_id = tuner_id;

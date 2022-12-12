@@ -45,9 +45,8 @@ export N=$(tput -Tvt100 sgr0)
 
 test_init()
 {
-	if [ $VERBOSE -gt 1 ]; then
+	if [ $VERBOSE -gt 0 ]; then
 		set -o xtrace
-		export bpfevent_debug=1
 	fi
 	set -o nounset
 	set -o errexit
@@ -186,6 +185,7 @@ test_setup_local()
 			$FIREWALL_CMD --add-port=${PORT}/tcp >/dev/null 2>&1
 		fi
 	fi
+	sysctl -qw net.ipv4.tcp_fin_timeout=5
 	test_run_cmd_local "$CMD" true
 }
 

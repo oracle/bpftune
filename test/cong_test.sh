@@ -9,9 +9,9 @@
 
 PORT=5201
 
-LOGFILE=/var/log/messages
-
 . ./test_lib.sh
+
+LOGFILE=$TESTLOG_LAST
 
 SLEEPTIME=0.5
 TIMEOUT=30
@@ -42,9 +42,9 @@ for DROP_PERCENT in 10 0 ; do
    for MODE in baseline test ; do
 
 	echo "Running ${MODE}..."
-	test_run_cmd_local "ip netns exec $NETNS $IPERF3 -p $PORT -s -1 -D"
+	test_run_cmd_local "ip netns exec $NETNS $IPERF3 -p $PORT -s -1 &"
 	if [[ $MODE != "baseline" ]]; then
-		test_run_cmd_local "$BPFTUNE &"
+		test_run_cmd_local "$BPFTUNE -ds &" true
 	else
 		LOGSZ=$(wc -l $LOGFILE | awk '{print $1}')
 		#LOGSZ=$(expr $LOGSZ + 1)
