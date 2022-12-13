@@ -12,7 +12,7 @@
 . ./test_lib.sh
 
 
-SLEEPTIME=0.5
+SLEEPTIME=1
 
 for TUNER in neigh_table ; do
 

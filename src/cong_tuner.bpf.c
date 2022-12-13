@@ -103,8 +103,6 @@ int BPF_PROG(cong_retransmit, struct sock *sk, struct sk_buff *skb)
 	if (total_retrans > (segs_out >> 5)) {
 		remote_host->retransmit_threshold = true;
 		remote_host->last_retransmit = bpf_ktime_get_ns();
-		__bpf_printk("exceeded retrans threshold with %u/%u\n",
-			     total_retrans, segs_out);
 	} else {
 		return 0;
 	}

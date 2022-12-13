@@ -26,7 +26,7 @@ static __always_inline bool tcp_nearly_out_of_memory(struct sock *sk,
 	long limit_sk_mem_quantum[3] = { };
 	long allocated;
 	long mem[3] = { }, mem_new[3] = { };
-	struct net *net;
+	struct net *net = sk->sk_net.net;
 	__u8 shift_left = 0, shift_right = 0;
 	int i;
 
@@ -43,7 +43,7 @@ static __always_inline bool tcp_nearly_out_of_memory(struct sock *sk,
 	if (!mem[0] || !mem[1] || !mem[2])
 		return false;
 
-	if (kernel_page_shift > sk_mem_quantum_shift) {
+	if (kernel_page_shift >= sk_mem_quantum_shift) {
 		shift_left = kernel_page_shift - sk_mem_quantum_shift;
 		if (shift_left >= 32)
 			return false;
@@ -74,25 +74,28 @@ static __always_inline bool tcp_nearly_out_of_memory(struct sock *sk,
 		mem_new[2] = min(nr_free_buffer_pages >> 2,
 				 BPFTUNE_GROW_BY_QUARTER(mem[2]));
 		send_sysctl_event(sk, TCP_MEM_EXHAUSTION,
-				  TCP_BUFFER_TCP_MEM, mem, mem_new, event);
-		/* XXX fix */
-		return true;
-		if (net) {
-			mem[0] = mem_new[0] = net->ipv4.sysctl_tcp_wmem[0];
-			mem[1] = mem_new[1] = net->ipv4.sysctl_tcp_wmem[1];
-			mem[2] = net->ipv4.sysctl_tcp_wmem[2];
-			mem_new[2] = BPFTUNE_SHRINK_BY_QUARTER(mem[2]);
-			send_sysctl_event(sk, TCP_BUFFER_DECREASE,
-					  TCP_BUFFER_TCP_WMEM, 
-					  mem, mem_new, event);
-			mem[0] = mem_new[0] = net->ipv4.sysctl_tcp_rmem[0];
-			mem[1] = mem_new[1] = net->ipv4.sysctl_tcp_rmem[1];
-			mem[2] = net->ipv4.sysctl_tcp_rmem[2];
-			mem_new[2] = BPFTUNE_SHRINK_BY_QUARTER(mem[2]);
-			send_sysctl_event(sk, TCP_BUFFER_DECREASE,
-					  TCP_BUFFER_TCP_RMEM,
-					  mem, mem_new, event);
-		}
+				  TCP_BUFFER_TCP_MEM, mem, mem_new,
+				  event);
+		if (!net)
+			return true;
+		if (bpf_probe_read_kernel(mem, sizeof(mem),
+					  (void *)net + offsetof(struct net, ipv4.sysctl_tcp_wmem)))
+			return true;
+		mem_new[0] = mem[0];
+		mem_new[1] = mem[1];
+		mem_new[2] = BPFTUNE_SHRINK_BY_QUARTER(mem[2]);
+		send_sysctl_event(sk, TCP_BUFFER_DECREASE,
+				  TCP_BUFFER_TCP_WMEM, 
+				  mem, mem_new, event);
+		if (bpf_probe_read_kernel(mem, sizeof(mem),
+                                          (void *)net + offsetof(struct net, ipv4.sysctl_tcp_rmem)))
+			return true;
+		mem_new[0] = mem[0];
+		mem_new[1] = mem[1];
+		mem_new[2] = BPFTUNE_SHRINK_BY_QUARTER(mem[2]);
+		send_sysctl_event(sk, TCP_BUFFER_DECREASE,
+				  TCP_BUFFER_TCP_RMEM,
+				  mem, mem_new, event);
 		return true;
 	} else if (NEARLY_FULL(allocated, limit_sk_mem_quantum[1])) {
 		/* send approaching memory pressure event; we also increase

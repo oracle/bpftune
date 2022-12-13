@@ -13,7 +13,7 @@ PORT=5201
 
 . ./test_lib.sh
 
-SLEEPTIME=0.5
+SLEEPTIME=1
 TIMEOUT=30
 MAX_CONN=50
 
@@ -43,7 +43,7 @@ for FAMILY in ipv4 ipv6 ; do
 	echo "Running ${MODE}..."
 	test_run_cmd_local "ip netns exec $NETNS $IPERF3 -s -p $PORT -1 &"
 	if [[ $MODE != "baseline" ]]; then
-		test_run_cmd_local "$BPFTUNE -d &"
+		test_run_cmd_local "$BPFTUNE -ds &" true
 	else
 		LOGSZ=$(wc -l $LOGFILE | awk '{print $1}')
 		LOGSZ=$(expr $LOGSZ + 1)

@@ -99,12 +99,11 @@ static __always_inline void send_sysctl_event(struct sock *sk,
 					      long *old, long *new,
 					      struct bpftune_event *event)
 {
-	struct net *net = sk ? sk->sk_net.net : 0;
+	struct net *net = sk ? sk->sk_net.net : NULL;
 
-	__builtin_memset(event, 0, sizeof(*event));
 	event->tuner_id = tuner_id;
 	event->scenario_id = scenario_id;
-	event->netns_cookie = net ? get_netns_cookie(net) : 0;
+	event->netns_cookie = get_netns_cookie(net);
 	event->update[0].id = event_id;
 	event->update[0].old[0] = old[0];
 	event->update[0].old[1] = old[1];
@@ -114,6 +113,5 @@ static __always_inline void send_sysctl_event(struct sock *sk,
 	event->update[0].new[2] = new[2];
 	bpf_ringbuf_output(&ringbuf_map, event, sizeof(*event), 0);
 }
-
 
 char _license[] SEC("license") = "Dual BSD/GPL";
