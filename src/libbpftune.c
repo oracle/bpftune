@@ -31,11 +31,17 @@
 #define SO_NETNS_COOKIE 71
 #endif
 
-int bpftune_loglevel = LOG_INFO;
 void *bpftune_log_ctx;
+
+int bpftune_loglevel = LOG_INFO;
 
 struct ring_buffer *ring_buffer;
 int ring_buffer_fd;
+
+int bpftune_log_level(void)
+{
+	return bpftune_loglevel;
+}
 
 void bpftune_log_stderr(__attribute__((unused)) void *ctx,
 			__attribute__((unused)) int level,
@@ -363,8 +369,8 @@ int bpftune_sysctl_read(int netns_fd, const char *name, long *values)
 	fp = fopen(path, "r");
 	if (!fp) {
 		err = -errno;
-		bpftune_log(LOG_ERR, "could not open %s for reading: %s\n",
-			    path, strerror(-err));
+		bpftune_log(LOG_ERR, "could not open %s (netns fd %d) for reading: %s\n",
+			    path, netns_fd, strerror(-err));
 		goto out;
 	}
 	num_values = fscanf(fp, "%ld %ld %ld",

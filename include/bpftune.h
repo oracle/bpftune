@@ -5,7 +5,7 @@
 #define BPFTUNE_MAX_TUNERS		64
 
 /* max # of tunables per tuner */
-#define BPFTUNE_MAX_TUNABLES		10
+#define BPFTUNE_MAX_TUNABLES		16
 
 /* grow by 25% */
 #define BPFTUNE_GROW_BY_QUARTER(val)    ((val) + ((val) >> 2))
@@ -15,6 +15,7 @@
 #define BPFTUNE_SHRINK_BY_QUARTER(val)	((val) - ((val) >> 2))
 #define BPFTUNE_SHRINK_BY_HALF(val)	((val) - ((val) >> 1))
 
+#define MSEC				((__u64)1000000)
 #define SECOND				((__u64)1000000000)
 #define MINUTE				(60 * SECOND)
 #define HOUR				(3600 * SECOND)

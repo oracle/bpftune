@@ -1,5 +1,6 @@
 LIBBPFTUNE_0.1.1 {
 	global:
+		bpftune_log_level;
 		bpftune_log_stderr;
 		bpftune_log_syslog;
 		bpftune_log;

@@ -30,6 +30,9 @@ void *ring_buffer;
 int ringbuf_map_fd;
 bool use_stderr;
 
+char *allowlist[BPFTUNE_MAX_TUNERS];
+int nr_allowlist;
+
 char *bin_name;
 
 static void cleanup(int sig)
@@ -70,7 +73,26 @@ int init(const char *cgroup_dir, const char *library_dir)
 	bpftune_log(LOG_DEBUG, "searching %s for plugins...\n", library_dir);
 	while ((dirent = readdir(dir)) != NULL) {
 		struct bpftuner *tuner;
+		bool allowed = true;
 
+		/* check if tuner is on optional allowlist */
+		if (nr_allowlist) {
+			int i;
+
+			allowed = false;
+			for (i = 0; i < nr_allowlist; i++) {
+				if (strcmp(dirent->d_name, allowlist[i]) == 0) {
+					allowed = true;
+					break;
+				}
+			}
+		}
+		if (!allowed) {
+			bpftune_log(LOG_DEBUG, "skipping %s as not on allowlist\n",
+				    dirent->d_name);
+			continue;
+		}
+					
 		if (strstr(dirent->d_name, BPFTUNER_LIB_SUFFIX) == NULL)
 			continue;
 		snprintf(library_path, sizeof(library_path), "%s/%s",
@@ -101,7 +123,8 @@ void do_help(void)
 {
 	fprintf(stderr,
 		"Usage: %s [OPTIONS]\n"
-		"	OPTIONS := { { -d|--debug} {-D|--daemon}\n"
+		"	OPTIONS := { { -a|--allowlist tuner [-a tuner]}\n"
+		"		     { -d|--debug} {-D|--daemon}\n"
 		"		     { -c|--cgroup_path cgroup_path}\n"
 		"		     {-h|--help}}\n"
 		"		     { -l|--library_path library_path\n"
@@ -123,6 +146,7 @@ static void do_usage(void)
 int main(int argc, char *argv[])
 {
 	static const struct option options[] = {
+		{ "allowlist",	required_argument,	NULL,	'a' },
 		{ "cgroup",	required_argument,	NULL,	'c' },
 		{ "debug",	no_argument,		NULL,	'd' },
 		{ "help",	no_argument,		NULL,	'h' },
@@ -140,9 +164,12 @@ int main(int argc, char *argv[])
 
 	bin_name = argv[0];
 
-	while ((opt = getopt_long(argc, argv, "c:dDhl:sV", options, NULL))
+	while ((opt = getopt_long(argc, argv, "a:c:dDhl:sV", options, NULL))
 		>= 0) {
 		switch (opt) {
+		case 'a':
+			allowlist[nr_allowlist++] = optarg;
+			break;
 		case 'c':
 			cgroup_dir = optarg;
 			break;

@@ -44,7 +44,7 @@ for DROP_PERCENT in 10 0 ; do
 	echo "Running ${MODE}..."
 	test_run_cmd_local "ip netns exec $NETNS $IPERF3 -p $PORT -s -1 &"
 	if [[ $MODE != "baseline" ]]; then
-		test_run_cmd_local "$BPFTUNE -ds &" true
+		test_run_cmd_local "$BPFTUNE -s &" true
 	else
 		LOGSZ=$(wc -l $LOGFILE | awk '{print $1}')
 		#LOGSZ=$(expr $LOGSZ + 1)

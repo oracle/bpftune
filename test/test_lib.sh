@@ -17,6 +17,12 @@ export PASSED=${PASSED:-0}
 
 # 1: more output, >1: xtrace
 export VERBOSE=${VERBOSE:-0}
+
+if [[ "$VERBOSE" == "1" ]]; then
+	export DEBUG=1
+else
+	export DEBUG=${DEBUG:-0}
+fi
 # Set the following to 1 if you want to see state after failure.
 export SKIP_CLEANUP=${SKIP_CLEANUP:-0}
 
@@ -79,9 +85,12 @@ export MTU=1500
 export DROP=${DROP:-""}
 export LATENCY=${LATENCY:-""}
 
-export BPFTUNE=../src/bpftune
+export BPFTUNE_FLAGS=${BPFTUNE_FLAGS:-""}
+if [[ "$DEBUG" != 0 ]]; then
+	export BPFTUNE_FLAGS="${BPFTUNE_FLAGS} -d"
+fi
 export CGROUPDIR=${CGROUPDIR:-"/tmp/cgroupv2"}
-export BPFTUNE="../src/bpftune -c $CGROUPDIR"
+export BPFTUNE="../src/bpftune -c $CGROUPDIR $BPFTUNE_FLAGS"
 
 # Don't want __pycache__ files hanging around.
 export PYTHONCMD="python3 -B"

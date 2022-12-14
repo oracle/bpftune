@@ -135,17 +135,22 @@ void event_handler(struct bpftuner *tuner,
 		   __attribute__((unused))void *ctx)
 {
 	struct tcp_buffer_tuner_bpf *skel = tuner->skel;
+	const char *lowmem = "normal memory conditions";
+	const char *reason = "unknown reason";
 	int scenario = event->scenario_id;
-	const char *lowmem = NULL;
 	const char *tunable;
+	long new[3], old[3];
 	int netns_fd = 0;
-	long newvals[3];
+	int id;
 
-	newvals[0] = event->update[0].new[0];
-	newvals[1] = event->update[0].new[1];
-	newvals[2] = event->update[0].new[2];
+	id = event->update[0].id;
 
-	if (event->netns_cookie) {
+	memcpy(new, event->update[0].new, sizeof(new));
+	memcpy(old, event->update[0].old, sizeof(old));
+	
+	/* tcp_mem, max_backlog not namespaced */
+	if (event->netns_cookie && id != TCP_BUFFER_TCP_MEM &&
+	    id != NETDEV_MAX_BACKLOG) {
 		netns_fd = bpftune_netns_fd_from_cookie(event->netns_cookie);
 		if (netns_fd < 0) {
 			bpftune_log(LOG_DEBUG, "could not get netns fd for cookie %ld\n",
@@ -153,49 +158,46 @@ void event_handler(struct bpftuner *tuner,
 			return;
 		}
 	}
-	tunable = bpftuner_tunable_name(tuner, event->update[0].id);
+	tunable = bpftuner_tunable_name(tuner, id);
 	if (!tunable) {
-		bpftune_log(LOG_DEBUG, "unknown tunable [%d] for tcp_buffer_tuner\n",
-				       event->update[0].id);
+		bpftune_log(LOG_DEBUG, "unknown tunable [%d] for tcp_buffer_tuner\n", id);
 		return;
 	}
-	if (skel->bss->near_memory_pressure)
-		lowmem = "near memory pressure";
+	if (skel->bss->near_memory_exhaustion)
+		lowmem = "near memory exhaustion";
 	else if (skel->bss->under_memory_pressure)
 		lowmem = "under memory pressure";
-	else if (skel->bss->near_memory_exhaustion)
-		lowmem = "near memory exhaustion";
+	else if (skel->bss->near_memory_pressure)
+		lowmem = "near memory pressure";
 
-	switch (event->update[0].id) {
+	switch (id) {
 	case TCP_BUFFER_TCP_MEM:
 		switch (scenario) {
 		case TCP_MEM_PRESSURE:
 		case TCP_MEM_EXHAUSTION:
 			bpftune_log(LOG_INFO,
-"%s; since this is a highly unstable state "
-"for the TCP/IP stack, increase %s[2] limit from %d -> %d.\n",
-				     lowmem, tunable, event->update[0].old[2], newvals[2]);
+"%s; since memory exhaustion is a highly unstable state "
+"for the TCP/IP stack, change %s(min pressure max) from (%d %d %d) -> (%d %d %d)\n",
+				    lowmem, tunable, old[0], old[1], old[2],
+				    new[0], new[1], new[2]); 
 			break;
 		}
-		bpftune_sysctl_write(netns_fd, tunable, 3, newvals);
+		bpftune_sysctl_write(netns_fd, tunable, 3, new);
 		break;
 	case TCP_BUFFER_TCP_WMEM:
 	case TCP_BUFFER_TCP_RMEM:
 		switch (scenario) {
 		case TCP_BUFFER_INCREASE:
-			bpftune_log(LOG_INFO,
-"A socket needs to increase max buffer size (%s[2]) to maximize throughput. "
-"Increasing it from %d -> %d, as we are not experiencing memory shortages.\n",
-				    tunable, event->update[0].old[2], newvals[2]); 
+			reason = "need to increase max buffer size to maximize throughput";
 			break;
 		case TCP_BUFFER_DECREASE:
-			bpftune_log(LOG_INFO,
-"As we are %s, decrease max buffer size (%s[2]) to reduce per-socket memory utilization."
-"Decreasing from %d -> %d\n",
-	 			    lowmem, tunable, event->update[0].old[2], newvals[2]);
+			reason = lowmem;
 			break;
 		}
-		bpftune_sysctl_write(netns_fd, tunable, 3, newvals);
+		bpftune_log(LOG_INFO, "Due to %s, change %s(min default max) from (%d %d %d) -> (%d %d %d)\n",
+			    reason, tunable, old[0], old[1], old[2],
+			    new[0], new[1], new[2]);
+		bpftune_sysctl_write(netns_fd, tunable, 3, new);
 		break;
 	case NETDEV_MAX_BACKLOG:
 		switch (scenario) {
@@ -203,13 +205,12 @@ void event_handler(struct bpftuner *tuner,
 			bpftune_log(LOG_INFO,
 "Dropped more than 1/4 of the backlog queue size (%d) in last minute; "
 "Increase backlog queue size from %d -> %d to support faster network device.\n",
-				    event->update[0].old[0],
-				    event->update[0].old[0], newvals[0]);
+				    old[0], new[0]);
 			break;
 		case NETDEV_MAX_BACKLOG_DECREASE:
 			break;
 		}
-		bpftune_sysctl_write(netns_fd, tunable, 1, newvals);
+		bpftune_sysctl_write(netns_fd, tunable, 1, new);
 		break;
 	case TCP_BUFFER_TCP_MAX_ORPHANS:
 		break;

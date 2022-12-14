@@ -29,6 +29,9 @@
 
 #define BPFTUNE_PROC_SYS		"/proc/sys/"
 
+
+int bpftune_log_level(void);
+
 void bpftune_log(int level, const char *fmt, ...);
 
 void bpftune_log_stderr(void *ctx, int level, const char *fmt, va_list args);
@@ -91,6 +94,7 @@ void bpftuner_tunables_fini(struct bpftuner *tuner);
                 tuner->skel = __skel;                                        \
                 tuner->skeleton = __skel->skeleton;                          \
                 tuner->ringbuf_map = __skel->maps.ringbuf_map;               \
+		__skel->bss->debug = bpftune_log_level() >= LOG_DEBUG;	     \
 	} while (0)
 
 #define bpftuner_bpf_load(tuner_name, tuner, ringbuf_map_fd)		     \

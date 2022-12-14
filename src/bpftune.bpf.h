@@ -13,13 +13,6 @@
 #include <bpf/bpf_tracing.h>
 #include <bpf/bpf_core_read.h>
 
-#define DEBUG
-/* don't want __bpf_printk()s slipping into production... */
-#ifndef DEBUG
-#undef __bpf_printk
-#define __bpf_printk(...)
-#endif
-
 struct {
         __uint(type, BPF_MAP_TYPE_RINGBUF);
         __uint(max_entries, 64 * 1024);
@@ -89,10 +82,24 @@ unsigned int tuner_id;
 #define NTF_EXT_LEARNED	0x10
 #endif
 
+bool debug;
+
+#define bpftune_log(...)	if (debug) __bpf_printk(__VA_ARGS__)
+
 static __always_inline long get_netns_cookie(struct net *net)
 {
 	return net ? net->net_cookie : 0;
 }
+ 
+#define last_event_key(nscookie, tuner, event)	\
+	((__u64)nscookie | ((__u64)event << 32) |((__u64)tuner <<48))
+
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__uint(max_entries, 65536);
+	__type(key, __u64);
+	__type(value, __u64);
+} last_event_map SEC(".maps");
 
 static __always_inline void send_sysctl_event(struct sock *sk,
 					      int scenario_id, int event_id,
@@ -100,10 +107,28 @@ static __always_inline void send_sysctl_event(struct sock *sk,
 					      struct bpftune_event *event)
 {
 	struct net *net = sk ? sk->sk_net.net : NULL;
+	__u64 now = bpf_ktime_get_ns();
+	__u64 event_key = 0;
+	long nscookie = 0;
+	__u64 *last_timep = NULL;
+	int ret = 0;
+
+	nscookie = get_netns_cookie(net);
+
+	event_key = last_event_key(nscookie, tuner_id, event_id);
+	/* avoid sending same event for same tuner+netns in < 25msec */
+	last_timep = bpf_map_lookup_elem(&last_event_map, &event_key);
+	if (last_timep) {
+		if ((now - *last_timep) < (25 * MSEC))
+			return;
+		*last_timep = now;
+	} else {
+		bpf_map_update_elem(&last_event_map, &event_key, &now, 0);
+	}
 
 	event->tuner_id = tuner_id;
 	event->scenario_id = scenario_id;
-	event->netns_cookie = get_netns_cookie(net);
+	event->netns_cookie = nscookie;
 	event->update[0].id = event_id;
 	event->update[0].old[0] = old[0];
 	event->update[0].old[1] = old[1];
@@ -111,7 +136,11 @@ static __always_inline void send_sysctl_event(struct sock *sk,
 	event->update[0].new[0] = new[0];
 	event->update[0].new[1] = new[1];
 	event->update[0].new[2] = new[2];
-	bpf_ringbuf_output(&ringbuf_map, event, sizeof(*event), 0);
+	ret = bpf_ringbuf_output(&ringbuf_map, event, sizeof(*event), 0);
+	bpftune_log("tuner [%d] scenario [%d]: event send: %d ",
+		    tuner_id, scenario_id, ret);
+	bpftune_log("\told '%d %d %d'\n", old[0], old[1], old[2]);
+	bpftune_log("\tnew '%d %d %d'\n", new[0], new[1], new[2]);
 }
 
 char _license[] SEC("license") = "Dual BSD/GPL";

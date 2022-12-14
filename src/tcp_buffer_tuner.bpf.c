@@ -73,23 +73,31 @@ static __always_inline bool tcp_nearly_out_of_memory(struct sock *sk,
 		mem_new[1] = mem[1];
 		mem_new[2] = min(nr_free_buffer_pages >> 2,
 				 BPFTUNE_GROW_BY_QUARTER(mem[2]));
-		send_sysctl_event(sk, TCP_MEM_EXHAUSTION,
-				  TCP_BUFFER_TCP_MEM, mem, mem_new,
-				  event);
+		/* if we still have room to grow mem exhaustion limit, do that,
+		 * otherwise shrink wmem/rmem.
+		 */
+		if (mem_new[2] <= (nr_free_buffer_pages >> 2)) {
+			send_sysctl_event(sk, TCP_MEM_EXHAUSTION,
+					  TCP_BUFFER_TCP_MEM, mem, mem_new,
+					  event);
+			return true;
+		}
 		if (!net)
 			return true;
-		if (bpf_probe_read_kernel(mem, sizeof(mem),
-					  (void *)net + offsetof(struct net, ipv4.sysctl_tcp_wmem)))
-			return true;
+		mem[0] = (long)(net->ipv4.sysctl_tcp_wmem[0]);
+		mem[1] = (long)(net->ipv4.sysctl_tcp_wmem[1]);
+		mem[2] = (long)(net->ipv4.sysctl_tcp_wmem[2]);
 		mem_new[0] = mem[0];
 		mem_new[1] = mem[1];
 		mem_new[2] = BPFTUNE_SHRINK_BY_QUARTER(mem[2]);
 		send_sysctl_event(sk, TCP_BUFFER_DECREASE,
-				  TCP_BUFFER_TCP_WMEM, 
+				  TCP_BUFFER_TCP_WMEM,
 				  mem, mem_new, event);
-		if (bpf_probe_read_kernel(mem, sizeof(mem),
-                                          (void *)net + offsetof(struct net, ipv4.sysctl_tcp_rmem)))
+		if (!net)
 			return true;
+		mem[0] = (long)(net->ipv4.sysctl_tcp_rmem[0]);
+		mem[1] = (long)(net->ipv4.sysctl_tcp_rmem[1]);
+		mem[2] = (long)(net->ipv4.sysctl_tcp_rmem[2]);
 		mem_new[0] = mem[0];
 		mem_new[1] = mem[1];
 		mem_new[2] = BPFTUNE_SHRINK_BY_QUARTER(mem[2]);
@@ -100,17 +108,28 @@ static __always_inline bool tcp_nearly_out_of_memory(struct sock *sk,
 	} else if (NEARLY_FULL(allocated, limit_sk_mem_quantum[1])) {
 		/* send approaching memory pressure event; we also increase
 		 * memory exhaustion limit as it tends to lead to
-		 * pathological tcp behaviour.
+		 * pathological tcp behaviour.  If min/memory pressure are
+		 * less than ~8%,~12% of memory), bump them up too.
+		 * Mem exhaustion maxes out at 25% of memory.
 		 */
 		if (!mem[0] || !mem[1] || !mem[2])
 			return false;
 
 		mem_new[0] = mem[0];
 		mem_new[1] = mem[1];
+		bpftune_log("near/under pressure allocated %d/%d\n",
+			     allocated, limit_sk_mem_quantum[1]);
+		if (mem[0] < nr_free_buffer_pages >> 4)
+			mem_new[0] = BPFTUNE_GROW_BY_QUARTER(mem[0]);
+		bpftune_log("mem[1] %d limit %d\n", mem[1],
+			      nr_free_buffer_pages >> 3);
+		if (mem[1] < nr_free_buffer_pages >> 3)
+			mem_new[1] = BPFTUNE_GROW_BY_QUARTER(mem[1]);
 		mem_new[2] = min(nr_free_buffer_pages >> 2,
 				 BPFTUNE_GROW_BY_QUARTER(mem[2]));
 		send_sysctl_event(sk, TCP_MEM_PRESSURE,
-				  TCP_BUFFER_TCP_MEM, mem, mem_new, event);
+				  TCP_BUFFER_TCP_MEM, mem, mem_new,
+				  event);
 		near_memory_pressure = true;
 		return true;
 	}
@@ -123,7 +142,9 @@ static __always_inline bool tcp_nearly_out_of_memory(struct sock *sk,
 SEC("fentry/tcp_enter_memory_pressure")
 int BPF_PROG(bpftune_enter_memory_pressure, struct sock *sk)
 {
-	under_memory_pressure = true;
+	struct bpftune_event event = { 0 };
+
+	(void) tcp_nearly_out_of_memory(sk, &event);
 	return 0;
 }
 
@@ -153,7 +174,7 @@ int BPF_PROG(bpftune_sndbuf_expand, struct sock *sk)
 	long wmem[3], wmem_new[3];
 	long sndbuf;
 
-	if (!sk || !net || near_memory_pressure || near_memory_exhaustion)
+	if (!sk || !net || tcp_nearly_out_of_memory(sk, &event))
 		return 0;
 
 	sndbuf = sk->sk_sndbuf;
