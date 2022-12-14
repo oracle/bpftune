@@ -148,4 +148,7 @@ int bpftune_netns_fd_from_cookie(unsigned long cookie);
 #define bpftuner_for_each_netns(tuner, netns)				\
 	for (netns = &tuner->netns; netns != NULL; netns = netns->next)
 
+int bpftune_module_load(const char *name);
+int bpftune_module_delete(const char *name);
+
 #endif /* __LIBBPFTUNE_H */

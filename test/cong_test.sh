@@ -70,6 +70,12 @@ for DROP_PERCENT in 10 0 ; do
 				tail -n +${LOGSZ} $LOGFILE | grep 'bbr'
 			fi
 		fi
+		if [[ $MODE == "test" ]]; then
+			echo "Following changes were made:"
+			set +e
+			grep bpftune $LOGFILE
+			set -e
+		fi
         fi
 	sleep $SLEEPTIME
    done

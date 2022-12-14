@@ -1,4 +1,5 @@
 #include <libbpftune.h>
+#include "cong_tuner.h"
 #include "cong_tuner.skel.h"
 
 #include <arpa/inet.h>
@@ -16,6 +17,14 @@ int init(struct bpftuner *tuner, int ringbuf_map_fd)
 {
 	struct bpf_link *link;
 	int err;
+
+	/* make sure cong modules are loaded; might be builtin so do not
+ 	 * shout about errors.
+ 	 */
+	if (bpftune_module_load("net/ipv4/tcp_bbr.ko"))
+		bpftune_log(LOG_DEBUG, "could not load BBR module\n");
+	if (bpftune_module_load("net/ipv4/tcp_htcp.ko"))
+		bpftune_log(LOG_DEBUG, "could not load htcp module\n");
 
 	bpftuner_bpf_init(cong, tuner, ringbuf_map_fd);
 
@@ -50,13 +59,14 @@ void event_handler(struct bpftuner *tuner, struct bpftune_event *event,
 		   __attribute__((unused))void *ctx)
 {
 	struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)&event->raw_data;
+	int id = event->scenario_id;
 	char buf[INET6_ADDRSTRLEN];
 	char iterbuf;
 
 	inet_ntop(sin6->sin6_family, &sin6->sin6_addr, buf, sizeof(buf));
 	bpftune_log(LOG_INFO,
-		    "due to loss events for %s, we will specify 'bbr' congestion control algorithm: (scenario %d) for tuner %s\n",
-		    buf, event->scenario_id, tuner->name);
+		    "due to loss events for %s, we will specify '%s' congestion control algorithm: (scenario %d) for tuner %s\n",
+		    buf, id == TCP_CONG_BBR ? "bbr" : "htcp", id, tuner->name);
 
 	/* kick existing connections by running iterator over them... */
 	while (read(tcp_iter_fd, &iterbuf, sizeof(iterbuf)) == -1 && errno == EAGAIN)

@@ -21,7 +21,7 @@
 
 ### congestion tuner
  - tuner counts retransmissions keyed by remote IP, and if we see
-   a lot of retransmits in the last hour to a remote host, we apply
+   >3% retransmission for a connection to a remote host, we apply
    BBR on connection setup to ensure we do not over-estimate
    congestion (and thus under-estimate link capacity) (tested)
 
@@ -100,7 +100,11 @@ would only update buffer sizes for example if we came within
   where SO_[SND|RCV]BUF is not honoured do to [wr]mem_max
   settings and adjust [wr]mem_max?
 
-### neigh table tuner (end July 2022)
+### Congestion tuner improvements
+- use htcp for large bandwidth-delay product links - a large
+BDP is > 10^5, so cong
+cases 
+### neigh table tuner
 
 - look at gc frequency and churn; optimize this also?
 

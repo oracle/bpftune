@@ -12,6 +12,7 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/syscall.h>
 #include <fcntl.h>
 #include <dirent.h>
 #include <libgen.h>
@@ -19,6 +20,7 @@
 #include <linux/types.h>
 #include <sys/mount.h>
 #include <sys/socket.h>
+#include <sys/utsname.h>
 #include <sched.h>
 #include <mntent.h>
 
@@ -774,4 +776,57 @@ struct bpftuner_netns *bpftuner_netns_from_cookie(unsigned long tuner_id,
 	bpftune_log(LOG_DEBUG, "no tuner netns found for tuner %d, cookie %ld\n",
 		    tuner_id, cookie);
 	return NULL;
+}
+
+static int bpftune_module_path(const char *name, char *modpath)
+{
+	struct utsname utsname;
+	int ret;
+
+	if (uname(&utsname) < 0) {
+		ret = -errno;
+		bpftune_log(LOG_DEBUG, "uname failed: %s\n", strerror(ret));
+		return ret;
+	}
+	snprintf(modpath, PATH_MAX, "/usr/lib/modules/%s/kernel/%s",
+		 utsname.release, name);
+	return 0;
+}
+
+/* load module name, e.g. net/ipv4/foo.ko */
+int bpftune_module_load(const char *name)
+{
+	char modpath[PATH_MAX];
+	int ret, fd;
+
+	ret = bpftune_module_path(name, modpath);
+	if (ret)
+		return ret;
+
+	fd = open(modpath, O_RDONLY);
+	if (fd < 0) {
+		bpftune_log(LOG_DEBUG, "no module '%s' found.\n", modpath);
+		return -errno;
+	}
+	ret = syscall(__NR_finit_module, fd, "", 0);
+	if (ret) {
+		bpftune_log(LOG_DEBUG, "could not init module '%s'\n",
+			    modpath);
+		ret = -errno;
+	}
+	close(fd);
+	return ret;
+}
+
+int bpftune_module_delete(const char *name)
+{
+	int ret;
+
+	ret = syscall(__NR_delete_module, name, 0);
+	if (ret) {
+		bpftune_log(LOG_DEBUG, "could not delete module '%s'\n",
+			    name);
+		ret = -errno;
+	}
+	return ret;
 }

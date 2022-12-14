@@ -3,10 +3,15 @@
 
 #include "bpftune.bpf.h"
 
+#include "cong_tuner.h"
+
+#define CONG_MAXNAME	16
+
 struct remote_host {
 	__u64 last_retransmit;
 	__u64 retransmits;
 	bool retransmit_threshold;
+	char cong_alg[CONG_MAXNAME];
 };
 
 struct {
@@ -79,8 +84,13 @@ int BPF_PROG(cong_retransmit, struct sock *sk, struct sk_buff *skb)
 	struct remote_host *remote_host;
 	struct bpftune_event event = {};
 	struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)&event.raw_data;
+	struct tcp_sock *tp = (struct tcp_sock *)sk;
 	struct in6_addr *key = &sin6->sin6_addr;
 	__u32 segs_out = 0, total_retrans = 0;
+	const char bbr[CONG_MAXNAME] = "bbr";
+	const char htcp[CONG_MAXNAME] = "htcp";
+	int id = TCP_CONG_BBR;
+	__u64 bdp = 0;
 
 	remote_host = get_remote_host(sk, key);
 	if (!remote_host)
@@ -98,25 +108,63 @@ int BPF_PROG(cong_retransmit, struct sock *sk, struct sk_buff *skb)
 		return 0;
 
 	/* with a retransmission rate of > 1%, BBR performs much better;
-	 * below translates to ~ 3.125%.
+	 * below translates to ~ 3.125%.  With a high bandwidth delay
+	 * product (BDP), use h-tcp.
 	 */
 	if (total_retrans > (segs_out >> 5)) {
+		__u32 rate_delivered, rate_interval_us;
+		__u32 mss_cache, srtt_us;
+		__u64 bdp;
+
 		remote_host->retransmit_threshold = true;
 		remote_host->last_retransmit = bpf_ktime_get_ns();
+		if (!bpf_probe_read_kernel(&rate_delivered, sizeof(rate_delivered),
+					 (void *)sk + offsetof(struct tcp_sock, rate_delivered)) &&
+		    !bpf_probe_read_kernel(&rate_interval_us, sizeof(rate_interval_us),
+					   (void *)sk + offsetof(struct tcp_sock, rate_interval_us)) &&
+		    !bpf_probe_read_kernel(&mss_cache, sizeof(mss_cache),
+					   (void *)sk + offsetof(struct tcp_sock, mss_cache)) &&
+		    !bpf_probe_read_kernel(&srtt_us, sizeof(srtt_us),
+					   (void *)sk + offsetof(struct tcp_sock, srtt_us))) {
+			srtt_us  = srtt_us >> 3;
+			bpftune_log("rate_delivered %d, rate_interval_us %d\n",
+				    rate_delivered, rate_interval_us);
+			bpftune_log("srtt %d mss_cache %d\n",
+				    srtt_us, mss_cache);
+			bdp = rate_interval_us > 0 ?
+			      (__u64)(rate_delivered * mss_cache * srtt_us)/rate_interval_us :
+				     0;
+			bpftune_log("bdp estimate: %ld: LFP: %d\n",
+				    bdp, BDP_LFP);
+		}
+		/* a long fat pipe is defined as having a BDP of > 10^5;
+		 * it implies latency plus high bandwith.  In such cases,
+		 * use htcp.  Note we multiply the usual LFP metric (10^5)
+		 * by 5 to be conservative.
+		 */
+
+		if (bdp > BDP_LFP * 5) {
+			__builtin_memcpy(remote_host->cong_alg, htcp,
+					 sizeof(remote_host->cong_alg));
+			id = TCP_CONG_HTCP;
+		} else {
+			__builtin_memcpy(remote_host->cong_alg, bbr,
+				 sizeof(remote_host->cong_alg));
+		}
 	} else {
 		return 0;
 	}
 
 	sin6->sin6_family = sk->sk_family;
 	event.tuner_id = tuner_id;
-	event.scenario_id = 0;
+	event.scenario_id = id;
 	event.netns_cookie = get_netns_cookie(sk->sk_net.net);
 	bpf_ringbuf_output(&ringbuf_map, &event, sizeof(event), 0);
 
 	return 0;
 }
 
-/* specify BBR congestion control algorithm here via iterator (to catch
+/* specify congestion control algorithm here via iterator (to catch
  * existing + new TCP connections) for connections to remote hosts which
  * have seen retransmits in the past.  The event sent from the retransmit
  * threshold being surpassed will trigger the iterator.
@@ -125,7 +173,6 @@ SEC("iter/tcp")
 int bpftune_cong_iter(struct bpf_iter__tcp *ctx)
 {
 	struct sock_common *skc = ctx->sk_common;
-	char bbr[TCP_CA_NAME_MAX] = "bbr";
 	struct remote_host *remote_host;
 	struct in6_addr key = {};
 	struct tcp_sock *tp;
@@ -144,9 +191,9 @@ int bpftune_cong_iter(struct bpf_iter__tcp *ctx)
 
 	if (!remote_host_retransmit_threshold(remote_host))
 		return 0;
-		
+
 	bpf_setsockopt(tp, SOL_TCP, TCP_CONGESTION,
-		       &bbr, sizeof(bbr));
+		       &remote_host->cong_alg, sizeof(remote_host->cong_alg));
 
 	return 0;
 }

@@ -1,0 +1,11 @@
+#include <bpftune.h>
+
+enum tcp_cong_scenarios {
+	TCP_CONG_BBR,
+	TCP_CONG_HTCP,
+};
+
+/* a long fat pipe is defined as having a BDP of > 10^5; it implies latency
+ * plus high bandwith.  In such cases use htcp.
+ */
+#define BDP_LFP		100000

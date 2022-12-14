@@ -29,6 +29,15 @@ DESCRIPTION
         to it we will likely see more retransmits, and potentially stay with
         it for a length of time until such losses shake out.
 
+        If however we see retransmits with a socket with a large bandwidth
+        delay product (BDP) - calculated via bandwidth estimate:
+
+            (tcp_rate_delivered_packets * tcp_mss)/tcp_rate_delivered_interval)
+
+        ...multiplied by the smoothed round-trip time.  If this value
+        indicates a long fat pipe (LFP), the htcp algorithm is used as
+        it works well for such networks.
+
         We use the tracepoint tcp_retransmit_skb to count retransmits by
         remote host, and a BPF iterator program to set congestion control
         algorithm, since it allows us to update congestion control for

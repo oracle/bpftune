@@ -104,3 +104,17 @@ Multiple bug reports suggest increasing the netdev max backlog to 30000.
 
 #  Large numbers of TIME_WAIT sockets
 
+# Congestion control and high-speed links
+
+Orabug: 31565670
+
+Intermittent high CPU load driven by NFS causing hangs; turns out
+settings were not optimal for 10G network.  Similar observations as
+above, with additional use of htcp as congestion control algorithm.
+
+# Conclusion
+
+Would be good to auto-select htcp for high-speed links; it is more
+aggressive in increasing the congestion window after loss events.
+How do we distinguish which connections to use it for? Papers
+describe high BDP links as being appropriate.
