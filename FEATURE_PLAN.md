@@ -81,7 +81,20 @@ also more gradual, so probably better for the risk-averse; we
 would only update buffer sizes for example if we came within
 1.5% of buffer limit, and only increase buffer size by 1.5%.
 
+### Describe, suggestion modes
+
+- add an additional tuner callback that explains changes made;
+  describe(). It should use scenario descriptions plus history
+  of tuning events to describe overall changes and why
+- analyze mode which looks at current state without changing it.
+  Downside is we cannot then assess the results of changes we
+  made.
+
 ### TCP buffer tuner improvements
+- one problem is hard to have a one max buffer size to fit all;
+  can we use snd buffer clamping (via setsockopt) to clamp for
+  small flows? this would be a good strategy to mimimize overhead
+  for non-critical flows during memory crunches.
 - look at pulling buffer values back down based on longer latency
   (potential bufferbloat)
 - look at netdev_max_backlog; tune that too?
@@ -102,8 +115,9 @@ would only update buffer sizes for example if we came within
 
 ### Congestion tuner improvements
 - use htcp for large bandwidth-delay product links - a large
-BDP is > 10^5, so cong
-cases 
+BDP is > 10^5, so use htcp for those cases.  Use rate estimates
+to generate BDP estimate.
+
 ### neigh table tuner
 
 - look at gc frequency and churn; optimize this also?

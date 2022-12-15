@@ -21,7 +21,7 @@ DESCRIPTION
         to potential bandwitdh.
 
         With the above in mind, we count retransmission events by remote host,
-        and if we see >1% retransmits to the host in the last hour, we utilize
+        if we see >1% socket retransmits to the host in the last hour, we use
         BBR as the congestion algorithm instead, anticipating these sorts of
         losses may result in us under-estimating bandwidth potential.
 
