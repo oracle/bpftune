@@ -55,7 +55,7 @@ int __bpftuner_bpf_load_and_attach(struct bpftuner *tuner, int ringbuf_map_fd);
 int bpftuner_tunables_init(struct bpftuner *tuner, unsigned int num_descs,
 			   struct bpftunable_desc *descs);
 struct bpftunable *bpftuner_tunable(struct bpftuner *tuner, unsigned int index);
-unsigned int bpftuner_tunable_num(struct bpftuner *tuner);
+unsigned int bpftuner_num_tunables(struct bpftuner *tuner);
 
 static inline const char *bpftuner_tunable_name(struct bpftuner *tuner,
 						unsigned int index)
@@ -66,6 +66,12 @@ static inline const char *bpftuner_tunable_name(struct bpftuner *tuner,
 
 #define bpftuner_for_each_tunable(tuner, tunable)			     \
 	for (unsigned int __itun = 0; (tunable = bpftuner_tunable(tuner, __itun)); __itun++)
+
+int bpftuner_tunable_sysctl_write(struct bpftuner *tuner,
+				  unsigned int tunable,
+				  unsigned int scenario,
+				  int netns_fd,
+				  __u8 num_values, long *values);
 
 struct bpftuner *bpftune_tuner(unsigned int index);
 unsigned int bpftune_tuner_num(void);

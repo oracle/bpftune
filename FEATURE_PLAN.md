@@ -92,9 +92,13 @@ would only update buffer sizes for example if we came within
 
 ### TCP buffer tuner improvements
 - one problem is hard to have a one max buffer size to fit all;
-  can we use snd buffer clamping (via setsockopt) to clamp for
+  can we use snd buffer clamping (via bpf_setsockopt) to clamp for
   small flows? this would be a good strategy to mimimize overhead
-  for non-critical flows during memory crunches.
+  for non-critical flows during memory crunches. tp->snd_cwnd_clamp
+  and tp->window_clamp are clamping values for send/receive windows.
+  use TCP_BPF_SNDCWND_CLAMP, TCP_WINDOW_CLAMP for these.  Problem:
+  "moderate rcvbuf" behaviour alters window clamp so may need to
+  be a send-side only approach.
 - look at pulling buffer values back down based on longer latency
   (potential bufferbloat)
 - look at netdev_max_backlog; tune that too?

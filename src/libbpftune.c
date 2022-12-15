@@ -486,6 +486,9 @@ int bpftuner_tunables_init(struct bpftuner *tuner, unsigned int num_descs,
 				    descs[i].num_values, num_values);
 			return -EINVAL;
 		}
+		memcpy(tuner->tunables[i].initial_values,
+		       tuner->tunables[i].current_values,
+		       sizeof(tuner->tunables[i].initial_values));
 	}
 
 	return 0;
@@ -496,6 +499,35 @@ struct bpftunable *bpftuner_tunable(struct bpftuner *tuner, unsigned int index)
 	if (index < tuner->num_tunables)
 		return &tuner->tunables[index];
 	return NULL;
+}
+
+static void bpftuner_tunable_stats_update(struct bpftunable *tunable,
+					  unsigned int scenario, bool global_ns)
+{
+	if (global_ns)
+		tunable->stats.global_ns[scenario]++;
+	else
+		tunable->stats.nonglobal_ns[scenario]++;
+}
+
+int bpftuner_tunable_sysctl_write(struct bpftuner *tuner, unsigned int tunable,
+				  unsigned int scenario, int netns_fd,
+				  __u8 num_values, long *values)
+{
+	struct bpftunable *t = bpftuner_tunable(tuner, tunable);
+	int ret = 0, fd;
+
+	if (!t) {
+		bpftune_log(LOG_ERR, "no tunable %d for tuner '%s'\n",
+			    tunable, tuner->name);
+		return -EINVAL;
+	}
+
+	fd = t->desc.namespaced ? netns_fd : 0;
+	ret = bpftune_sysctl_write(fd, t->desc.name, num_values, values);
+	if (ret > 0)
+		bpftuner_tunable_stats_update(t, scenario, netns_fd == 0);
+	return ret;
 }
 
 unsigned int bpftuner_num_tunables(struct bpftuner *tuner)

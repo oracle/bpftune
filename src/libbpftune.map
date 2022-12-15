@@ -18,7 +18,8 @@ LIBBPFTUNE_0.1.1 {
 		__bpftuner_bpf_load_and_attach;
 		bpftuner_tunables_init;
 		bpftuner_tunable;
-		bpftuner_tunable_num;
+		bpftuner_num_tunables;
+		bpftuner_tunable_sysctl_write;
 		bpftuner_fini;
 		bpftuner_bpf_fini;
 		bpftuner_tunables_fini;

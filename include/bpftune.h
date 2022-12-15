@@ -7,6 +7,8 @@
 /* max # of tunables per tuner */
 #define BPFTUNE_MAX_TUNABLES		16
 
+#define BPFTUNE_MAX_SCENARIOS		16
+
 /* grow by 25% */
 #define BPFTUNE_GROW_BY_QUARTER(val)    ((val) + ((val) >> 2))
 #define BPFTUNE_GROW_BY_HALF(val)	((val) + ((val) >> 1))
@@ -51,11 +53,17 @@ struct bpftunable_desc {
 	__u8 num_values;
 };
 
+struct bpftunable_stats {
+	long global_ns[BPFTUNE_MAX_SCENARIOS];
+	long nonglobal_ns[BPFTUNE_MAX_SCENARIOS];
+};
+
 struct bpftunable {
 	struct bpftunable_desc desc;
 	enum bpftune_state state;
 	long initial_values[BPFTUNE_MAX_VALUES];
 	long current_values[BPFTUNE_MAX_VALUES];
+	struct bpftunable_stats stats;
 };
 
 struct bpftunable_update {

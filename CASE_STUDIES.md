@@ -34,6 +34,14 @@ tcp_mem exhaustion leads to very broken behaviour; we should avoid
 it at all costs. Adaptively increase tcp_mem[2] when we approach the exhaustion
 limit.
 
+However we have to consider the effect; if a large number of connections
+are active, we can exhaust system memory.  The problem is that some settings
+are global (such as tcp_[wr]mem, and different sockets have different
+priorities; we should, for example always support iSCSI buffer space
+demands.  To handle this, may be worth clamping lower-priority service
+buffer sizes to limit overheads in the case that a service needs a larger
+buffer size.
+
 See tcp_buffer_tuner (8) for more details.
 
 # NFS server not responding 

@@ -148,9 +148,7 @@ void event_handler(struct bpftuner *tuner,
 	memcpy(new, event->update[0].new, sizeof(new));
 	memcpy(old, event->update[0].old, sizeof(old));
 	
-	/* tcp_mem, max_backlog not namespaced */
-	if (event->netns_cookie && id != TCP_BUFFER_TCP_MEM &&
-	    id != NETDEV_MAX_BACKLOG) {
+	if (event->netns_cookie) {
 		netns_fd = bpftune_netns_fd_from_cookie(event->netns_cookie);
 		if (netns_fd < 0) {
 			bpftune_log(LOG_DEBUG, "could not get netns fd for cookie %ld\n",
@@ -182,7 +180,8 @@ void event_handler(struct bpftuner *tuner,
 				    new[0], new[1], new[2]); 
 			break;
 		}
-		bpftune_sysctl_write(netns_fd, tunable, 3, new);
+		bpftuner_tunable_sysctl_write(tuner, id, scenario,
+					     netns_fd, 3, new);
 		break;
 	case TCP_BUFFER_TCP_WMEM:
 	case TCP_BUFFER_TCP_RMEM:
@@ -197,7 +196,8 @@ void event_handler(struct bpftuner *tuner,
 		bpftune_log(LOG_INFO, "Due to %s, change %s(min default max) from (%d %d %d) -> (%d %d %d)\n",
 			    reason, tunable, old[0], old[1], old[2],
 			    new[0], new[1], new[2]);
-		bpftune_sysctl_write(netns_fd, tunable, 3, new);
+		bpftuner_tunable_sysctl_write(tuner, id, scenario,
+					     netns_fd, 3, new);
 		break;
 	case NETDEV_MAX_BACKLOG:
 		switch (scenario) {
@@ -210,7 +210,8 @@ void event_handler(struct bpftuner *tuner,
 		case NETDEV_MAX_BACKLOG_DECREASE:
 			break;
 		}
-		bpftune_sysctl_write(netns_fd, tunable, 1, new);
+		bpftuner_tunable_sysctl_write(tuner, id, scenario,
+					      netns_fd, 1, new);
 		break;
 	case TCP_BUFFER_TCP_MAX_ORPHANS:
 		break;
