@@ -18,6 +18,10 @@ enum neigh_table_tunables {
 	NEIGH_TABLE_NUM_TUNABLES
 };
 
+enum neigh_table_scenarios {
+	NEIGH_TABLE_FULL,
+};
+
 struct tbl_stats {
 	int family;
 	int entries;

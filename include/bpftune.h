@@ -31,7 +31,7 @@
 
 enum bpftunable_type {
 	BPFTUNABLE_SYSCTL,
-	BPFTUNABLE_CONGESTION_CONTROL,
+	BPFTUNABLE_OTHER,
 	BPFTUNABLE_MAX,
 };
 
@@ -39,6 +39,12 @@ enum bpftune_state {
 	BPFTUNE_INACTIVE,
 	BPFTUNE_ACTIVE,		/* actively being tuned. */
 	BPFTUNE_MANUAL,		/* manual intervention observed. */
+};
+
+struct bpftunable_scenario {
+	unsigned int id;
+	const char *name;
+	const char *description;
 };
 
 /* some tunables are defined as triples */
@@ -112,7 +118,8 @@ struct bpftuner {
 			      struct bpftune_event *event, void *ctx);
 	unsigned int num_tunables;
 	struct bpftunable *tunables;
-	const char **scenarios;
+	unsigned int num_scenarios;
+	struct bpftunable_scenario *scenarios;
 };
 
 /* from include/linux/log2.h */

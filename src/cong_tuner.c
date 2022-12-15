@@ -9,6 +9,18 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
+static struct bpftunable_desc descs[] = {
+{ 
+ TCP_CONG, BPFTUNABLE_OTHER, "TCP congestion control", true, 0 },
+};
+
+static struct bpftunable_scenario scenarios[] = {
+{ TCP_CONG_BBR,		"specify BBR congestion control",
+  "Because loss rate has exceeded 1% for a connection, use BBR congestion control algorithm instead of default" },
+{ TCP_CONG_HTCP,	"specify H-TCP congestion control",
+  "Because loss rate has exceeded 1% gor a connection, and it is classified as a Long Fat Pipe (high bandwidth-delay product), use h-tcp congestion control algorithm instead of default" },
+};
+
 struct cong_tuner_bpf *skel;
 
 int tcp_iter_fd;
@@ -44,7 +56,8 @@ int init(struct bpftuner *tuner, int ringbuf_map_fd)
 		return 1;
 	}
 
-	return 0;
+	return bpftuner_tunables_init(tuner, ARRAY_SIZE(descs), descs,
+				      ARRAY_SIZE(scenarios), scenarios);
 }
 
 void fini(struct bpftuner *tuner)
@@ -64,9 +77,9 @@ void event_handler(struct bpftuner *tuner, struct bpftune_event *event,
 	char iterbuf;
 
 	inet_ntop(sin6->sin6_family, &sin6->sin6_addr, buf, sizeof(buf));
-	bpftune_log(LOG_INFO,
-		    "due to loss events for %s, we will specify '%s' congestion control algorithm: (scenario %d) for tuner %s\n",
-		    buf, id == TCP_CONG_BBR ? "bbr" : "htcp", id, tuner->name);
+	bpftuner_tunable_update(tuner, TCP_CONG, id, 0,
+"due to loss events for %s, specify '%s' congestion control algorithm\n",
+				buf, id == TCP_CONG_BBR ? "bbr" : "htcp", id, tuner->name);
 
 	/* kick existing connections by running iterator over them... */
 	while (read(tcp_iter_fd, &iterbuf, sizeof(iterbuf)) == -1 && errno == EAGAIN)

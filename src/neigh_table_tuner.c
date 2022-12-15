@@ -30,10 +30,16 @@ static struct bpftunable_desc descs[] = {
 		"net.ipv6.neigh.default.gc_thresh3",    false, 1, },
 };
 
+static struct bpftunable_scenario scenarios[] = {
+{ NEIGH_TABLE_FULL,	"neighbour table nearly full",
+		"neighbour table is nearly full, preventing new entries from being added." },
+};
+
 int init(struct bpftuner *tuner, int ringbuf_map_fd)
 {
 	bpftuner_bpf_init(neigh_table, tuner, ringbuf_map_fd);
-	return bpftuner_tunables_init(tuner, NEIGH_TABLE_NUM_TUNABLES, descs);
+	return bpftuner_tunables_init(tuner, ARRAY_SIZE(descs), descs,
+				      ARRAY_SIZE(scenarios), scenarios);
 }
 
 void fini(struct bpftuner *tuner)
@@ -42,10 +48,13 @@ void fini(struct bpftuner *tuner)
 	bpftuner_bpf_fini(tuner);
 }
 
-static void set_gc_thresh3(struct tbl_stats *stats)
+static int set_gc_thresh3(struct bpftuner *tuner, struct tbl_stats *stats)
 {
 	char *tbl_name = stats->family == AF_INET ? "arp_cache" : "ndisc_cache";
 	/* Open raw socket for the NETLINK_ROUTE protocol */
+	unsigned int tunable = stats->family == AF_INET ?
+				NEIGH_TABLE_IPV4_GC_THRESH3 :
+				NEIGH_TABLE_IPV6_GC_THRESH3;
 	struct nl_sock *sk = nl_socket_alloc();
 	struct ndtmsg ndt = {
                 .ndtm_family = stats->family,
@@ -56,7 +65,7 @@ static void set_gc_thresh3(struct tbl_stats *stats)
 
 	if (!sk) {
 		bpftune_log(LOG_ERR, "failed to alloc netlink socket\n");
-		return;
+		return -ENOMEM;
 	}
 	nl_connect(sk, NETLINK_ROUTE);
 
@@ -105,17 +114,19 @@ out:
 		bpftune_log(LOG_ERR, "could not change neightbl for %s : %s\n",
 			    stats->dev, strerror(-ret));
 	} else {
-		bpftune_log(LOG_DEBUG, "updated gc_thresh3 for %s table, dev '%s' (ifindex %d) from %d to %d\n",
+		bpftuner_tunable_update(tuner, tunable, NEIGH_TABLE_FULL, 0,
+"updated gc_thresh3 for %s table, dev '%s' (ifindex %d) from %d to %d\n",
 			    tbl_name, stats->dev, stats->ifindex,
 			    stats->max, new_gc_thresh3);
 	}
+	return ret;
 }		
 
-void event_handler(__attribute__((unused))struct bpftuner *tuner,
+void event_handler(struct bpftuner *tuner,
 		   struct bpftune_event *event,
 		   __attribute__((unused))void *ctx)
 {
-	struct tbl_stats *tbl_stats = (struct tbl_stats *)&event->raw_data;
+	struct tbl_stats *stats = (struct tbl_stats *)&event->raw_data;
 
-	set_gc_thresh3(tbl_stats);
+	set_gc_thresh3(tuner, stats);
 }

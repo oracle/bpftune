@@ -252,12 +252,34 @@ struct bpftuner *bpftuner_init(const char *path, int ringbuf_map_fd)
 	return tuner;
 }
 
+static void bpftuner_scenario_log(struct bpftuner *tuner, unsigned int tunable,
+				  unsigned int scenario, int netns_fd,
+				  bool summary,
+				  const char *fmt, va_list args);
+
+unsigned long global_netns_cookie;
+
 void bpftuner_fini(struct bpftuner *tuner, enum bpftune_state state)
 {
+	unsigned int i, j;
+
 	if (!tuner || tuner->state != BPFTUNE_ACTIVE)
 		return;
+
+	/* report summary of events for tuner */
+	for (i = 0; i < tuner->num_tunables; i++) {
+		for (j = 0; j < tuner->num_scenarios; j++) {
+			bpftuner_scenario_log(tuner, i, j,
+					      global_netns_cookie, true, NULL,
+					      NULL);
+			bpftuner_scenario_log(tuner, i, j,
+                                              global_netns_cookie + 1,
+					      true, NULL, NULL);
+		}
+	}
 	if (tuner->fini)
 		tuner->fini(tuner);
+
 	tuner->state = state;
 }
 
@@ -272,8 +294,6 @@ unsigned int bpftune_tuner_num(void)
 {
 	return bpftune_num_tuners;
 }
-
-unsigned long global_netns_cookie;
 
 static int bpftune_ringbuf_event_read(void *ctx, void *data, size_t size)
 {
@@ -452,10 +472,14 @@ out:
 }
 
 int bpftuner_tunables_init(struct bpftuner *tuner, unsigned int num_descs,
-			   struct bpftunable_desc *descs)
+			   struct bpftunable_desc *descs,
+			   unsigned int num_scenarios,
+			   struct bpftunable_scenario *scenarios)
 {
 	unsigned int i;
 
+	tuner->scenarios = scenarios;
+	tuner->num_scenarios = num_scenarios;
 	tuner->tunables = calloc(num_descs, sizeof(struct bpftunable));
 	if (!tuner->tunables) {
 		bpftune_log(LOG_DEBUG, "no memory to alloc tunables for %s\n",
@@ -469,11 +493,8 @@ int bpftuner_tunables_init(struct bpftuner *tuner, unsigned int num_descs,
 		bpftune_log(LOG_DEBUG, "handling desc %ld/%ld\n", i, num_descs);
 		memcpy(&tuner->tunables[i].desc, &descs[i], sizeof(*descs));
 
-		if (descs[i].type != BPFTUNABLE_SYSCTL) {
-			bpftune_log(LOG_ERR, "cannot add '%s': only sysctl tunables supported\n",
-				    descs[i].name);
-			return -EINVAL;
-		}
+		if (descs[i].type != BPFTUNABLE_SYSCTL)
+			continue;
 		num_values = bpftune_sysctl_read(0, descs[i].name,
 				tuner->tunables[i].current_values);
 		if (num_values < 0) {
@@ -510,9 +531,44 @@ static void bpftuner_tunable_stats_update(struct bpftunable *tunable,
 		tunable->stats.nonglobal_ns[scenario]++;
 }
 
+static void bpftuner_scenario_log(struct bpftuner *tuner, unsigned int tunable,
+				  unsigned int scenario, int netns_fd,
+				  bool summary,
+				  const char *fmt, va_list args)
+{
+	struct bpftunable *t = bpftuner_tunable(tuner, tunable);
+	bool global_ns = netns_fd == 0;
+
+	if (!t->desc.namespaced)
+		global_ns = false;
+
+	if (summary) {
+		unsigned long count;
+
+		count = global_ns ? t->stats.global_ns[scenario] :
+				    t->stats.nonglobal_ns[scenario];
+		if (!count)
+			return;
+		bpftune_log(LOG_INFO, "Summary: scenario '%s' occurred %ld times for tunable '%s' in %sglobal ns. %s\n",
+			    tuner->scenarios[scenario].name, count,
+			    t->desc.name,
+			    global_ns ? "" : "non-",
+			    tuner->scenarios[scenario].description);
+	} else {
+		bpftune_log(LOG_INFO, "Scenario '%s' occurred for tunable '%s' in %sglobal ns. %s\n",
+			    tuner->scenarios[scenario].name,
+			    t->desc.name,
+			    global_ns ? "" : "non-",
+			    tuner->scenarios[scenario].description);
+		__bpftune_log(LOG_INFO, fmt, args);
+		bpftuner_tunable_stats_update(t, scenario, global_ns);
+	}
+}
+
 int bpftuner_tunable_sysctl_write(struct bpftuner *tuner, unsigned int tunable,
 				  unsigned int scenario, int netns_fd,
-				  __u8 num_values, long *values)
+				  __u8 num_values, long *values,
+				  const char *fmt, ...)
 {
 	struct bpftunable *t = bpftuner_tunable(tuner, tunable);
 	int ret = 0, fd;
@@ -524,10 +580,38 @@ int bpftuner_tunable_sysctl_write(struct bpftuner *tuner, unsigned int tunable,
 	}
 
 	fd = t->desc.namespaced ? netns_fd : 0;
+
 	ret = bpftune_sysctl_write(fd, t->desc.name, num_values, values);
-	if (ret > 0)
-		bpftuner_tunable_stats_update(t, scenario, netns_fd == 0);
+	if (!ret) {
+		va_list args;
+
+		va_start(args, fmt);
+		bpftuner_scenario_log(tuner, tunable, scenario, netns_fd,
+				      false, fmt, args);
+		va_end(args);
+	}
+
 	return ret;
+}
+
+int bpftuner_tunable_update(struct bpftuner *tuner, unsigned int tunable,
+			    unsigned int scenario, int netns_fd,
+			    const char *fmt, ...)
+{
+	struct bpftunable *t = bpftuner_tunable(tuner, tunable);
+	va_list args;
+
+	if (!t) {
+		bpftune_log(LOG_ERR, "no tunable %d for tuner '%s'\n",
+			    tunable, tuner->name);
+		return -EINVAL;
+	}
+	va_start(args, fmt);
+	bpftuner_scenario_log(tuner, tunable, scenario, netns_fd, false,
+			      fmt, args);
+	va_end(args);
+
+	return 0;
 }
 
 unsigned int bpftuner_num_tunables(struct bpftuner *tuner)

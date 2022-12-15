@@ -1,5 +1,9 @@
 #include <bpftune.h>
 
+enum tcp_cong_tunables {
+	TCP_CONG,
+};
+
 enum tcp_cong_scenarios {
 	TCP_CONG_BBR,
 	TCP_CONG_HTCP,

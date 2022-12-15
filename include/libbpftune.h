@@ -29,6 +29,9 @@
 
 #define BPFTUNE_PROC_SYS		"/proc/sys/"
 
+#ifndef ARRAY_SIZE
+#define ARRAY_SIZE(arr)			(sizeof(arr) / sizeof((arr)[0])) 
+#endif
 
 int bpftune_log_level(void);
 
@@ -53,7 +56,9 @@ int __bpftuner_bpf_load(struct bpftuner *tuner, int ringbuf_map_fd);
 int __bpftuner_bpf_attach(struct bpftuner *tuner, int ringbuf_map_fd);
 int __bpftuner_bpf_load_and_attach(struct bpftuner *tuner, int ringbuf_map_fd);
 int bpftuner_tunables_init(struct bpftuner *tuner, unsigned int num_descs,
-			   struct bpftunable_desc *descs);
+			   struct bpftunable_desc *descs,
+			   unsigned int num_scenarios,
+			   struct bpftunable_scenario *scenarios);
 struct bpftunable *bpftuner_tunable(struct bpftuner *tuner, unsigned int index);
 unsigned int bpftuner_num_tunables(struct bpftuner *tuner);
 
@@ -71,7 +76,14 @@ int bpftuner_tunable_sysctl_write(struct bpftuner *tuner,
 				  unsigned int tunable,
 				  unsigned int scenario,
 				  int netns_fd,
-				  __u8 num_values, long *values);
+				  __u8 num_values, long *values,
+				  const char *fmt, ...);
+
+int bpftuner_tunable_update(struct bpftuner *tuner,
+			    unsigned int tunable,
+			    unsigned int scenario,
+			    int netns_fd,
+			    const char *fmt, ...);
 
 struct bpftuner *bpftune_tuner(unsigned int index);
 unsigned int bpftune_tuner_num(void);

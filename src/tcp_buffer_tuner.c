@@ -17,6 +17,26 @@ static struct bpftunable_desc descs[] = {
 								false, 1 },
 };
 
+static struct bpftunable_scenario scenarios[] = {
+{ TCP_BUFFER_INCREASE,	"need to increase TCP buffer size(s)",
+	"Need to increase buffer size(s) to maximize throughput" },
+{ TCP_BUFFER_DECREASE,	"Need to decrease TCP buffer size(s)",
+	"Need to decrease buffer size(s) to reduce memory utilization" },
+{ TCP_MEM_PRESSURE,	"approaching TCP memory pressure",
+	"Since memory pressure/exhaustion are unstable system states, adjust tcp memory-related tunables" },
+{ TCP_MEM_EXHAUSTION,	"approaching TCP memory exhaustion",
+	"Since memory exhaustion is a highly unstable state, adjust TCP memory-related tunables to avoid exhaustion" },
+{ TCP_MAX_ORPHANS_INCREASE,
+			"increase max number of orphaned sockets",
+			"" },
+{ NETDEV_MAX_BACKLOG_INCREASE,
+			"increase max backlog for received packets",
+			"" },
+{ NETDEV_MAX_BACKLOG_DECREASE,
+			"decrease max backlog for received packets",
+			"" },
+};
+
 /* When TCP starts up, it calls nr_free_buffer_pages() and uses it to estimate
  * the values for tcp_mem[0-2].  The equivalent of this estimate can be
  * retrieved via /proc/zoneinfo; in the Normal zone the number of managed
@@ -121,7 +141,8 @@ int init(struct bpftuner *tuner, int ringbuf_map_fd)
 	bpftune_log(LOG_DEBUG,
 		    "set nr_free_buffer_pages to %ld\n", skel->bss->nr_free_buffer_pages);
 	bpftuner_bpf_attach(tcp_buffer, tuner, ringbuf_map_fd);
-	return bpftuner_tunables_init(tuner, TCP_BUFFER_NUM_TUNABLES, descs);
+	return bpftuner_tunables_init(tuner, TCP_BUFFER_NUM_TUNABLES, descs,
+				      ARRAY_SIZE(scenarios), scenarios);
 }
 
 void fini(struct bpftuner *tuner)
@@ -170,18 +191,12 @@ void event_handler(struct bpftuner *tuner,
 
 	switch (id) {
 	case TCP_BUFFER_TCP_MEM:
-		switch (scenario) {
-		case TCP_MEM_PRESSURE:
-		case TCP_MEM_EXHAUSTION:
-			bpftune_log(LOG_INFO,
-"%s; since memory exhaustion is a highly unstable state "
-"for the TCP/IP stack, change %s(min pressure max) from (%d %d %d) -> (%d %d %d)\n",
-				    lowmem, tunable, old[0], old[1], old[2],
-				    new[0], new[1], new[2]); 
-			break;
-		}
 		bpftuner_tunable_sysctl_write(tuner, id, scenario,
-					     netns_fd, 3, new);
+					     netns_fd, 3, new,
+"Due to %s change %s(min pressure max) from (%d %d %d) -> (%d %d %d)\n",
+					     lowmem, tunable, old[0], old[1], old[2],
+					     new[0], new[1], new[2]);
+
 		break;
 	case TCP_BUFFER_TCP_WMEM:
 	case TCP_BUFFER_TCP_RMEM:
@@ -193,25 +208,19 @@ void event_handler(struct bpftuner *tuner,
 			reason = lowmem;
 			break;
 		}
-		bpftune_log(LOG_INFO, "Due to %s, change %s(min default max) from (%d %d %d) -> (%d %d %d)\n",
-			    reason, tunable, old[0], old[1], old[2],
-			    new[0], new[1], new[2]);
 		bpftuner_tunable_sysctl_write(tuner, id, scenario,
-					     netns_fd, 3, new);
+					     netns_fd, 3, new,
+"Due to %s change %s(min default max) from (%d %d %d) -> (%d %d %d)\n",
+					      reason, tunable,
+					      old[0], old[1], old[2],
+					      new[0], new[1], new[2]);
 		break;
 	case NETDEV_MAX_BACKLOG:
-		switch (scenario) {
-		case NETDEV_MAX_BACKLOG_INCREASE:
-			bpftune_log(LOG_INFO,
-"Dropped more than 1/4 of the backlog queue size (%d) in last minute; "
-"Increase backlog queue size from %d -> %d to support faster network device.\n",
-				    old[0], new[0]);
-			break;
-		case NETDEV_MAX_BACKLOG_DECREASE:
-			break;
-		}
 		bpftuner_tunable_sysctl_write(tuner, id, scenario,
-					      netns_fd, 1, new);
+					      netns_fd, 1, new,
+"Dropped more than 1/4 of the backlog queue size (%d) in last minute; "
+"increase backlog queue size from %d -> %d to support faster network device.\n",
+					      old[0], new[0]);
 		break;
 	case TCP_BUFFER_TCP_MAX_ORPHANS:
 		break;

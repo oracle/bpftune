@@ -11,6 +11,8 @@
 
 . ./test_lib.sh
 
+LOGFILE=$TESTLOG_LAST
+
 SLEEPTIME=0.5
 
 for TUNER in neigh_table ; do
@@ -49,7 +51,11 @@ for TUNER in neigh_table ; do
 	$PREFIX_CMD ip neigh add $ip6addr lladdr $macaddr dev $INTF
       fi
    done
-   grep "updated gc_thresh3 for $TBL" $TESTLOG_LAST
+   echo "Following changes were made:"
+   set +e  
+   grep bpftune $LOGFILE
+   set -e
+   grep "updated gc_thresh3 for $TBL" $LOGFILE
    test_pass
   done
  done
