@@ -7,13 +7,13 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
-int init(struct bpftuner *tuner, int ringbuf_map_fd)
+int init(struct bpftuner *tuner)
 {
 	struct sysctl_tuner_bpf *skel;
 	int prog_fd, cgroup_fd, err;
 	const char *cgroup_dir;
 
-	bpftuner_bpf_init(sysctl, tuner, ringbuf_map_fd);
+	bpftuner_bpf_init(sysctl, tuner);
 
 	/* attach to root cgroup */
 	cgroup_dir = bpftune_cgroup_name();

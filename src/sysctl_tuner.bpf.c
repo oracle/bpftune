@@ -27,6 +27,6 @@ int sysctl_write(struct bpf_sysctl *ctx)
 	current_task = (struct task_struct *)bpf_get_current_task();
 	current_pid = BPF_CORE_READ(current_task, pid);
 	if (current_pid != bpftune_pid)
-		bpf_ringbuf_output(&ringbuf_map, &event, sizeof(event), 0);
+		bpf_ringbuf_output(&ring_buffer_map, &event, sizeof(event), 0);
 	return 1;
 }

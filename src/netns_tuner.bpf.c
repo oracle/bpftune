@@ -19,7 +19,7 @@ int BPF_PROG(bpftune_setup_net, struct net *net, struct user_namespace *user_ns,
 	event.pid = bpf_get_current_pid_tgid() >> 32;
 	event.scenario_id = NETNS_SCENARIO_CREATE;
 	event.netns_cookie = net->net_cookie;
-	bpf_ringbuf_output(&ringbuf_map, &event, sizeof(event), 0);
+	bpf_ringbuf_output(&ring_buffer_map, &event, sizeof(event), 0);
 
 	return 0;
 }
@@ -35,7 +35,7 @@ int BPF_PROG(bpftune_net_free, struct net *net)
 	event.tuner_id = tuner_id;
 	event.scenario_id = NETNS_SCENARIO_DESTROY;
 	event.netns_cookie = net->net_cookie;
-	bpf_ringbuf_output(&ringbuf_map, &event, sizeof(event), 0);
+	bpf_ringbuf_output(&ring_buffer_map, &event, sizeof(event), 0);
 
 	return 0;
 }

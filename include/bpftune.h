@@ -110,10 +110,12 @@ struct bpftuner {
 	const char *name;
 	struct bpf_object_skeleton *skeleton;
 	void *skel;
-	int (*init)(struct bpftuner *tuner, int ringbuf_map_fd);
+	int (*init)(struct bpftuner *tuner);
 	void (*fini)(struct bpftuner *tuner);
-	void *ringbuf_map;
-	int ringbuf_map_fd;
+	void *ring_buffer_map;
+	int ring_buffer_map_fd;
+	void *corr_map;
+	int corr_map_fd;
 	void (*event_handler)(struct bpftuner *tuner,
 			      struct bpftune_event *event, void *ctx);
 	unsigned int num_tunables;

@@ -25,7 +25,7 @@ struct cong_tuner_bpf *skel;
 
 int tcp_iter_fd;
 
-int init(struct bpftuner *tuner, int ringbuf_map_fd)
+int init(struct bpftuner *tuner)
 {
 	struct bpf_link *link;
 	int err;
@@ -40,7 +40,7 @@ int init(struct bpftuner *tuner, int ringbuf_map_fd)
 	if (err != -EEXIST)
 		bpftune_log(LOG_DEBUG, "could not load tcp_htcp module\n");
 
-	bpftuner_bpf_init(cong, tuner, ringbuf_map_fd);
+	bpftuner_bpf_init(cong, tuner);
 
 	skel = tuner->skel;
 	link = bpf_program__attach_iter(skel->progs.bpftune_cong_iter, NULL);

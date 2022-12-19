@@ -2,6 +2,8 @@
 #include "tcp_buffer_tuner.h"
 #include "tcp_buffer_tuner.skel.h"
 
+#include "corr.h"
+
 #include <unistd.h>
 
 struct tcp_buffer_tuner_bpf *skel;
@@ -116,13 +118,13 @@ long nr_free_buffer_pages(bool initial)
 	return nr_pages;
 }
 
-int init(struct bpftuner *tuner, int ringbuf_map_fd)
+int init(struct bpftuner *tuner)
 {
 	struct tcp_buffer_tuner_bpf *skel;
 	int pagesize;
 
-	bpftuner_bpf_open(tcp_buffer, tuner, ringbuf_map_fd);
-	bpftuner_bpf_load(tcp_buffer, tuner, ringbuf_map_fd);
+	bpftuner_bpf_open(tcp_buffer, tuner);
+	bpftuner_bpf_load(tcp_buffer, tuner);
 
 	skel = tuner->skel;
 
@@ -140,7 +142,7 @@ int init(struct bpftuner *tuner, int ringbuf_map_fd)
 		    skel->bss->sk_mem_quantum_shift);
 	bpftune_log(LOG_DEBUG,
 		    "set nr_free_buffer_pages to %ld\n", skel->bss->nr_free_buffer_pages);
-	bpftuner_bpf_attach(tcp_buffer, tuner, ringbuf_map_fd);
+	bpftuner_bpf_attach(tcp_buffer, tuner);
 	return bpftuner_tunables_init(tuner, TCP_BUFFER_NUM_TUNABLES, descs,
 				      ARRAY_SIZE(scenarios), scenarios);
 }
@@ -159,8 +161,10 @@ void event_handler(struct bpftuner *tuner,
 	const char *lowmem = "normal memory conditions";
 	const char *reason = "unknown reason";
 	int scenario = event->scenario_id;
+	struct corr corr = { 0 };
 	const char *tunable;
 	long new[3], old[3];
+	struct corr_key key;
 	int netns_fd = 0;
 	int id;
 
@@ -189,6 +193,16 @@ void event_handler(struct bpftuner *tuner,
 	else if (skel->bss->near_memory_pressure)
 		lowmem = "near memory pressure";
 
+	key.id = (__u64)id;
+	key.netns_cookie = event->netns_cookie;
+
+	bpftune_log(LOG_INFO, "looking up corr map fd %d with key %ld\n",
+		    tuner->corr_map_fd, key.id);
+	if (!bpf_map_lookup_elem(tuner->corr_map_fd, &key, &corr)) {
+		bpftune_log(LOG_INFO, "covar for '%s' (new %ld %ld %ld): %LF ; corr %LF\n",
+			    tunable, new[0], new[1], new[2],
+			    covar_compute(&corr), corr_compute(&corr));
+	}
 	switch (id) {
 	case TCP_BUFFER_TCP_MEM:
 		bpftuner_tunable_sysctl_write(tuner, id, scenario,

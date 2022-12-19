@@ -38,7 +38,8 @@ void *bpftune_log_ctx;
 int bpftune_loglevel = LOG_INFO;
 
 struct ring_buffer *ring_buffer;
-int ring_buffer_fd;
+int ring_buffer_map_fd;
+int corr_map_fd;
 
 int bpftune_log_level(void)
 {
@@ -162,36 +163,66 @@ void bpftune_cgroup_fini(void)
 		close(__bpftune_cgroup_fd);
 }
 
-int __bpftuner_bpf_load(struct bpftuner *tuner, int ring_buffer_fd)
+int __bpftuner_bpf_load(struct bpftuner *tuner)
 {
+	struct bpf_map *map;
 	int err;	
 
-	if (ring_buffer_fd > 0) {
-		err = bpf_map__reuse_fd(tuner->ringbuf_map, ring_buffer_fd);
+	if (ring_buffer_map_fd > 0) {
+		err = bpf_map__reuse_fd(tuner->ring_buffer_map,
+					ring_buffer_map_fd);
 		if (err < 0) {
 			bpftune_log_bpf_err(err, "could not reuse fd: %s\n");
 			return err;
 		}
+		tuner->ring_buffer_map_fd = ring_buffer_map_fd;
+	}
+	
+	if (corr_map_fd > 0) {
+		err = bpf_map__reuse_fd(tuner->corr_map, corr_map_fd);
+		if (err < 0) {
+			bpftune_log_bpf_err(err, "could not reuse corr fd: %s\n");
+			return err;
+		}
+		tuner->corr_map_fd = corr_map_fd;
 	}
 	err = bpf_object__load_skeleton(tuner->skeleton);
 	if (err) {
 		bpftune_log_bpf_err(err, "could not load skeleton: %s\n");      
 		return err;
 	}
+	if (ring_buffer_map_fd == 0) {
+		map = bpf_object__find_map_by_name(*tuner->skeleton->obj,
+						   "ring_buffer_map");
+		if (map) {
+			ring_buffer_map_fd = bpf_map__fd(map);
+			bpftune_log(LOG_DEBUG, "got ring_buffer_map fd %d\n",
+				    ring_buffer_map_fd);
+		}
+		tuner->ring_buffer_map_fd = ring_buffer_map_fd;
+	}
+	if (corr_map_fd == 0) {
+		map = bpf_object__find_map_by_name(*tuner->skeleton->obj,
+						   "corr_map");
+		if (map) {
+			corr_map_fd = bpf_map__fd(map);
+			bpftune_log(LOG_DEBUG, "got corr_map fd %d\n",
+				    corr_map_fd);
+			tuner->corr_map_fd = corr_map_fd;
+		}
+	}
 
 	return 0;
 }
 
-int __bpftuner_bpf_attach(struct bpftuner *tuner, int ring_buffer_fd)
+int __bpftuner_bpf_attach(struct bpftuner *tuner)
 {
 	int err = bpf_object__attach_skeleton(tuner->skeleton);
 	if (err) {
 		bpftune_log_bpf_err(err, "could not attach skeleton: %s\n");
 		return err;
 	}
-	if (!ring_buffer_fd)
-		ring_buffer_fd = bpf_map__fd(tuner->ringbuf_map);
-	tuner->ringbuf_map_fd = ring_buffer_fd;
+	tuner->ring_buffer_map_fd = bpf_map__fd(tuner->ring_buffer_map);
 
 	return 0;
 }
@@ -208,7 +239,7 @@ static unsigned int bpftune_num_tuners;
 /* add a tuner to the list of tuners, or replace existing inactive tuner.
  * If successful, call init().
  */
-struct bpftuner *bpftuner_init(const char *path, int ringbuf_map_fd)
+struct bpftuner *bpftuner_init(const char *path)
 {
 	struct bpftuner *tuner = NULL;
 	int err;
@@ -229,14 +260,13 @@ struct bpftuner *bpftuner_init(const char *path, int ringbuf_map_fd)
  	 * for other ringbuf maps (so we can use the same ring buffer for all
  	 * BPF events.
  	 */
-	if (ringbuf_map_fd > 0)
-		tuner->ringbuf_map_fd = ringbuf_map_fd;
+		tuner->ring_buffer_map_fd = ring_buffer_map_fd;
 	tuner->init = dlsym(tuner->handle, "init");
 	tuner->fini = dlsym(tuner->handle, "fini");
 	tuner->event_handler = dlsym(tuner->handle, "event_handler");
 	
 	bpftune_log(LOG_DEBUG, "calling init for '%s\n", path);
-	err = tuner->init(tuner, ringbuf_map_fd);
+	err = tuner->init(tuner);
 	if (err) {
 		dlclose(tuner->handle);
 		bpftune_log(LOG_ERR, "error initializing '%s: %s\n",
@@ -324,14 +354,19 @@ static int bpftune_ringbuf_event_read(void *ctx, void *data, size_t size)
 	return 0;
 }
 
-void *bpftune_ring_buffer_init(int ringbuf_map_fd, void *ctx)
+int bpftuner_ring_buffer_map_fd(struct bpftuner *tuner)
+{
+	return tuner->ring_buffer_map_fd;
+}
+
+void *bpftune_ring_buffer_init(int ring_buffer_map_fd, void *ctx)
 {
 	struct ring_buffer *rb;
 	int err;
 
 	bpftune_log(LOG_DEBUG, "calling ring_buffer__new, ringbuf_map_fd %d\n",
-		    ringbuf_map_fd);
-	rb = ring_buffer__new(ringbuf_map_fd, bpftune_ringbuf_event_read, ctx, NULL);
+		    ring_buffer_map_fd);
+	rb = ring_buffer__new(ring_buffer_map_fd, bpftune_ringbuf_event_read, ctx, NULL);
 	err = libbpf_get_error(rb);
 	if (err) {
 		bpftune_log_bpf_err(err, "couldnt create ring buffer: %s\n");

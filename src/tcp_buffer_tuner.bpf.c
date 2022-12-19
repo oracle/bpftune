@@ -20,6 +20,16 @@ int sk_mem_quantum;
 int sk_mem_quantum_shift;
 unsigned long nr_free_buffer_pages;
 
+#define tcp_tunable_corr(__id, __cookie, __newval, __sk, __field_type, __field)\
+	{								\
+		__field_type __field;					\
+		if (!bpf_probe_read_kernel(&__field, sizeof(__field),	\
+				   (void *)__sk +			\
+				   offsetof(struct tcp_sock, __field)))	\
+                        corr_update_bpf(__id, __cookie, __newval,	\
+					__field);			\
+	}
+
 static __always_inline bool tcp_nearly_out_of_memory(struct sock *sk,
 						     struct bpftune_event *event)
 {
@@ -181,6 +191,7 @@ int BPF_PROG(bpftune_sndbuf_expand, struct sock *sk)
 	wmem[2] = net->ipv4.sysctl_tcp_wmem[2];
 
 	if (NEARLY_FULL(sndbuf, wmem[2])) {
+
 		if (tcp_nearly_out_of_memory(sk, &event))
 			return 0;
 
@@ -193,6 +204,12 @@ int BPF_PROG(bpftune_sndbuf_expand, struct sock *sk)
 		send_sysctl_event(sk, TCP_BUFFER_INCREASE,
 				  TCP_BUFFER_TCP_WMEM,
 				  wmem, wmem_new, &event);
+		/* correlate changes to wmem with round-trip time to spot
+		 * cases where buffer increase is correlated with longer
+		 * latencies.
+		 */
+		tcp_tunable_corr(TCP_BUFFER_TCP_WMEM, event.netns_cookie,
+				 wmem_new[2], sk, __u32, srtt_us);
 	}
 	return 0;
 }
@@ -228,6 +245,13 @@ int BPF_PROG(bpftune_rcvbuf_adjust, struct sock *sk)
 		rmem_new[2] = BPFTUNE_GROW_BY_QUARTER(rmem[2]);
 		send_sysctl_event(sk, TCP_BUFFER_INCREASE, TCP_BUFFER_TCP_RMEM,
 				  rmem, rmem_new, &event);
+		/* correlate changes to rmem with round-trip time to spot
+		 * cases where buffer increase is correlated with longer
+		 * latencies.
+		 */
+		tcp_tunable_corr(TCP_BUFFER_TCP_RMEM, event.netns_cookie,
+				 rmem_new[2], sk, __u32, srtt_us);
+
 	}
 	return 0;
 }

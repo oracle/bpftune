@@ -3,20 +3,29 @@
 
 #include "vmlinux.h"
 
+#define __KERNEL__
 #define __x86_64__
 #include <errno.h>
-
-#include "bpftune.h"
 
 #include <bpf/bpf_endian.h>
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
 #include <bpf/bpf_core_read.h>
 
+#include "bpftune.h"
+#include "corr.h"
+
 struct {
         __uint(type, BPF_MAP_TYPE_RINGBUF);
         __uint(max_entries, 64 * 1024);
-} ringbuf_map SEC(".maps");
+} ring_buffer_map SEC(".maps");
+
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__uint(max_entries, 1024);
+	__type(key, struct corr_key);
+	__type(value, struct corr);
+} corr_map SEC(".maps");
 
 unsigned int tuner_id;
 
@@ -136,11 +145,29 @@ static __always_inline void send_sysctl_event(struct sock *sk,
 	event->update[0].new[0] = new[0];
 	event->update[0].new[1] = new[1];
 	event->update[0].new[2] = new[2];
-	ret = bpf_ringbuf_output(&ringbuf_map, event, sizeof(*event), 0);
+	ret = bpf_ringbuf_output(&ring_buffer_map, event, sizeof(*event), 0);
 	bpftune_log("tuner [%d] scenario [%d]: event send: %d ",
 		    tuner_id, scenario_id, ret);
 	bpftune_log("\told '%d %d %d'\n", old[0], old[1], old[2]);
 	bpftune_log("\tnew '%d %d %d'\n", new[0], new[1], new[2]);
+}
+
+static inline void corr_update_bpf(__u64 id, __u64 netns_cookie,
+				   __u64 x, __u64 y)
+{
+	struct corr_key key = { .id = id, .netns_cookie = netns_cookie };
+	struct corr *corrp = bpf_map_lookup_elem(&corr_map, &key);
+
+	if (!corrp) {
+		struct corr corr = {};
+
+		bpf_map_update_elem(&corr_map, &key, &corr, 0);
+
+		corrp = bpf_map_lookup_elem(&corr_map, &key);
+		if (!corrp)
+			return;
+	}
+	corr_update(corrp, x, y);
 }
 
 char _license[] SEC("license") = "Dual BSD/GPL";

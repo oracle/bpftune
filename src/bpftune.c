@@ -26,8 +26,8 @@
 #define BPFTUNE_VERSION  "0.1"
 #endif
 
-void *ring_buffer;
 int ringbuf_map_fd;
+void *ring_buffer;
 bool use_stderr;
 
 char *allowlist[BPFTUNE_MAX_TUNERS];
@@ -98,12 +98,12 @@ int init(const char *cgroup_dir, const char *library_dir)
 		snprintf(library_path, sizeof(library_path), "%s/%s",
 			 library_dir, dirent->d_name);
 		bpftune_log(LOG_DEBUG, "found lib %s, init\n", library_path);
-		tuner = bpftuner_init(library_path, ringbuf_map_fd);
+		tuner = bpftuner_init(library_path);
 		/* individual tuner failure shouldn't prevent progress */
 		if (!tuner)
 			continue;
 		if (ringbuf_map_fd == 0)
-			ringbuf_map_fd = tuner->ringbuf_map_fd;
+			ringbuf_map_fd = bpftuner_ring_buffer_map_fd(tuner);
 	}
 
 	if (ringbuf_map_fd > 0) {

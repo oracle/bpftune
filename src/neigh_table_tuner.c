@@ -35,9 +35,9 @@ static struct bpftunable_scenario scenarios[] = {
 		"neighbour table is nearly full, preventing new entries from being added." },
 };
 
-int init(struct bpftuner *tuner, int ringbuf_map_fd)
+int init(struct bpftuner *tuner)
 {
-	bpftuner_bpf_init(neigh_table, tuner, ringbuf_map_fd);
+	bpftuner_bpf_init(neigh_table, tuner);
 	return bpftuner_tunables_init(tuner, ARRAY_SIZE(descs), descs,
 				      ARRAY_SIZE(scenarios), scenarios);
 }

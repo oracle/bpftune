@@ -16,9 +16,9 @@ static struct bpftunable_scenario scenarios[] = {
 { NETNS_SCENARIO_DESTROY, "netns destroyed", "network namespace destruction" },
 };
 
-int init(struct bpftuner *tuner, int ringbuf_map_fd)
+int init(struct bpftuner *tuner)
 {
-	bpftuner_bpf_init(netns, tuner, ringbuf_map_fd);
+	bpftuner_bpf_init(netns, tuner);
 
 	return bpftuner_tunables_init(tuner, ARRAY_SIZE(descs), descs,
 				      ARRAY_SIZE(scenarios), scenarios);

@@ -159,7 +159,7 @@ int BPF_PROG(cong_retransmit, struct sock *sk, struct sk_buff *skb)
 	event.tuner_id = tuner_id;
 	event.scenario_id = id;
 	event.netns_cookie = get_netns_cookie(sk->sk_net.net);
-	bpf_ringbuf_output(&ringbuf_map, &event, sizeof(event), 0);
+	bpf_ringbuf_output(&ring_buffer_map, &event, sizeof(event), 0);
 
 	return 0;
 }

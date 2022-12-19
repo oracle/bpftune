@@ -52,7 +52,7 @@ int BPF_PROG(bpftune_neigh_create, struct neigh_table *tbl,
 		if (n->parms && n->parms->net.net)
 			event.netns_cookie = get_netns_cookie(n->parms->net.net);
 		__builtin_memcpy(&event.raw_data, tbl_stats, sizeof(*tbl_stats));
-		bpf_ringbuf_output(&ringbuf_map, &event, sizeof(event), 0);
+		bpf_ringbuf_output(&ring_buffer_map, &event, sizeof(event), 0);
 	}
 	return 0;
 }
