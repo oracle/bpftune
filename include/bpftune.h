@@ -60,8 +60,8 @@ struct bpftunable_desc {
 };
 
 struct bpftunable_stats {
-	long global_ns[BPFTUNE_MAX_SCENARIOS];
-	long nonglobal_ns[BPFTUNE_MAX_SCENARIOS];
+	unsigned long global_ns[BPFTUNE_MAX_SCENARIOS];
+	unsigned long nonglobal_ns[BPFTUNE_MAX_SCENARIOS];
 };
 
 struct bpftunable {

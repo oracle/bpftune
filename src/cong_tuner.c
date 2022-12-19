@@ -11,14 +11,14 @@
 
 static struct bpftunable_desc descs[] = {
 { 
- TCP_CONG, BPFTUNABLE_OTHER, "TCP congestion control", true, 0 },
+ TCP_CONG, BPFTUNABLE_OTHER, "TCP congestion control", false, 0 },
 };
 
 static struct bpftunable_scenario scenarios[] = {
-{ TCP_CONG_BBR,		"specify BBR congestion control",
-  "Because loss rate has exceeded 1% for a connection, use BBR congestion control algorithm instead of default" },
-{ TCP_CONG_HTCP,	"specify H-TCP congestion control",
-  "Because loss rate has exceeded 1% gor a connection, and it is classified as a Long Fat Pipe (high bandwidth-delay product), use h-tcp congestion control algorithm instead of default" },
+{ TCP_CONG_BBR,		"specify bbr congestion control",
+  "Because loss rate has exceeded 1 percent for a connection, use bbr congestion control algorithm instead of default" },
+{ TCP_CONG_HTCP,	"specify h-tcp congestion control",
+  "Because loss rate has exceeded 1 percent for a connection, and it is classified as a Long Fat Pipe (high bandwidth-delay product), use h-tcp congestion control algorithm instead of default" },
 };
 
 struct cong_tuner_bpf *skel;
@@ -33,10 +33,12 @@ int init(struct bpftuner *tuner, int ringbuf_map_fd)
 	/* make sure cong modules are loaded; might be builtin so do not
  	 * shout about errors.
  	 */
-	if (bpftune_module_load("net/ipv4/tcp_bbr.ko"))
-		bpftune_log(LOG_DEBUG, "could not load BBR module\n");
-	if (bpftune_module_load("net/ipv4/tcp_htcp.ko"))
-		bpftune_log(LOG_DEBUG, "could not load htcp module\n");
+	err = bpftune_module_load("net/ipv4/tcp_bbr.ko");
+	if (err != -EEXIST)
+		bpftune_log(LOG_DEBUG, "could not load tcp_bbr module\n");
+	err = bpftune_module_load("net/ipv4/tcp_htcp.ko");
+	if (err != -EEXIST)
+		bpftune_log(LOG_DEBUG, "could not load tcp_htcp module\n");
 
 	bpftuner_bpf_init(cong, tuner, ringbuf_map_fd);
 
@@ -72,14 +74,14 @@ void event_handler(struct bpftuner *tuner, struct bpftune_event *event,
 		   __attribute__((unused))void *ctx)
 {
 	struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)&event->raw_data;
-	int id = event->scenario_id;
+	unsigned int id = event->scenario_id;
 	char buf[INET6_ADDRSTRLEN];
 	char iterbuf;
 
 	inet_ntop(sin6->sin6_family, &sin6->sin6_addr, buf, sizeof(buf));
 	bpftuner_tunable_update(tuner, TCP_CONG, id, 0,
 "due to loss events for %s, specify '%s' congestion control algorithm\n",
-				buf, id == TCP_CONG_BBR ? "bbr" : "htcp", id, tuner->name);
+				buf, id == TCP_CONG_BBR ? "bbr" : "htcp");
 
 	/* kick existing connections by running iterator over them... */
 	while (read(tcp_iter_fd, &iterbuf, sizeof(iterbuf)) == -1 && errno == EAGAIN)

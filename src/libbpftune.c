@@ -266,15 +266,15 @@ void bpftuner_fini(struct bpftuner *tuner, enum bpftune_state state)
 	if (!tuner || tuner->state != BPFTUNE_ACTIVE)
 		return;
 
+	bpftune_log(LOG_DEBUG, "cleaning up tuner %s with %d tunables, %d scenarios\n",
+		    tuner->name, tuner->num_tunables, tuner->num_scenarios);
 	/* report summary of events for tuner */
 	for (i = 0; i < tuner->num_tunables; i++) {
 		for (j = 0; j < tuner->num_scenarios; j++) {
-			bpftuner_scenario_log(tuner, i, j,
-					      global_netns_cookie, true, NULL,
-					      NULL);
-			bpftuner_scenario_log(tuner, i, j,
-                                              global_netns_cookie + 1,
-					      true, NULL, NULL);
+			bpftune_log(LOG_DEBUG, "checking scenarios for tuner %d, scenario %d\n",
+				    i, j);
+			bpftuner_scenario_log(tuner, i, j, 0, true, NULL, NULL);
+			bpftuner_scenario_log(tuner, i, j, 1, true, NULL, NULL);
 		}
 	}
 	if (tuner->fini)
@@ -526,9 +526,14 @@ static void bpftuner_tunable_stats_update(struct bpftunable *tunable,
 					  unsigned int scenario, bool global_ns)
 {
 	if (global_ns)
-		tunable->stats.global_ns[scenario]++;
+		(tunable->stats.global_ns[scenario])++;
 	else
-		tunable->stats.nonglobal_ns[scenario]++;
+		(tunable->stats.nonglobal_ns[scenario])++;
+	bpftune_log(LOG_DEBUG," updated stat for tunable %s, scenario %d: %lu\n",
+		    tunable->desc.name, scenario,
+		    global_ns ? tunable->stats.global_ns[scenario] :
+				tunable->stats.nonglobal_ns[scenario]);
+
 }
 
 static void bpftuner_scenario_log(struct bpftuner *tuner, unsigned int tunable,
@@ -540,7 +545,7 @@ static void bpftuner_scenario_log(struct bpftuner *tuner, unsigned int tunable,
 	bool global_ns = netns_fd == 0;
 
 	if (!t->desc.namespaced)
-		global_ns = false;
+		global_ns = true;
 
 	if (summary) {
 		unsigned long count;

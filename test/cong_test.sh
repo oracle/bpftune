@@ -45,9 +45,6 @@ for DROP_PERCENT in 10 0 ; do
 	test_run_cmd_local "ip netns exec $NETNS $IPERF3 -p $PORT -s -1 &"
 	if [[ $MODE != "baseline" ]]; then
 		test_run_cmd_local "$BPFTUNE -s &" true
-	else
-		LOGSZ=$(wc -l $LOGFILE | awk '{print $1}')
-		#LOGSZ=$(expr $LOGSZ + 1)
 	fi
 	sleep $SLEEPTIME
 	set +e
@@ -67,7 +64,7 @@ for DROP_PERCENT in 10 0 ; do
 		read -r -a rtest_results <<< $rresults
 		if [[ -z "$CLIENT_OPTS" ]]; then
 			if [[ $DROP_PERCENT -gt 0 ]]; then
-				tail -n +${LOGSZ} $LOGFILE | grep 'bbr'
+				grep -E "(specify bbr|specify h-tcp)" $LOGFILE
 			fi
 		fi
 		if [[ $MODE == "test" ]]; then
