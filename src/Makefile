@@ -33,7 +33,7 @@ CFLAGS = -fPIC -Wall -Wextra -march=native -g -I../include -std=c99
 
 CFLAGS += -DBPFTUNE_VERSION='"$(BPFTUNE_VERSION)"' $(INCLUDES)
 
-LDLIBS = -lbpf -ldl -lnl-3 -lnl-route-3
+LDLIBS = -lbpf -ldl -lm -lnl-3 -lnl-route-3
 
 LDFLAGS += -L.
 
