@@ -22,8 +22,11 @@ static struct bpftunable_desc descs[] = {
 static struct bpftunable_scenario scenarios[] = {
 { TCP_BUFFER_INCREASE,	"need to increase TCP buffer size(s)",
 	"Need to increase buffer size(s) to maximize throughput" },
-{ TCP_BUFFER_DECREASE,	"Need to decrease TCP buffer size(s)",
+{ TCP_BUFFER_DECREASE,	"need to decrease TCP buffer size(s)",
 	"Need to decrease buffer size(s) to reduce memory utilization" },
+{ TCP_BUFFER_NOCHANGE_LATENCY,
+			"need to retain TCP buffer size due to latency",
+	"Latency is starting to correlate with buffer size increases, so do not make buffer size increase to avoid this effect" },
 { TCP_MEM_PRESSURE,	"approaching TCP memory pressure",
 	"Since memory pressure/exhaustion are unstable system states, adjust tcp memory-related tunables" },
 { TCP_MEM_EXHAUSTION,	"approaching TCP memory exhaustion",
@@ -161,7 +164,8 @@ void event_handler(struct bpftuner *tuner,
 	const char *lowmem = "normal memory conditions";
 	const char *reason = "unknown reason";
 	int scenario = event->scenario_id;
-	struct corr corr = { 0 };
+	struct corr c = { 0 };
+	long double corr = 0;
 	const char *tunable;
 	long new[3], old[3];
 	struct corr_key key;
@@ -172,7 +176,7 @@ void event_handler(struct bpftuner *tuner,
 
 	memcpy(new, event->update[0].new, sizeof(new));
 	memcpy(old, event->update[0].old, sizeof(old));
-	
+
 	if (event->netns_cookie) {
 		netns_fd = bpftune_netns_fd_from_cookie(event->netns_cookie);
 		if (netns_fd < 0) {
@@ -196,12 +200,13 @@ void event_handler(struct bpftuner *tuner,
 	key.id = (__u64)id;
 	key.netns_cookie = event->netns_cookie;
 
-	bpftune_log(LOG_INFO, "looking up corr map fd %d with key %ld\n",
-		    tuner->corr_map_fd, key.id);
-	if (!bpf_map_lookup_elem(tuner->corr_map_fd, &key, &corr)) {
-		bpftune_log(LOG_INFO, "covar for '%s' (new %ld %ld %ld): %LF ; corr %LF\n",
-			    tunable, new[0], new[1], new[2],
-			    covar_compute(&corr), corr_compute(&corr));
+	if (!bpf_map_lookup_elem(tuner->corr_map_fd, &key, &c)) {
+		corr = corr_compute(&c);
+		bpftune_log(LOG_INFO, "covar for '%s' netns %ld (new %ld %ld %ld): %LF ; corr %LF\n",
+			    tunable, key.netns_cookie, new[0], new[1], new[2],
+			    covar_compute(&c), corr);
+		if (corr > CORR_THRESHOLD && scenario == TCP_BUFFER_INCREASE)
+			scenario = TCP_BUFFER_NOCHANGE_LATENCY;
 	}
 	switch (id) {
 	case TCP_BUFFER_TCP_MEM:
@@ -220,6 +225,10 @@ void event_handler(struct bpftuner *tuner,
 			break;
 		case TCP_BUFFER_DECREASE:
 			reason = lowmem;
+			break;
+		case TCP_BUFFER_NOCHANGE_LATENCY:
+			reason = "correlation between buffer size increase and latency";
+			new[2] = old[2];
 			break;
 		}
 		bpftuner_tunable_sysctl_write(tuner, id, scenario,

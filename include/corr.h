@@ -6,6 +6,9 @@
 
 #define CORR_MIN_SAMPLES	10
 
+/* threshold at which we determine correlation is significant */
+#define CORR_THRESHOLD		((long double)0.7)
+
 /* correlate tunables via id + netns cookie */
 struct corr_key {
 	__u64 id;

@@ -63,6 +63,18 @@
 
 ### set up project packaging and signing
 
+### correlational analysis
+- some tunables like [wr]mem can increase indefinitely, but too
+  much buffer space can lead to longer latencies.  By gradually
+  increasing the buffer size and correlating it with latency
+  (smoothed RTT) we can find the sweet spot between buffer size
+  and latency such that the increased buffer size does not induce
+  latency.  Find the min value of the correlation between buffer
+  size and latency; this represents the point at which buffer
+  size has the least effect on latency.  Currently we see with
+  tcp_wmem max it can highly correlate (>90% correlation) with
+  srtt increase if buffer max is set too high.
+
 ### add a configurable learning rate
 - currently we check for limit approach and up values based
   on a 25% value; i.e. within 25% of limit, adjust up by 25%.
@@ -100,7 +112,7 @@ would only update buffer sizes for example if we came within
   "moderate rcvbuf" behaviour alters window clamp so may need to
   be a send-side only approach.
 - look at pulling buffer values back down based on longer latency
-  (potential bufferbloat)
+  (potential bufferbloat) see above for correlational analysis
 - look at netdev_max_backlog; tune that too?
 - initial buffer sizing: can we find a heuristic to minimize an
   error signal (number of updates to buffer size?).  Problem:

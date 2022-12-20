@@ -209,7 +209,7 @@ int BPF_PROG(bpftune_sndbuf_expand, struct sock *sk)
 		 * latencies.
 		 */
 		tcp_tunable_corr(TCP_BUFFER_TCP_WMEM, event.netns_cookie,
-				 wmem_new[2], sk, __u32, srtt_us);
+				 wmem[2], sk, __u32, srtt_us);
 	}
 	return 0;
 }
@@ -250,7 +250,7 @@ int BPF_PROG(bpftune_rcvbuf_adjust, struct sock *sk)
 		 * latencies.
 		 */
 		tcp_tunable_corr(TCP_BUFFER_TCP_RMEM, event.netns_cookie,
-				 rmem_new[2], sk, __u32, srtt_us);
+				 rmem[2], sk, __u32, srtt_us);
 
 	}
 	return 0;

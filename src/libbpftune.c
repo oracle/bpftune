@@ -579,9 +579,6 @@ static void bpftuner_scenario_log(struct bpftuner *tuner, unsigned int tunable,
 	struct bpftunable *t = bpftuner_tunable(tuner, tunable);
 	bool global_ns = netns_fd == 0;
 
-	if (!t->desc.namespaced)
-		global_ns = true;
-
 	if (summary) {
 		unsigned long count;
 
