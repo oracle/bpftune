@@ -106,11 +106,63 @@ This value defaults to 1000 and represents the maximum number of packets
 to keep in the receive queue; received data is stored in that queue when it
 leaves the ring buffer and faster network devices need a larger backlog.
 
-# Conclusion
+## Conclusion
 
 Multiple bug reports suggest increasing the netdev max backlog to 30000.
 
-#  Large numbers of TIME_WAIT sockets
+# High CPU usage in ksoftirq processes
+
+Orabug: 31835223
+
+Seeing large amounts of time spent in page freeing from skb codepath:
+
+```
+    15.31%    15.07%  iperf            [kernel.kallsyms]                      
+            [k] __free_pages_ok
+                      |
+                      ---__free_pages_ok
+                         |
+                         |--99.97%-- free_compound_page
+                         |          __put_compound_page
+                         |          put_compound_page
+                         |          put_page
+                         |          |
+                         |          |--99.82%-- skb_release_data
+                         |          |          skb_release_all
+                         |          |          __kfree_skb
+                         |          |          |
+                         |          |          |--68.49%-- tcp_recvmsg
+                         |          |          |          inet_recvmsg
+                         |          |          |          sock_recvmsg
+                         |          |          |          SYSC_recvfrom
+                         |          |          |          sys_recvfrom
+                         |          |          |          
+system_call_fastpath
+                         |          |          |          __libc_recv
+                         |          |          |
+                         |          |          |--31.49%--
+tcp_clean_rtx_queue
+                         |          |          |          tcp_ack
+                         |          |          |          tcp_rcv_established
+                         |          |          |          tcp_v4_do_rcv
+                         |          |          |          |
+
+```
+
+Turns out tcp ack receive frees up packets, but because they are order
+3 (32Kb) the zone lock for ZONE_NORMAL was required and lock contention
+from all of these requests span up CPU usage to 99%. Switching to slab
+allocation or order-0 page avoids this as the per-CPU free lists are
+used instead which do not require locking.  A tunable was introduced:
+
+net.core.net_high_order_alloc_disable
+
+
+...which defaults to 0.
+
+## Conclusion
+
+Might be worth enabling this if we see high cpu utilization for ksoftirqd.
 
 # Congestion control and high-speed links
 
@@ -120,9 +172,11 @@ Intermittent high CPU load driven by NFS causing hangs; turns out
 settings were not optimal for 10G network.  Similar observations as
 above, with additional use of htcp as congestion control algorithm.
 
-# Conclusion
+## Conclusion
 
 Would be good to auto-select htcp for high-speed links; it is more
 aggressive in increasing the congestion window after loss events.
 How do we distinguish which connections to use it for? Papers
-describe high BDP links as being appropriate.
+describe high BDP links as being appropriate.  This is implemented
+but behaves worse than BBR for large-loss > 10% links so might
+make sense in a narrow loss-range.

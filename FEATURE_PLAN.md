@@ -69,11 +69,16 @@
   increasing the buffer size and correlating it with latency
   (smoothed RTT) we can find the sweet spot between buffer size
   and latency such that the increased buffer size does not induce
-  latency.  Find the min value of the correlation between buffer
-  size and latency; this represents the point at which buffer
-  size has the least effect on latency.  Currently we see with
-  tcp_wmem max it can highly correlate (>90% correlation) with
-  srtt increase if buffer max is set too high.
+  latency.  when buffer size increases start to correlate with
+  longer latency (higher SRTT) we know it is time to stop bumping
+  up buffer size.  Experimented with reducing buffer size at this
+  point but problem is correlation remains whether we increase
+  or decrease so we tend to reduce buffer too much.  Instead we
+  avoid making a change; this naturally de-correlates buffer size
+  and latency and we can start again potentially.  Note that we
+  see tcp_wmem can highly correlate (>90% correlation) with
+  srtt increase if buffer max is set too high.  No similar
+  correlation for rmem interestingly (done)
 
 ### add a configurable learning rate
 - currently we check for limit approach and up values based
@@ -93,7 +98,7 @@ also more gradual, so probably better for the risk-averse; we
 would only update buffer sizes for example if we came within
 1.5% of buffer limit, and only increase buffer size by 1.5%.
 
-### Describe, suggestion modes
+### Summarize/suggestion modes
 
 - add an additional tuner callback that explains changes made;
   describe(). It should use scenario descriptions plus history
@@ -132,7 +137,9 @@ would only update buffer sizes for example if we came within
 ### Congestion tuner improvements
 - use htcp for large bandwidth-delay product links - a large
 BDP is > 10^5, so use htcp for those cases.  Use rate estimates
-to generate BDP estimate.
+to generate BDP estimate.  Problem - h-tcp is terrible at
+high loss rates so investigate sweet spot of loss rate/perf
+for h-tcp, otherwise use BBR.
 
 ### neigh table tuner
 
@@ -143,6 +150,7 @@ to generate BDP estimate.
 
 ## Future work
 
+- mem tuning (min_free_kbytes etc)?
 - kernel tunables (numa balancing, pid max, threads_max, etc)
 - vm tunables?
 - limiting ulimit? see
