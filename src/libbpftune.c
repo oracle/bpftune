@@ -591,6 +591,23 @@ static void bpftuner_scenario_log(struct bpftuner *tuner, unsigned int tunable,
 			    t->desc.name,
 			    global_ns ? "" : "non-",
 			    tuner->scenarios[scenario].description);
+		if (t->desc.type == BPFTUNABLE_SYSCTL) {
+			char oldvals[256] = { };
+			char newvals[256] = { };
+			char s[256];
+			__u8 i;
+
+			for (i = 0; i < t->desc.num_values; i++) {
+				snprintf(s, sizeof(s), "%ld ",
+					 t->initial_values[i]);
+				strcat(oldvals, s);
+				snprintf(s, sizeof(s), "%ld ",
+					 t->current_values[i]);
+				strcat(newvals, s);
+			}
+			bpftune_log(LOG_INFO, "sysctl '%s' changed from (%s) -> (%s)\n",
+				    t->desc.name, oldvals, newvals);
+		}
 	} else {
 		bpftune_log(LOG_INFO, "Scenario '%s' occurred for tunable '%s' in %sglobal ns. %s\n",
 			    tuner->scenarios[scenario].name,
@@ -621,11 +638,15 @@ int bpftuner_tunable_sysctl_write(struct bpftuner *tuner, unsigned int tunable,
 	ret = bpftune_sysctl_write(fd, t->desc.name, num_values, values);
 	if (!ret) {
 		va_list args;
+		__u8 i;
 
 		va_start(args, fmt);
 		bpftuner_scenario_log(tuner, tunable, scenario, netns_fd,
 				      false, fmt, args);
 		va_end(args);
+
+		for (i = 0; i < t->desc.num_values; i++)
+			t->current_values[i] = values[i];
 	}
 
 	return ret;
