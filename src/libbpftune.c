@@ -129,20 +129,23 @@ int bpftune_cgroup_init(const char *cgroup_path)
 			bpftune_log(LOG_ERR, "couldnt create cgroup dir '%s': %s\n",
 				    cgroup_path, strerror(-err));
                         return err;
-                }
-		if (!mount("none" , cgroup_path, "cgroup2", 0, NULL)) {
-			err = -errno;
+		}
+		close(__bpftune_cgroup_fd);
+	}
+	if (!mount("none" , cgroup_path, "cgroup2", 0, NULL)) {
+		err = -errno;
+		if (err != -EEXIST) {
 			bpftune_log(LOG_ERR, "couldnt mount cgroup2 for '%s': %s\n",
 				    strerror(-err));
 			return err;
 		}
-		__bpftune_cgroup_fd = open(cgroup_path, O_RDONLY);
-		if (__bpftune_cgroup_fd < 0) {
-			err = -errno;
-			bpftune_log(LOG_ERR, "cannot open cgroup dir '%s': %s\n",
-				    cgroup_path, strerror(-err));
-			return err;
-		}
+	}
+	__bpftune_cgroup_fd = open(cgroup_path, O_RDONLY);
+	if (__bpftune_cgroup_fd < 0) {
+		err = -errno;
+		bpftune_log(LOG_ERR, "cannot open cgroup dir '%s': %s\n",
+			    cgroup_path, strerror(-err));
+		return err;
 	}
 	return 0;
 }
