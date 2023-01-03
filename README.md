@@ -33,11 +33,11 @@ behaviour.  The key benefit it provides are
   In some cases, we won't need to tune up values; they may be fine
   as they are. But in other cases limits block optimal performance,
   and if they are raised safely - with awareness of global memory
-  limits - we can get out the way of improved performance.  Note
-  that in the case of socket buffer sizing, we don't really need
-  to worry about bufferbloat effects by increasing buffer size
-  since the alternative - where we drop a packet or send an
-  error back up to userspace - is likely to be worse.
+  limits - we can get out the way of improved performance.  Another
+  concern is that increasing buffer size leads to latency - to
+  handle that, we correlate buffer size changes and TCP smoothed
+  round-trip time; if the correlation between these exceeds a
+  threshould (0.7) we stop increasing buffer size.
 
 # Architecture
 
@@ -84,7 +84,7 @@ Each tuner defines an init(), fini() and event_handler() function.
 # Tests
 
 Tests are supplied for each tuner in the tests/ subdirectory.
-"make tests" runs all the tests.  Tests us network namespaces
+"make tests" runs all the tests.  Tests use network namespaces
 to simulate interactions with remote hosts.
 
 # For more info
