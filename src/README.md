@@ -9,11 +9,6 @@
 ```
 #include <libbpftune.h>
 ```
-     ...and contain init() function which initializes sysctl tunables
-     from a table of descriptions (see tcp_buffer_tuner.c).  Declaring
-     sysctl tunables allows us to catch admin-driven changes which
-     force us to disable the tuner to avoid colliding with the admin
-     intent.
 
    - tuner_name_tuner.h containing common definitions for bpf/userspace;
      examples of these are enumerated values covering tunable and
@@ -27,7 +22,10 @@ used as a wrapper for sysctl changes which takes care of logging
 (additional reasons can be supplied) and bpftuner_tunable_update()
 can be used for other cases (see cong_tuner.c for example).
 
-2. Add tuner_name to TUNERS in Makefile
+2. Add tuner_name to TUNERS in Makefile so it will be built.
+
+3. Add bpftune-tuner-name.rst to docs and add tuner-name to TUNERS in
+   Makefile there also.
 
 # Example
 
@@ -35,9 +33,10 @@ neigh-table-tune.bpf.c monitors neighbour table updates, and when the
 neighbour table is approaching garbage collection limits, those
 limits are raised.  It consists of
 
-- neigh_table_tuner.bpf.c
-- neigh_table_tuner.c
-- neigh_table_tuner.h
+- src/neigh_table_tuner.bpf.c
+- src/neigh_table_tuner.c
+- src/neigh_table_tuner.h
+- docs/bpftune-neigh.rst
 
 We see that ringbuf messages are sent from the BPF program when the
 neighbour table approaches being full, and these are handled in the
