@@ -80,6 +80,12 @@
   those that see >1 percent retransmits.  Downside is it
   will not work for existing connections like iSCSI.
 
+### switch off tuners on per-ns basis
+- we should not switch of global tuner if someone fiddles with
+  a tunable in a namespace, so make sure we have per-namespace
+  disable for tuners.  Also do we need to spot initial namespace
+  config of tunables from sysctl.conf and ignore it?
+
 ### set up project packaging and signing
 
 ### add a configurable learning rate
