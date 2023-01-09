@@ -1,6 +1,6 @@
 # Plan for features, completed, to-do and possible future work
 
-## Completed tasks (June 20 2022)
+## Completed tasks (Jan 9 2023)
 
 ### Basic bpftune framework support
  - add configurable logging support syslog/stdout (tested)
@@ -28,7 +28,10 @@
 ### TCP buffer size tuner
  - tuner watches for tcp_expand_sndbuf() and checks if we approach
    tcp_wmem[2] max buffer size; if so increase buffer size to
-   accommodate more data since app needs more space. (tested)
+   accommodate more data since app needs more space.  Also watch
+   for correlation between [wr]mem and smoothed round-trip time;
+   if we see these correlate, we are introducing latency so stop
+   increasing buffer size (tested)
  - tuner watches for tcp_rcv_space_adjust() and if we approach
    tcp_rmem[2] increase buffer size to accommodate more space. (tested)
  - tuner watches for tcp memory pressure/exhaustion.  For the former
@@ -40,6 +43,10 @@
  - tuner iterates over network namespaces at init and watches
    for netns add/remove events so that we can maintain tuner
    state for non-global network namespaces also.
+
+### Summary mode on exit
+ - bpftune reports what changes were made to tunables on exit
+   as a kind of summarization mode.
 
 ### Packaging
  - added a "make pkg" target which creates rpm
@@ -61,24 +68,19 @@
 
 ## To do tasks
 
-### set up project packaging and signing
+### add support for aarch64/uek6
+- currently we only support x86_64+UEK7/LUCI/upstream due to
+  use of recent features (fentry/fexit, iterators etc).  Add
+  legacy kprobe support also as this will be needed for
+  UEK7 aarch64 support and UEK6 support where fentry does
+  not exist.  Also need to have an alternative to iterator
+  support for setting congestion control value; tcp-bpf
+  based seems the only workable way; enable retransmit
+  events for all connections and set cong control for
+  those that see >1 percent retransmits.  Downside is it
+  will not work for existing connections like iSCSI.
 
-### correlational analysis
-- some tunables like [wr]mem can increase indefinitely, but too
-  much buffer space can lead to longer latencies.  By gradually
-  increasing the buffer size and correlating it with latency
-  (smoothed RTT) we can find the sweet spot between buffer size
-  and latency such that the increased buffer size does not induce
-  latency.  when buffer size increases start to correlate with
-  longer latency (higher SRTT) we know it is time to stop bumping
-  up buffer size.  Experimented with reducing buffer size at this
-  point but problem is correlation remains whether we increase
-  or decrease so we tend to reduce buffer too much.  Instead we
-  avoid making a change; this naturally de-correlates buffer size
-  and latency and we can start again potentially.  Note that we
-  see tcp_wmem can highly correlate (>90% correlation) with
-  srtt increase if buffer max is set too high.  No similar
-  correlation for rmem interestingly (done)
+### set up project packaging and signing
 
 ### add a configurable learning rate
 - currently we check for limit approach and up values based
@@ -98,15 +100,6 @@ also more gradual, so probably better for the risk-averse; we
 would only update buffer sizes for example if we came within
 1.5% of buffer limit, and only increase buffer size by 1.5%.
 
-### Summarize/suggestion modes
-
-- add an additional tuner callback that explains changes made;
-  describe(). It should use scenario descriptions plus history
-  of tuning events to describe overall changes and why
-- analyze mode which looks at current state without changing it.
-  Downside is we cannot then assess the results of changes we
-  made.
-
 ### TCP buffer tuner improvements
 - one problem is hard to have a one max buffer size to fit all;
   can we use snd buffer clamping (via bpf_setsockopt) to clamp for
@@ -116,8 +109,6 @@ would only update buffer sizes for example if we came within
   use TCP_BPF_SNDCWND_CLAMP, TCP_WINDOW_CLAMP for these.  Problem:
   "moderate rcvbuf" behaviour alters window clamp so may need to
   be a send-side only approach.
-- look at pulling buffer values back down based on longer latency
-  (potential bufferbloat) see above for correlational analysis
 - look at netdev_max_backlog; tune that too?
 - initial buffer sizing: can we find a heuristic to minimize an
   error signal (number of updates to buffer size?).  Problem:
