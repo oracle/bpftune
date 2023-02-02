@@ -87,6 +87,7 @@
   config of tunables from sysctl.conf and ignore it?
 
 ### set up project packaging and signing
+- filed https://ca-labops-help.us.oracle.com/show_bug.cgi?id=28072
 
 ### add a configurable learning rate
 - currently we check for limit approach and up values based
