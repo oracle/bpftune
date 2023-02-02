@@ -9,6 +9,7 @@ Name:           %{name}
 Summary:        BPF/tracing tools for auto-tuning Linux
 Group:          Development/Tools
 Requires:       libbpf >= 0.6
+Requires:	bpftool >= 4.18
 Requires:       libnl3
 BuildRequires:  libbpf-devel >= 0.6
 BuildRequires:  libnl3-devel
