@@ -9,15 +9,15 @@ Name:           %{name}
 Summary:        BPF/tracing tools for auto-tuning Linux
 Group:          Development/Tools
 Requires:       libbpf >= 0.6
-Requires:	bpftool >= 4.18
 Requires:       libnl3
 BuildRequires:  libbpf-devel >= 0.6
+BuildRequires:	bpftool >= 4.18
 BuildRequires:  libnl3-devel
 BuildRequires:  systemd-rpm-macros
-#BuildRequires:  clang >= 11
-#BuildRequires:  clang-libs >= 11
-#BuildRequires:  llvm >= 11
-#BuildRequires:  llvm-libs >= 11
+BuildRequires:  clang >= 11
+BuildRequires:  clang-libs >= 11
+BuildRequires:  llvm >= 11
+BuildRequires:  llvm-libs >= 11
 Version:        %{version}
 Release:        %{release}
 Source:         bpftune-%{version}.tar.bz2
