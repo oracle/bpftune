@@ -18,6 +18,7 @@ BuildRequires:  clang >= 11
 BuildRequires:  clang-libs >= 11
 BuildRequires:  llvm >= 11
 BuildRequires:  llvm-libs >= 11
+BuildRequires:	python-docutils
 Version:        %{version}
 Release:        %{release}
 Source:         bpftune-%{version}.tar.bz2
