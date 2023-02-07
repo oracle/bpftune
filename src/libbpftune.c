@@ -307,10 +307,11 @@ void bpftuner_fini(struct bpftuner *tuner, enum bpftune_state state)
 	/* report summary of events for tuner */
 	for (i = 0; i < tuner->num_tunables; i++) {
 		for (j = 0; j < tuner->num_scenarios; j++) {
+			va_list args;
 			bpftune_log(LOG_DEBUG, "checking scenarios for tuner %d, scenario %d\n",
 				    i, j);
-			bpftuner_scenario_log(tuner, i, j, 0, true, NULL, NULL);
-			bpftuner_scenario_log(tuner, i, j, 1, true, NULL, NULL);
+			bpftuner_scenario_log(tuner, i, j, 0, true, NULL, args);
+			bpftuner_scenario_log(tuner, i, j, 1, true, NULL, args);
 		}
 	}
 	if (tuner->fini)
