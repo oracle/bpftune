@@ -50,6 +50,7 @@
 
 ### Packaging
  - added a "make pkg" target which creates rpm
+ - set up other/bpftune for ol8 builds
 
 ### Test suite
 
@@ -88,6 +89,10 @@
 
 ### set up project packaging and signing
 - filed https://ca-labops-help.us.oracle.com/show_bug.cgi?id=28072
+- package builds working now at other/bpftune
+- to do: ol7, ol9: for ol7 need to have alternative to skel
+  generation/stash newer bpftool; for ol9 need set up with
+  libbpf[-devel] as per ol7/8.
 
 ### add a configurable learning rate
 - currently we check for limit approach and up values based
