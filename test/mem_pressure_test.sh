@@ -1,12 +1,9 @@
 #!/usr/bin/bash
 #
-# Copyright (c) 2022, Oracle and/or its affiliates.
+# SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause)
 #
-# This program is free software; you can redistribute it and/or modify
-# it under the terms of the GNU General Public License version 2
-# as published by the Free Software Foundation.
+# Copyright (c) 2023, Oracle and/or its affiliates. All rights reserved.
 #
-
 # run iperf3 test with low mem pressure/max, ensure tuner increases
 # mem pressure and decreases mem exhaustion such that it is 20%
 # of free buffer pages.

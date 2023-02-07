@@ -1,4 +1,7 @@
 # SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause)
+#
+# Copyright (c) 2023, Oracle and/or its affiliates. All rights reserved.
+#
 
 SRCARCH := $(shell uname -m | sed -e s/i.86/x86/ -e s/x86_64/x86/ \
 				  -e /arm64/!s/arm.*/arm/ -e s/sa110/arm/ \
