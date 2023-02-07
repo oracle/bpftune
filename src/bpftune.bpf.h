@@ -4,8 +4,11 @@
 #include "vmlinux.h"
 
 #define __KERNEL__
-#define __x86_64__
-#include <errno.h>
+#if defined(__x86__64)
+#include "vmlinux_x86_64.h"
+#elif defined(__aarch64__)
+#include "vmlinux_aarch64.h"
+#endif
 
 #include <bpf/bpf_endian.h>
 #include <bpf/bpf_helpers.h>
@@ -90,6 +93,8 @@ unsigned int tuner_id;
 #ifndef NTF_EXT_LEARNED
 #define NTF_EXT_LEARNED	0x10
 #endif
+
+#define EINVAL		22
 
 bool debug;
 

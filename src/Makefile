@@ -69,7 +69,7 @@ all: bpftune $(TUNER_LIBS)
 clean:
 	$(call QUIET_CLEAN, bpftune)
 	$(Q)$(RM) *.o *.d *.so*
-	$(Q)$(RM) *.skel.h vmlinux.h
+	$(Q)$(RM) *.skel.h
 	$(Q)$(RM) bpftune
 	$(Q)$(RM) -r .output
 
@@ -108,19 +108,10 @@ bpftune.o: libbpftune.so
 %.skel.h: %.bpf.o
 	$(QUIET_GEN)$(BPFTOOL) gen skeleton $< > $@
 
-$(BPF_TUNERS): $(patsubst %.o,%.c,$(BPF_TUNERS)) vmlinux.h
+$(BPF_TUNERS): $(patsubst %.o,%.c,$(BPF_TUNERS))
 	$(CLANG) -g -D__TARGET_ARCH_$(SRCARCH) -O2 -target bpf			\
 		$(INCLUDES) -c $(patsubst %.o,%.c,$(@)) -o $(@)
 
 $(BPF_SKELS): $(BPF_TUNERS)
 	$(BPFTOOL) gen skeleton $(subst .skel.h,.bpf.o,$@) > $@
-
-
-vmlinux.h:
-	if [ ! -e "$(VMLINUX_BTF_PATH)" ] ; then \
-		echo "Couldn't find kernel BTF; set VMLINUX_BTF to"	       \
-			"specify its location." >&2;			       \
-		exit 1;\
-	fi
-	$(BPFTOOL) btf dump file $(VMLINUX_BTF_PATH) format c > $@
 
