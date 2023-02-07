@@ -2,9 +2,9 @@
 /* Copyright (c) 2021, Oracle and/or its affiliates. */
 
 #define __KERNEL__
-#if defined(__x86__64)
+#if defined(__TARGET_ARCH_x86)
 #include "vmlinux_x86_64.h"
-#elif defined(__aarch64__)
+#elif defined(__TARGET_ARCH_arm64)
 #include "vmlinux_aarch64.h"
 #endif
 
