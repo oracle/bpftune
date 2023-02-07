@@ -1,8 +1,6 @@
 /* SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause) */
 /* Copyright (c) 2021, Oracle and/or its affiliates. */
 
-#include "vmlinux.h"
-
 #define __KERNEL__
 #if defined(__x86__64)
 #include "vmlinux_x86_64.h"
