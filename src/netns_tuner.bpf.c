@@ -24,8 +24,7 @@ int BPF_PROG(bpftune_setup_net, struct net *net, struct user_namespace *user_ns,
 	return 0;
 }
 
-SEC("fentry/net_free")
-int BPF_PROG(bpftune_net_free, struct net *net)
+BPF_FENTRY(net_free, struct net *net)
 {
 	struct bpftune_event event = {};
 
