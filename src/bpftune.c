@@ -169,7 +169,7 @@ int main(int argc, char *argv[])
 
 	bin_name = argv[0];
 
-	while ((opt = getopt_long(argc, argv, "a:c:dDhl:sV", options, NULL))
+	while ((opt = getopt_long(argc, argv, "a:c:dDhl:LsV", options, NULL))
 		>= 0) {
 		switch (opt) {
 		case 'a':

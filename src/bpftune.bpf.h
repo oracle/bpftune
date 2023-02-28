@@ -69,20 +69,42 @@ static __always_inline typeof(name(0)) ____##name(struct pt_regs *ctx, ##args)
 	int BPF_PROG(entry__##func, ##args)
 #endif /* BPFTUNE_LEGACY */
 
+#if LIBBPF_DEPRECATED_APIS
+#define BPF_MAP_DEF(_name, _type, _key_size, _value, _max_entries)	\
+	struct bpf_map_def SEC("maps") _name = {			\
+		.type = _type,						\
+		.key_size = sizeof(_key),				\
+		.value_size = sizeof(_value),				\
+		.max_entries = _max_entries,				\
+	}
+
+#define BPF_RINGBUF(_name, _max_entries)				\
+	struct bpf_map_def SEC("maps") _name = {			\
+		.type = BPF_MAP_TYPE_RINGBUF,				\
+		.max_entries = _max_entries,				\
+	}
+#else
+#define BPF_MAP_DEF(_name, _type, _key, _value, _max_entries)		\
+        struct {							\
+		__uint(type, _type);					\
+		__type(key, _key);					\
+		__type(value, _value);					\
+		__uint(max_entries, _max_entries);			\
+        } _name SEC(".maps")
+
+#define BPF_RINGBUF(_name, _max_entries)				\
+	struct {							\
+		__uint(type, BPF_MAP_TYPE_RINGBUF);			\
+		__uint(max_entries, _max_entries);			\
+	} _name SEC(".maps")
+#endif /* BPFTUNE_LEGACY */
+
 #include "bpftune.h"
 #include "corr.h"
 
-struct {
-        __uint(type, BPF_MAP_TYPE_RINGBUF);
-        __uint(max_entries, 64 * 1024);
-} ring_buffer_map SEC(".maps");
+BPF_RINGBUF(ring_buffer_map, 64 * 1024);
 
-struct {
-	__uint(type, BPF_MAP_TYPE_HASH);
-	__uint(max_entries, 1024);
-	__type(key, struct corr_key);
-	__type(value, struct corr);
-} corr_map SEC(".maps");
+BPF_MAP_DEF(corr_map, BPF_MAP_TYPE_HASH, struct corr_key, struct corr, 1024);
 
 unsigned int tuner_id;
 
