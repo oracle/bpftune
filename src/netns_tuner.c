@@ -22,6 +22,9 @@ static struct bpftunable_scenario scenarios[] = {
 
 int init(struct bpftuner *tuner)
 {
+	if (!bpftune_netns_cookie_supported())
+		return -ENOTSUP;
+
 	bpftuner_bpf_init(netns, tuner);
 
 	return bpftuner_tunables_init(tuner, ARRAY_SIZE(descs), descs,

@@ -4,8 +4,6 @@
 #include "bpftune.bpf.h"
 #include "netns_tuner.h"
 
-extern const void init_net __ksym;
-
 #ifdef BPFTUNE_LEGACY
 
 BPF_MAP_DEF(setup_net_map, BPF_MAP_TYPE_HASH, __u64, __u64, 65536);

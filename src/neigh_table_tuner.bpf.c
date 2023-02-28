@@ -53,8 +53,11 @@ int BPF_PROG(bpftune_neigh_create, struct neigh_table *tbl,
 
 		event.tuner_id = tuner_id;
 		event.scenario_id = NEIGH_TABLE_FULL;
-		if (net)
+		if (net) {
 			event.netns_cookie = get_netns_cookie(net);
+			if (event.netns_cookie < 0)
+				return 0;
+		}
 		__builtin_memcpy(&event.raw_data, tbl_stats, sizeof(*tbl_stats));
 		bpf_ringbuf_output(&ring_buffer_map, &event, sizeof(event), 0);
 	}

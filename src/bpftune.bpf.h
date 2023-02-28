@@ -176,6 +176,8 @@ bool debug;
 
 #define bpftune_log(...)	if (debug) __bpf_printk(__VA_ARGS__)
 
+extern const void init_net __ksym;
+
 static __always_inline long get_netns_cookie(struct net *net)
 {
 	if (bpf_core_field_exists(net->net_cookie))

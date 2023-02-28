@@ -827,7 +827,7 @@ static int bpftune_netns_find(unsigned long cookie)
 	int ret = -ENOENT;
 	DIR *dir;
 
-	if (cookie == 0 || global_netns_cookie && cookie == global_netns_cookie)
+	if (cookie == 0 || (global_netns_cookie && cookie == global_netns_cookie))
 		return 0;
 
 	mounts = setmntent("/proc/mounts", "r");
@@ -909,9 +909,40 @@ int bpftune_netns_fd_from_cookie(unsigned long cookie)
 	return bpftune_netns_find(cookie);
 }
 
+bool bpftune_netns_cookie_supported(void)
+{
+	int s = socket(AF_INET, SOCK_STREAM, 0);
+	unsigned long netns_cookie;
+	int ret = 0;
+
+	if (s < 0) {
+		ret = -errno;
+		bpftune_log(LOG_ERR, "could not open socket: %s\n",
+			    strerror(errno));
+	} else {
+		socklen_t cookie_sz = sizeof(netns_cookie);
+
+		ret = getsockopt(s, SOL_SOCKET, SO_NETNS_COOKIE, &netns_cookie,
+				 &cookie_sz);
+		if (ret < 0)
+			ret = -errno;
+		if (ret == -ENOPROTOOPT) {
+			bpftune_log(LOG_DEBUG, "netns cookie not supported");
+			return false;
+		}
+	}
+	return true;
+}
+
+static bool netns_cookie_supported;
+
 int bpftune_netns_init_all(void)
 {
 	unsigned long cookie;
+
+	netns_cookie_supported = bpftune_netns_cookie_supported();
+	if (!netns_cookie_supported)
+		return 0;
 
 	if (!bpftune_netns_info(getpid(), NULL, &cookie)) {
 		global_netns_cookie = cookie;
@@ -944,6 +975,9 @@ void bpftuner_netns_fini(struct bpftuner *tuner, unsigned long cookie)
 {
 	struct bpftuner_netns *netns, *prev = NULL;
 
+	if (!netns_cookie_supported)
+		return;
+	
 	for (netns = &tuner->netns; netns != NULL; netns = netns->next) {
 		if (netns->netns_cookie == cookie) {
 			if (prev)
@@ -963,6 +997,9 @@ struct bpftuner_netns *bpftuner_netns_from_cookie(unsigned long tuner_id,
 {
 	struct bpftuner *tuner;
 	struct bpftuner_netns *netns;
+	
+	if (!netns_cookie_supported)
+		return NULL;
 
 	bpftune_for_each_tuner(tuner) {
 		if (tuner->id != tuner_id)
