@@ -1,6 +1,6 @@
 # Plan for features, completed, to-do and possible future work
 
-## Completed tasks (Jan 9 2023)
+## Completed tasks
 
 ### Basic bpftune framework support
  - add configurable logging support syslog/stdout (tested)
@@ -52,6 +52,30 @@
  - added a "make pkg" target which creates rpm
  - set up other/bpftune for ol8 builds
 
+### add support for aarch64/uek6
+- currently we only support x86_64+UEK7/LUCI/upstream due to
+  use of recent features (fentry/fexit, iterators etc).  Add
+  legacy kprobe support also as this will be needed for
+  UEK7 aarch64 support and UEK6 support where fentry does
+  not exist.  Also need to have an alternative to iterator
+  support for setting congestion control value; tcp-bpf
+  based seems the only workable way; enable retransmit
+  events for all connections and set cong control for
+  those that see >1 percent retransmits.  Downside is it
+  will not work for existing connections like iSCSI.
+  This support is now present and each tuner builds a
+  legacy version, using definition BPFTUNE_LEGACY to
+  distinguish.  This replaces fentry with kprobes etc.
+  See CONTRIBUTING.md for more details on how to support
+  legacy mode.
+
+### set up project packaging and signing
+- filed https://ca-labops-help.us.oracle.com/show_bug.cgi?id=28072
+- package builds working now at other/bpftune
+- to do: ol7, ol9: for ol7 need to have alternative to skel
+  generation/stash newer bpftool; for ol9 need set up with
+  libbpf[-devel] as per ol7/8.
+
 ### Test suite
 
  - tests should validate core features and tunable behaviour
@@ -69,30 +93,11 @@
 
 ## To do tasks
 
-### add support for aarch64/uek6
-- currently we only support x86_64+UEK7/LUCI/upstream due to
-  use of recent features (fentry/fexit, iterators etc).  Add
-  legacy kprobe support also as this will be needed for
-  UEK7 aarch64 support and UEK6 support where fentry does
-  not exist.  Also need to have an alternative to iterator
-  support for setting congestion control value; tcp-bpf
-  based seems the only workable way; enable retransmit
-  events for all connections and set cong control for
-  those that see >1 percent retransmits.  Downside is it
-  will not work for existing connections like iSCSI.
-
 ### switch off tuners on per-ns basis
 - we should not switch of global tuner if someone fiddles with
   a tunable in a namespace, so make sure we have per-namespace
   disable for tuners.  Also do we need to spot initial namespace
   config of tunables from sysctl.conf and ignore it?
-
-### set up project packaging and signing
-- filed https://ca-labops-help.us.oracle.com/show_bug.cgi?id=28072
-- package builds working now at other/bpftune
-- to do: ol7, ol9: for ol7 need to have alternative to skel
-  generation/stash newer bpftool; for ol9 need set up with
-  libbpf[-devel] as per ol7/8.
 
 ### add a configurable learning rate
 - currently we check for limit approach and up values based

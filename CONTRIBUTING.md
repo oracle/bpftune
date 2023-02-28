@@ -49,6 +49,30 @@ in that object which identify the tuner source.  The tuner id
 in the ringbuf event allows us to call the event handler callback
 in the appropriate tuner.
 
+## Legacy kernel handling
+
+Here "legacy" implies lack of fentry, fexit, tp_btf and BPF
+iter programs.  BPF ringbuf is assumed.  For each tuner, we
+build a version with BPFTUNE_LEGACY defined.  This corresponds
+to around v5.6 of the kernel, but for Oracle Linux it corresponds
+to UEK6U3 since it includes backports of ringbuf support.
+
+If the BPF program just consists of fentry programs, simply use
+the BPF_FENTRY() wrapper - it will convert to kprobes
+for the legacy version.  For other cases see these examples:
+
+- using raw_tracepoint instead of tp_btf, see sysctl_tuner.bpf.c
+- using kprobe+kretprobe instead of fexit access to calling args,
+  see neigh_table_tuner.bpf.c
+- using kretprobe instead of fexit (where no access to calling
+  args is needed), see tcp_buffer_tuner.bpf.c
+
+Also use BPF_CORE_READ() rather than direct dereference where
+possible as that will work for both kprobe and fentry for example.
+
+For maps, use the BPF_MAP_DEF() definitions which will invoke
+the older libbpf map definition if using an older libbpf.
+
 # Userspace component - tuner_name.c
 
 It should #include <libbpftune.h>, and must consist of the following
@@ -101,6 +125,8 @@ the associated neigh_table_tuner.
 If any data structures are common across userspace and BPF, they
 should be added to a tuner_name.h file which both include.
 
+Remember to include both the skel.h and skel.legacy.h files.
+
 # Events
 
 When an event the user-space component needs to know about occurs,
@@ -132,4 +158,6 @@ tp_btf instead of tracepoint etc as these perform much better.
 Tests are mandatory for tuners; in the test directory you can see
 lots of examples.  The test framework uses network namespaces to
 support iperf3 runs within the same system.  Tests should validate
-tuning behaviour works, and ideally improves performance.
+tuning behaviour works, and ideally improves performance.  In
+addition, ensure to test both legacy (where legacy mode is forced
+via "-L") and non-legacy modes.
