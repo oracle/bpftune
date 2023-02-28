@@ -48,10 +48,13 @@ int BPF_PROG(bpftune_neigh_create, struct neigh_table *tbl,
  	 * do take up table entries.
  	 */
 	if (NEARLY_FULL(tbl_stats->entries, tbl_stats->max)) {
+		struct neigh_parms *parms = BPF_CORE_READ(n, parms);
+		struct net *net = BPF_CORE_READ(parms, net.net);
+
 		event.tuner_id = tuner_id;
 		event.scenario_id = NEIGH_TABLE_FULL;
-		if (n->parms && n->parms->net.net)
-			event.netns_cookie = get_netns_cookie(n->parms->net.net);
+		if (net)
+			event.netns_cookie = get_netns_cookie(net);
 		__builtin_memcpy(&event.raw_data, tbl_stats, sizeof(*tbl_stats));
 		bpf_ringbuf_output(&ring_buffer_map, &event, sizeof(event), 0);
 	}

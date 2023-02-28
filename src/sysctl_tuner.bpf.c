@@ -15,8 +15,10 @@ int sysctl_write(struct bpf_sysctl *ctx)
 	struct task_struct *current_task;
 	struct bpftune_event event = {};
 	int current_pid, err;
+	__u32 write = BPF_CORE_READ(ctx, write);
 
-	if (!ctx->write)
+
+	if (!write)
 		return 1;
 	event.tuner_id = tuner_id;
 	event.scenario_id = 0;

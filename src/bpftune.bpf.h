@@ -178,7 +178,7 @@ bool debug;
 
 static __always_inline long get_netns_cookie(struct net *net)
 {
-	return net ? net->net_cookie : 0;
+	return BPF_CORE_READ(net, net_cookie);
 }
  
 #define last_event_key(nscookie, tuner, event)	\
@@ -196,7 +196,7 @@ static __always_inline void send_sysctl_event(struct sock *sk,
 					      long *old, long *new,
 					      struct bpftune_event *event)
 {
-	struct net *net = sk ? sk->sk_net.net : NULL;
+	struct net *net = BPF_CORE_READ(sk, sk_net.net);
 	__u64 now = bpf_ktime_get_ns();
 	__u64 event_key = 0;
 	long nscookie = 0;

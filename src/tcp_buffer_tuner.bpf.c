@@ -36,18 +36,19 @@ static __always_inline bool tcp_nearly_out_of_memory(struct sock *sk,
 	long limit_sk_mem_quantum[3] = { };
 	long allocated;
 	long mem[3] = { }, mem_new[3] = { };
-	struct net *net = sk->sk_net.net;
+	struct net *net = BPF_CORE_READ(sk, sk_net.net);
+	struct proto *prot = BPF_CORE_READ(sk, sk_prot);
+	atomic_long_t *memory_allocated = BPF_CORE_READ(prot, memory_allocated);
+	long *sysctl_mem = BPF_CORE_READ(prot, sysctl_mem);
 	__u8 shift_left = 0, shift_right = 0;
 	int i;
 
-	if (!sk || !sk->sk_prot || !sk->sk_prot->memory_allocated)
+	if (!sk || !prot || !memory_allocated)
 		return false;
-	allocated = sk->sk_prot->memory_allocated->counter;
+	allocated = BPF_CORE_READ(memory_allocated, counter);
 	if (!allocated)
 		return false;
-	if (bpf_probe_read_kernel(mem,
-				  sizeof(mem),
-				  sk->sk_prot->sysctl_mem))
+	if (bpf_probe_read_kernel(mem, sizeof(mem), sysctl_mem))
 		return false;
 
 	if (!mem[0] || !mem[1] || !mem[2])
@@ -94,9 +95,9 @@ static __always_inline bool tcp_nearly_out_of_memory(struct sock *sk,
 		}
 		if (!net)
 			return true;
-		mem[0] = (long)(net->ipv4.sysctl_tcp_wmem[0]);
-		mem[1] = (long)(net->ipv4.sysctl_tcp_wmem[1]);
-		mem[2] = (long)(net->ipv4.sysctl_tcp_wmem[2]);
+		mem[0] = (long)BPF_CORE_READ(net, ipv4.sysctl_tcp_wmem[0]);
+		mem[1] = (long)BPF_CORE_READ(net, ipv4.sysctl_tcp_wmem[1]);
+		mem[2] = (long)BPF_CORE_READ(net, ipv4.sysctl_tcp_wmem[2]);
 		mem_new[0] = mem[0];
 		mem_new[1] = mem[1];
 		mem_new[2] = BPFTUNE_SHRINK_BY_QUARTER(mem[2]);
@@ -105,9 +106,9 @@ static __always_inline bool tcp_nearly_out_of_memory(struct sock *sk,
 				  mem, mem_new, event);
 		if (!net)
 			return true;
-		mem[0] = (long)(net->ipv4.sysctl_tcp_rmem[0]);
-		mem[1] = (long)(net->ipv4.sysctl_tcp_rmem[1]);
-		mem[2] = (long)(net->ipv4.sysctl_tcp_rmem[2]);
+		mem[0] = (long)BPF_CORE_READ(net, ipv4.sysctl_tcp_rmem[0]);
+		mem[1] = (long)BPF_CORE_READ(net, ipv4.sysctl_tcp_rmem[1]);
+		mem[2] = (long)BPF_CORE_READ(net, ipv4.sysctl_tcp_rmem[2]);
 		mem_new[0] = mem[0];
 		mem_new[1] = mem[1];
 		mem_new[2] = BPFTUNE_SHRINK_BY_QUARTER(mem[2]);
@@ -177,15 +178,15 @@ BPF_FENTRY(tcp_leave_memory_pressure, struct sock *sk)
 BPF_FENTRY(tcp_sndbuf_expand, struct sock *sk)
 {
 	struct bpftune_event event = { 0 };
-	struct net *net = sk->sk_net.net;
+	struct net *net = BPF_CORE_READ(sk, sk_net.net);
 	long wmem[3], wmem_new[3];
 	long sndbuf;
 
 	if (!sk || !net || tcp_nearly_out_of_memory(sk, &event))
 		return 0;
 
-	sndbuf = sk->sk_sndbuf;
-	wmem[2] = net->ipv4.sysctl_tcp_wmem[2];
+	sndbuf = BPF_CORE_READ(sk, sk_sndbuf);
+	wmem[2] = BPF_CORE_READ(net, ipv4.sysctl_tcp_wmem[2]);
 
 	if (NEARLY_FULL(sndbuf, wmem[2])) {
 
@@ -194,8 +195,8 @@ BPF_FENTRY(tcp_sndbuf_expand, struct sock *sk)
 
 		if (!net)
 			return 0;
-		wmem[0] = wmem_new[0] = net->ipv4.sysctl_tcp_wmem[0];
-		wmem[1] = wmem_new[1] = net->ipv4.sysctl_tcp_wmem[1];
+		wmem[0] = wmem_new[0] = BPF_CORE_READ(net, ipv4.sysctl_tcp_wmem[0]);
+		wmem[1] = wmem_new[1] = BPF_CORE_READ(net, ipv4.sysctl_tcp_wmem[1]);
 		wmem_new[2] = BPFTUNE_GROW_BY_QUARTER(wmem[2]);
 
 		send_sysctl_event(sk, TCP_BUFFER_INCREASE,
@@ -218,26 +219,31 @@ BPF_FENTRY(tcp_sndbuf_expand, struct sock *sk)
 BPF_FENTRY(tcp_rcv_space_adjust, struct sock *sk)
 {
 	struct bpftune_event event = { 0 };
-	struct net *net = sk->sk_net.net;
+	struct net *net = BPF_CORE_READ(sk, sk_net.net);
 	long rmem[3], rmem_new[3];
+	__u8 sk_userlocks = 0;
 	long rcvbuf;
 
 	if (!sk || !net)
 		return 0;
 
-	if ((sk->sk_userlocks & SOCK_RCVBUF_LOCK) || near_memory_pressure ||
+#ifndef BPFTUNE_LEGACY
+	/* CO-RE does not support bitfields... */
+	sk_userlocks = sk->sk_userlocks;
+#endif
+	if ((sk_userlocks & SOCK_RCVBUF_LOCK) || near_memory_pressure ||
 	    near_memory_exhaustion)
 		return 0;
 
-	rcvbuf = sk->sk_rcvbuf;
-	rmem[2] = net->ipv4.sysctl_tcp_rmem[2];
+	rcvbuf = BPF_CORE_READ(sk, sk_rcvbuf);
+	rmem[2] = BPF_CORE_READ(net, ipv4.sysctl_tcp_rmem[2]);
 
 	if (NEARLY_FULL(rcvbuf, rmem[2])) {
 		if (tcp_nearly_out_of_memory(sk, &event))
 			return 0;
 
-		rmem[0] = rmem_new[0] = net->ipv4.sysctl_tcp_rmem[0];
-		rmem[1] = rmem_new[1] = net->ipv4.sysctl_tcp_rmem[1];
+		rmem[0] = rmem_new[0] = BPF_CORE_READ(net, ipv4.sysctl_tcp_rmem[0]);
+		rmem[1] = rmem_new[1] = BPF_CORE_READ(net, ipv4.sysctl_tcp_rmem[1]);
 		rmem_new[2] = BPFTUNE_GROW_BY_QUARTER(rmem[2]);
 		send_sysctl_event(sk, TCP_BUFFER_INCREASE, TCP_BUFFER_TCP_RMEM,
 				  rmem, rmem_new, &event);
