@@ -76,7 +76,8 @@ BPF_FENTRY(net_free, struct net *net)
 
 	event.tuner_id = tuner_id;
 	event.scenario_id = NETNS_SCENARIO_DESTROY;
-	event.netns_cookie = BPF_CORE_READ(net, net_cookie);
+	if (bpf_core_field_exists(net->net_cookie)
+		event.netns_cookie = BPF_CORE_READ(net, net_cookie);
 	bpf_ringbuf_output(&ring_buffer_map, &event, sizeof(event), 0);
 
 	return 0;
