@@ -11,7 +11,7 @@ CLANG ?= clang
 LLC ?= llc
 LLVM_STRIP ?= llvm-strip
 BPFTOOL ?= bpftool
-BPF_INCLUDE := /usr/local/include
+BPF_INCLUDE := /usr/include
 NL_INCLUDE := /usr/include/libnl3
 INCLUDES := -I../include -I$(BPF_INCLUDE) -I$(NL_INCLUDE) -I../include/uapi
 
