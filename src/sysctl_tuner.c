@@ -3,6 +3,7 @@
 
 #include <libbpftune.h>
 #include "sysctl_tuner.skel.h"
+#include "sysctl_tuner.skel.legacy.h"
 
 #include <errno.h>
 #include <string.h>

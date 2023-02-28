@@ -7,6 +7,7 @@
 #include <libnl3/netlink/route/neightbl.h>
 #include "neigh_table_tuner.h"
 #include "neigh_table_tuner.skel.h"
+#include "neigh_table_tuner.skel.legacy.h"
 
 struct neigh_table_tuner_bpf *skel;
 

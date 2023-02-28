@@ -90,7 +90,7 @@ bpftune: bpftune.c bpftune.o libbpftune.so
 	$(QUIET_LINK)$(CC) $(CFLAGS) bpftune.o -o $@ \
 	$(LDFLAGS) $(LDLIBS) -lbpftune
 
-libbpftune.so: libbpftune.c libbpftune.o
+libbpftune.so: libbpftune.c ../include/libbpftune.h libbpftune.o
 	$(CC) $(CFLAGS) -Wl,--version-script=$(VERSION_SCRIPT) \
 			-Wl,--soname,libbpftune.so.$(VERSION) \
 			-shared -o $(@).$(VERSION) $(patsubst %.so,%.o,$(@)) \
@@ -113,8 +113,12 @@ bpftune.o: libbpftune.so
 
 $(BPF_TUNERS): $(patsubst %.o,%.c,$(BPF_TUNERS))
 	$(CLANG) -g -D__TARGET_ARCH_$(SRCARCH) -O2 -target bpf			\
-		$(INCLUDES) -c $(patsubst %.o,%.c,$(@)) -o $(@)
+		$(INCLUDES) -c $(patsubst %.o,%.c,$(@)) -o $(@);
+	$(CLANG) -g -D__TARGET_ARCH_$(SRCARCH) -DBPFTUNE_LEGACY -O2 -target bpf \
+		$(INCLUDES) -c $(patsubst %.o,%.c,$(@)) \
+		-o $(patsubst %.o,%.legacy.o,$(@))
 
 $(BPF_SKELS): $(BPF_TUNERS)
-	$(BPFTOOL) gen skeleton $(subst .skel.h,.bpf.o,$@) > $@
+	$(BPFTOOL) gen skeleton $(subst .skel.h,.bpf.o,$@) > $@ ;\
+	$(BPFTOOL) gen skeleton $(subst .skel.h,.bpf.legacy.o,$@) > $(subst .skel.h,.skel.legacy.h,$@)
 

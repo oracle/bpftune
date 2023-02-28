@@ -31,6 +31,7 @@
 
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
+#include <bpf/libbpf_version.h>
 
 #ifndef SO_NETNS_COOKIE
 #define SO_NETNS_COOKIE 71
@@ -167,6 +168,24 @@ void bpftune_cgroup_fini(void)
 {
 	if (__bpftune_cgroup_fd)
 		close(__bpftune_cgroup_fd);
+}
+
+static bool force_bpf_legacy;
+
+void bpftuner_force_bpf_legacy(void)
+{
+	force_bpf_legacy = true;
+}
+
+bool bpftuner_bpf_legacy(void)
+{
+	if (force_bpf_legacy)
+		return true;
+#if LIBBPF_MAJOR_VERSION > 0
+	return libbpf_probe_bpf_prog_type(BPF_PROG_TYPE_TRACING, NULL)  == 0;
+#else
+	return bpf_probe_prog_type(BPF_PROG_TYPE_TRACING, 0) == 0;
+#endif
 }
 
 int __bpftuner_bpf_load(struct bpftuner *tuner)

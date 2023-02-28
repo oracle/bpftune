@@ -129,6 +129,7 @@ void do_help(void)
 		"	OPTIONS := { { -a|--allowlist tuner [-a tuner]}\n"
 		"		     { -d|--debug} {-D|--daemon}\n"
 		"		     { -c|--cgroup_path cgroup_path}\n"
+		"		     { -L|--legacy}\n"
 		"		     {-h|--help}}\n"
 		"		     { -l|--library_path library_path\n"
 		"		     { -V|--version}}\n",
@@ -152,6 +153,7 @@ int main(int argc, char *argv[])
 		{ "allowlist",	required_argument,	NULL,	'a' },
 		{ "cgroup",	required_argument,	NULL,	'c' },
 		{ "debug",	no_argument,		NULL,	'd' },
+		{ "legacy",	no_argument,		NULL,	'L' },
 		{ "help",	no_argument,		NULL,	'h' },
 		{ "libdir",	required_argument,	NULL,	'l' },
 		{ "stderr", 	no_argument,		NULL,	's' },
@@ -192,6 +194,9 @@ int main(int argc, char *argv[])
 			return 0;
 		case 'l':
 			library_dir = optarg;
+			break;
+		case 'L':
+			bpftuner_force_bpf_legacy();
 			break;
 		case 's':
 			use_stderr = true;

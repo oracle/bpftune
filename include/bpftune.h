@@ -112,6 +112,7 @@ struct bpftuner {
 	void *handle;
 	const char *name;
 	struct bpf_object_skeleton *skeleton;
+	bool bpf_legacy;
 	void *skel;
 	int (*init)(struct bpftuner *tuner);
 	void (*fini)(struct bpftuner *tuner);

@@ -13,6 +13,62 @@
 #include <bpf/bpf_tracing.h>
 #include <bpf/bpf_core_read.h>
 
+/* provide BPF_KPROBE/BPF_KRETPROBE to simplify legacy support */
+
+#ifndef BPF_KPROBE
+#define BPF_KPROBE(name, args...)                                           \
+name(struct pt_regs *ctx);                                                  \
+static __attribute__((always_inline)) typeof(name(0))                       \
+____##name(struct pt_regs *ctx, ##args);                                    \
+typeof(name(0)) name(struct pt_regs *ctx)                                   \
+{                                                                           \
+        _Pragma("GCC diagnostic push")                                      \
+        _Pragma("GCC diagnostic ignored \"-Wint-conversion\"")              \
+        return ____##name(___bpf_kprobe_args(args));                        \
+        _Pragma("GCC diagnostic pop")                                       \
+}                                                                           \
+static __attribute__((always_inline)) typeof(name(0))                       \
+____##name(struct pt_regs *ctx, ##args)
+#endif /* BPF_KPROBE */
+
+#ifndef BPF_KRETPROBE
+#define ___bpf_kretprobe_args0() ctx
+#define ___bpf_kretprobe_args1(x) \
+        ___bpf_kretprobe_args0(), (void *)PT_REGS_RC(ctx)
+#define ___bpf_kretprobe_args(args...) \
+        ___bpf_apply(___bpf_kretprobe_args, ___bpf_narg(args))(args)
+
+/*
+ *  * BPF_KRETPROBE is similar to BPF_KPROBE, except, it only provides optional
+ *   * return value (in addition to `struct pt_regs *ctx`), but no input
+ *    * arguments, because they will be clobbered by the time probed function
+ *     * returns.
+ *      */
+#define BPF_KRETPROBE(name, args...)                                        \
+name(struct pt_regs *ctx);                                                  \
+static __attribute__((always_inline)) typeof(name(0))                       \
+____##name(struct pt_regs *ctx, ##args);                                    \
+typeof(name(0)) name(struct pt_regs *ctx)                                   \
+{                                                                           \
+        _Pragma("GCC diagnostic push")                                      \
+        _Pragma("GCC diagnostic ignored \"-Wint-conversion\"")              \
+        return ____##name(___bpf_kretprobe_args(args));                     \
+        _Pragma("GCC diagnostic pop")                                       \
+}                                                                           \
+static __always_inline typeof(name(0)) ____##name(struct pt_regs *ctx, ##args)
+#endif /* BPF_KRETPROBE */
+
+#ifdef BPFTUNE_LEGACY
+#define BPF_FENTRY(func, args...)				\
+	SEC("kprobe/" #func)					\
+	int BPF_KPROBE(entry__##func, ##args)
+
+#else
+#define BPF_FENTRY(func, args...)				\
+	SEC("fentry/" #func)					\
+	int BPF_PROG(entry__##func, ##args)
+#endif /* BPFTUNE_LEGACY */
+
 #include "bpftune.h"
 #include "corr.h"
 

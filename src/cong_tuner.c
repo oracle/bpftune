@@ -4,6 +4,7 @@
 #include <libbpftune.h>
 #include "cong_tuner.h"
 #include "cong_tuner.skel.h"
+#include "cong_tuner.skel.legacy.h"
 
 #include <arpa/inet.h>
 #include <errno.h>

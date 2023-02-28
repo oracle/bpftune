@@ -149,8 +149,7 @@ static __always_inline bool tcp_nearly_out_of_memory(struct sock *sk,
 	return false;
 }
 
-SEC("fentry/tcp_enter_memory_pressure")
-int BPF_PROG(bpftune_enter_memory_pressure, struct sock *sk)
+BPF_FENTRY(tcp_enter_memory_pressure, struct sock *sk)
 {
 	struct bpftune_event event = { 0 };
 
@@ -158,8 +157,7 @@ int BPF_PROG(bpftune_enter_memory_pressure, struct sock *sk)
 	return 0;
 }
 
-SEC("fentry/tcp_leave_memory_pressure")
-int BPF_PROG(bpftune_leave_memory_pressure, struct sock *sk)
+BPF_FENTRY(tcp_leave_memory_pressure, struct sock *sk)
 {
 	under_memory_pressure = false;
 	return 0;
@@ -176,8 +174,7 @@ int BPF_PROG(bpftune_leave_memory_pressure, struct sock *sk)
  * However, all that said, we may soon run out of sndbuf space, so
  * if it is nearly exhausted (>75% full), expand by 25%.
  */
-SEC("fentry/tcp_sndbuf_expand")
-int BPF_PROG(bpftune_sndbuf_expand, struct sock *sk)
+BPF_FENTRY(tcp_sndbuf_expand, struct sock *sk)
 {
 	struct bpftune_event event = { 0 };
 	struct net *net = sk->sk_net.net;
@@ -218,8 +215,7 @@ int BPF_PROG(bpftune_sndbuf_expand, struct sock *sk)
  * regardless of if we are under memory pressure or not; so use the variable
  * we set when memory pressure is triggered.
  */
-SEC("fentry/tcp_rcv_space_adjust")
-int BPF_PROG(bpftune_rcvbuf_adjust, struct sock *sk)
+BPF_FENTRY(tcp_rcv_space_adjust, struct sock *sk)
 {
 	struct bpftune_event event = { 0 };
 	struct net *net = sk->sk_net.net;
@@ -256,8 +252,7 @@ int BPF_PROG(bpftune_rcvbuf_adjust, struct sock *sk)
 	return 0;
 }
 
-SEC("fentry/tcp_init_sock")
-int BPF_PROG(bpftune_tcp_init_sock, struct sock *sk)
+BPF_FENTRY(tcp_init_sock, struct sock *sk)
 {
 	struct bpftune_event event = { 0 };
 
@@ -269,8 +264,7 @@ int BPF_PROG(bpftune_tcp_init_sock, struct sock *sk)
 	return 0;
 }
 
-SEC("fentry/tcp_release_cb")
-int BPF_PROG(bpftune_tcp_release, struct sock *sk)
+BPF_FENTRY(tcp_release_cb, struct sock *sk)
 {
 	if (tcp_sock_count > 0)
 		tcp_sock_count--;

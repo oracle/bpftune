@@ -13,7 +13,6 @@ Requires:       libnl3
 BuildRequires:  libbpf-devel >= 0.6
 BuildRequires:	bpftool >= 4.18
 BuildRequires:  libnl3-devel
-BuildRequires:  systemd-rpm-macros
 BuildRequires:  clang >= 11
 BuildRequires:  clang-libs >= 11
 BuildRequires:  llvm >= 11

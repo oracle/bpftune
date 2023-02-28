@@ -4,6 +4,7 @@
 #include <libbpftune.h>
 #include "netns_tuner.h"
 #include "netns_tuner.skel.h"
+#include "netns_tuner.skel.legacy.h"
 
 struct netns_tuner_bpf *skel;
 

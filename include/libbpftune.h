@@ -102,44 +102,62 @@ void bpftuner_tunables_fini(struct bpftuner *tuner);
 #define bpftuner_bpf_open(tuner_name, tuner)				     \
 	do {								     \
 		struct tuner_name##_tuner_bpf *__skel;                       \
+		struct tuner_name##_tuner_bpf_legacy *__lskel;		     \
                 int __err;                                                   \
                                                                              \
                 tuner->name = #tuner_name;                                   \
-                __skel = tuner_name##_tuner_bpf__open();                     \
-                __err = libbpf_get_error(__skel);                            \
+		tuner->bpf_legacy = bpftuner_bpf_legacy();		     \
+                if(!tuner->bpf_legacy) {				     \
+			tuner->skel = __skel = tuner_name##_tuner_bpf__open();\
+			tuner->skeleton = __skel->skeleton;		     \
+		} else {						     \
+			tuner->skel = __lskel = tuner_name##_tuner_bpf_legacy__open();\
+			tuner->skeleton = __lskel->skeleton;		     \
+		}							     \
+                __err = libbpf_get_error(tuner->skel);                       \
                 if (__err) {                                                 \
                         bpftune_log_bpf_err(__err,                           \
                                             #tuner_name " open bpf: %s\n");  \
                         return __err;                                        \
                 }                                                            \
-                tuner->skel = __skel;                                        \
                 tuner->skeleton = __skel->skeleton;                          \
                 tuner->ring_buffer_map = __skel->maps.ring_buffer_map;       \
 		tuner->corr_map = __skel->maps.corr_map;		     \
 		__skel->bss->debug = bpftune_log_level() >= LOG_DEBUG;	     \
 	} while (0)
 
+#define bpftuner_bpf_destroy(tuner_name, tuner)				     \
+	do {								     \
+		if (!tuner->bpf_legacy)					     \
+			tuner_name##_tuner_bpf__destroy(tuner->skel);	     \
+		else							     \
+			tuner_name##_tuner_bpf_legacy__destroy(tuner->skel); \
+	} while (0)
+
 #define bpftuner_bpf_load(tuner_name, tuner)				     \
 	do {								     \
 		struct tuner_name##_tuner_bpf *__skel = tuner->skel;	     \
+		struct tuner_name##_tuner_bpf_legacy *__lskel = tuner->skel; \
 		int __err;						     \
 									     \
 		__err = __bpftuner_bpf_load(tuner);			     \
 		if (__err) {						     \
-			tuner_name##_tuner_bpf__destroy(__skel);	     \
+			bpftuner_bpf_destroy(tuner_name, tuner);	     \
 			return __err;					     \
 		}							     \
-		__skel->bss->tuner_id = bpftune_tuner_num();		     \
+		if (!tuner->bpf_legacy)					     \
+			__skel->bss->tuner_id = bpftune_tuner_num();	     \
+		else							     \
+			__lskel->bss->tuner_id = bpftune_tuner_num();	     \
 	} while (0)
 
 #define bpftuner_bpf_attach(tuner_name, tuner)				     \
 	do {								     \
-		struct tuner_name##_tuner_bpf *__skel = tuner->skel;         \
                 int __err;                                                   \
                                                                              \
                 __err = __bpftuner_bpf_attach(tuner);			     \
                 if (__err) {                                                 \
-                        tuner_name##_tuner_bpf__destroy(__skel);             \
+			bpftuner_bpf_destroy(tuner_name, tuner);	     \
                         return __err;                                        \
 		}							     \
 	} while (0)
@@ -151,6 +169,9 @@ void bpftuner_tunables_fini(struct bpftuner *tuner);
 		bpftuner_bpf_attach(tuner_name, tuner);			     \
 	} while (0)
 
+
+void bpftuner_force_bpf_legacy(void);
+bool bpftuner_bpf_legacy(void);
 int bpftuner_ring_buffer_map_fd(struct bpftuner *tuner);
 void *bpftune_ring_buffer_init(int ringbuf_map_fd, void *ctx);
 int bpftune_ring_buffer_poll(void *ring_buffer, int interval);
