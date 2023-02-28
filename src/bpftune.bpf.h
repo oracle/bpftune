@@ -178,7 +178,9 @@ bool debug;
 
 static __always_inline long get_netns_cookie(struct net *net)
 {
-	return BPF_CORE_READ(net, net_cookie);
+	if (bpf_core_field_exists(net->net_cookie))
+		return BPF_CORE_READ(net, net_cookie);
+	return 0;
 }
  
 #define last_event_key(nscookie, tuner, event)	\

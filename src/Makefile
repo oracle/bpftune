@@ -38,7 +38,7 @@ CFLAGS += -DBPFTUNE_VERSION='"$(BPFTUNE_VERSION)"' $(INCLUDES)
 
 LDLIBS = -lbpf -ldl -lm -lnl-3 -lnl-route-3
 
-LDFLAGS += -L.
+LDFLAGS += -L. -L/usr/local/lib64
 
 # Try to detect best kernel BTF source
 KERNEL_REL := $(shell uname -r)

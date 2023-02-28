@@ -40,7 +40,8 @@ int BPF_KRETPROBE(bpftune_setup_net_return, int ret)
 	event.tuner_id = tuner_id;
 	event.pid = bpf_get_current_pid_tgid() >> 32;
 	event.scenario_id = NETNS_SCENARIO_CREATE;
-	event.netns_cookie = BPF_CORE_READ(netns, net_cookie);
+	if (bpf_core_field_exists(netns->net_cookie))
+		event.netns_cookie = BPF_CORE_READ(netns, net_cookie);
 	bpf_ringbuf_output(&ring_buffer_map, &event, sizeof(event), 0);
 
 	return 0;
