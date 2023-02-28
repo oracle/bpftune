@@ -789,9 +789,10 @@ int bpftune_netns_info(int pid, int *fd, unsigned long *cookie)
 					 &cookie_sz);
 			if (ret < 0) {
 				ret = -errno;
-				bpftune_log(LOG_ERR,
+				bpftune_log(LOG_DEBUG,
 					    "could not get SO_NETNS_COOKIE: %s\n",
 					   strerror(-ret));
+				/* system may not support SO_NETNS_COOKIE */
 			}
 			
 			close(s);
@@ -826,7 +827,7 @@ static int bpftune_netns_find(unsigned long cookie)
 	int ret = -ENOENT;
 	DIR *dir;
 
-	if (global_netns_cookie && cookie == global_netns_cookie)
+	if (cookie == 0 || global_netns_cookie && cookie == global_netns_cookie)
 		return 0;
 
 	mounts = setmntent("/proc/mounts", "r");
