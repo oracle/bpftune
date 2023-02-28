@@ -5,7 +5,10 @@
 
 PERF_TESTS = iperf3_test qperf_test
 
-TUNER_TESTS =	sysctl_test log_test netns_test neigh_table_test \
+TUNER_TESTS =	log_test \
+		sysctl_test sysctl_legacy_test \
+		netns_test netns_legacy_test \
+		neigh_table_test neigh_table_legacy_test \
 		cong_test \
 		mem_pressure_test mem_exhaust_test \
 		wmem_test rmem_test

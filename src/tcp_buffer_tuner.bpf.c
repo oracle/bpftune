@@ -280,9 +280,14 @@ extern const void netdev_max_backlog __ksym;
 __u64 drop_count = 0;
 __u64 drop_interval_start = 0;
 
+#ifdef BPFTUNE_LEGACY
+SEC("kretprobe/enqueue_to_backlog")
+int BPF_KRETPROBE(bpftune_enqueue_to_backlog, int ret)
+#else
 SEC("fexit/enqueue_to_backlog")
 int BPF_PROG(bpftune_enqueue_to_backlog, struct sk_buff *skb, int cpu,
 	     unsigned int *qtail, int ret)
+#endif
 {
 	struct bpftune_event event =  { 0 };
 	long old[3], new[3];
