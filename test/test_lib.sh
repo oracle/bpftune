@@ -145,7 +145,7 @@ test_setup_local()
 	CMD=$1
 	TIMEOUT=$2
 
-	BPFTUNE_SUPPORT="$(${BPFTUNE} -S)"
+	BPFTUNE_SUPPORT="$(${BPFTUNE} -S 2>&1)"
 	if [[ "${BPFTUNE_SUPPORT}" =~ "legacy mode" ]]; then
 		BPFTUNE_LEGACY=1
 	fi
