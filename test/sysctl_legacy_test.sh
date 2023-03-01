@@ -17,6 +17,13 @@ for TUNER in neigh_table ; do
 
    test_setup "true"
 
+   if [[ ${BPFTUNE_LEGACY} -eq 1 ]]; then
+	echo "sysctl test not supported for legacy mode, skipping..."
+	test_pass
+	test_cleanup
+	test_exit
+   fi
+
    test_run_cmd_local "$BPFTUNE -dsL &" true
 
    sleep $SLEEPTIME

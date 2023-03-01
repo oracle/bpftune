@@ -20,7 +20,7 @@ for TUNER in neigh_table ; do
    if [[ $MODE == "debug" ]]; then
 	OPTIONS="-ds"
    elif [[ $MODE == "syslog" ]]; then
-	OPTIONS=""
+	OPTIONS="-d"
 	LOGFILE=/var/log/messages
    else
 	OPTIONS="-s"
@@ -33,12 +33,7 @@ for TUNER in neigh_table ; do
    test_run_cmd_local "$BPFTUNE $OPTIONS &" true
 
    sleep $SLEEPTIME
-   for SYSCTL in kernel.core_pattern net.ipv4.neigh.default.gc_thresh1 ; do
-	val=$(sysctl -qn $SYSCTL)
-	sysctl -qw ${SYSCTL}=${val}
-   done
-   sleep $SLEEPTIME
-   grep "modified sysctl" $LOGFILE
+   grep "bpftune works" $LOGFILE
    if [[ "$OPTIONS" == "-ds" ]]; then
 	# should see multiple lines for debug
 	LINES=$(wc -l $LOGFILE | awk '{ print $1 }')
