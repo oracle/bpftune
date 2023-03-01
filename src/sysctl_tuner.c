@@ -13,8 +13,8 @@
 
 int init(struct bpftuner *tuner)
 {
-	struct sysctl_tuner_bpf *skel;
 	int prog_fd, cgroup_fd, err;
+	struct bpf_program *prog;
 	const char *cgroup_dir;
 
 	if (bpftune_bpf_support() < BPFTUNE_NORMAL) {
@@ -31,8 +31,12 @@ int init(struct bpftuner *tuner)
 		return 1;
 	}
 	cgroup_fd = bpftune_cgroup_fd();
-	skel = tuner->skel;
-	prog_fd = bpf_program__fd(skel->progs.sysctl_write);
+	prog = bpf_object__find_program_by_name(tuner->obj, "sysctl_write");
+	if (!prog) {
+		bpftune_log(LOG_ERR, "no prog 'sysctl_write'\n");
+		return -EINVAL;
+	}
+	prog_fd = bpf_program__fd(prog);
 
 	if (bpf_prog_attach(prog_fd, cgroup_fd,
 			    BPF_CGROUP_SYSCTL, BPF_F_ALLOW_MULTI)) {
@@ -43,24 +47,19 @@ int init(struct bpftuner *tuner)
 	}
 	bpftune_log(LOG_DEBUG, "attached prog fd %d to cgroup fd %d\n",
 		    prog_fd, cgroup_fd);
-	/* set our pid so we can identify tuning events that come from
-	 * outside.
-	 */
-	skel->bss->bpftune_pid = getpid();
 
 	return 0;
 }
 
 void fini(struct bpftuner *tuner)
 {
-	struct sysctl_tuner_bpf *skel;
+	struct bpf_program *prog;
 	int err, prog_fd, cgroup_fd;
 
-	skel = tuner->skel;
-
 	bpftune_log(LOG_DEBUG, "calling fini for %s\n", tuner->name);
-	if (skel->progs.sysctl_write) {
-		prog_fd = bpf_program__fd(skel->progs.sysctl_write);
+	prog = bpf_object__find_program_by_name(tuner->obj, "sysctl_write");
+	if (prog) {
+		prog_fd = bpf_program__fd(prog);
 		cgroup_fd = bpftune_cgroup_fd();
 
 		if (bpf_prog_detach2(prog_fd, cgroup_fd, BPF_CGROUP_SYSCTL)) {

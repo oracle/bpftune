@@ -107,6 +107,7 @@ BPF_RINGBUF(ring_buffer_map, 64 * 1024);
 BPF_MAP_DEF(corr_map, BPF_MAP_TYPE_HASH, struct corr_key, struct corr, 1024);
 
 unsigned int tuner_id;
+unsigned int bpftune_pid;
 
 /* TCP buffer tuning */
 #ifndef SO_SNDBUF

@@ -111,12 +111,16 @@ void bpftuner_tunables_fini(struct bpftuner *tuner);
 			tuner->skel = __skel = tuner_name##_tuner_bpf__open();\
 			tuner->skeleton = __skel->skeleton;		     \
 			__skel->bss->debug = bpftune_log_level() >= LOG_DEBUG;\
+			__skel->bss->bpftune_pid = getpid();		     \
+			tuner->obj = __skel->obj;			     \
 			tuner->ring_buffer_map = __skel->maps.ring_buffer_map;\
 			tuner->corr_map = __skel->maps.corr_map;	     \
 		} else {						     \
 			tuner->skel = __lskel = tuner_name##_tuner_bpf_legacy__open();\
 			tuner->skeleton = __lskel->skeleton;		     \
 			__lskel->bss->debug = bpftune_log_level() >= LOG_DEBUG;\
+			__lskel->bss->bpftune_pid = getpid();		     \
+			tuner->obj = __lskel->obj;			     \
 			tuner->ring_buffer_map = __lskel->maps.ring_buffer_map;\
 			tuner->corr_map = __lskel->maps.corr_map;	     \
 		}							     \

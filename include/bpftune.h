@@ -114,6 +114,7 @@ struct bpftuner {
 	struct bpf_object_skeleton *skeleton;
 	bool bpf_legacy;
 	void *skel;
+	void *obj;
 	int (*init)(struct bpftuner *tuner);
 	void (*fini)(struct bpftuner *tuner);
 	void *ring_buffer_map;
