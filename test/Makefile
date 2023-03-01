@@ -9,11 +9,11 @@ TUNER_TESTS =	log_test \
 		sysctl_test sysctl_legacy_test \
 		netns_test netns_legacy_test \
 		neigh_table_test neigh_table_legacy_test \
-		cong_test \
 		mem_pressure_test mem_pressure_legacy_test \
 		mem_exhaust_test mem_exhaust_legacy_test \
 		wmem_test wmem_legacy_test \
-		rmem_test rmem_legacy_test
+		rmem_test rmem_legacy_test \
+		cong_test
 
 DEFAULT_TESTS = $(TUNER_TESTS) $(PERF_TESTS)
 
