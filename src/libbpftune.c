@@ -208,16 +208,15 @@ bool bpftune_netns_cookie_supported(void)
 	if (s < 0) {
 		bpftune_log(LOG_ERR, "could not open socket: %s\n",
 			   strerror(errno));
+		return false;
 	} else {
 		socklen_t cookie_sz = sizeof(netns_cookie);
 
 		ret = getsockopt(s, SOL_SOCKET, SO_NETNS_COOKIE, &netns_cookie,
 				 &cookie_sz);
 		if (ret < 0) {
-			if (ret == -ENOPROTOOPT) {
-				bpftune_log(LOG_DEBUG, "netns cookie not supported, cannot monitor per-netns events\n");
-				return false;
-			}
+			bpftune_log(LOG_DEBUG, "netns cookie not supported, cannot monitor per-netns events\n");
+			return false;
 		}
         }
 	return true;
