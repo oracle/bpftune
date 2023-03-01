@@ -149,6 +149,26 @@ static void do_usage(void)
 	exit(1);
 }
 
+void print_support_level(enum bpftune_support_level support_level)
+{
+	switch (support_level) {
+	case BPFTUNE_NONE:
+		bpftune_log(LOG_INFO, "bpftune is not supported\n");
+		break;
+	case BPFTUNE_LEGACY:
+		bpftune_log(LOG_INFO, "bpftune works in legacy mode\n");
+		break;
+	case BPFTUNE_NORMAL:
+		bpftune_log(LOG_INFO, "bpftune works fully\n");
+		break;
+	}
+	if (support_level > BPFTUNE_NONE) {
+		bpftune_log(LOG_INFO, "bpftune %s per-netns policy (via netns cookie)\n",
+			    bpftune_netns_cookie_supported() ?
+			    "supports" : "does not support");
+	}
+}
+
 int main(int argc, char *argv[])
 {
 	static const struct option options[] = {
@@ -208,22 +228,7 @@ int main(int argc, char *argv[])
 		case 'S':
 			use_stderr = true;
 			support_level = bpftune_bpf_support();
-			switch (support_level) {
-			case BPFTUNE_NONE:
-				fprintf(stderr, "bpftune is not supported\n");
-				break;
-			case BPFTUNE_LEGACY:
-				fprintf(stderr, "bpftune works in legacy mode\n");
-				break;
-			case BPFTUNE_NORMAL:
-				fprintf(stderr, "bpftune works fully\n");
-				break;
-			}
-			if (support_level > BPFTUNE_NONE) {
-				fprintf(stderr, "bpftune %s per-netns policy (via netns cookie)\n",
-					bpftune_netns_cookie_supported() ?
-					"supports" : "does not support");
-			}
+			print_support_level(support_level);
 			return support_level > BPFTUNE_NONE ? 0 : 1;
 		case 'V':
 			do_version();
@@ -238,6 +243,7 @@ int main(int argc, char *argv[])
 	bpftune_set_log(log_level, is_daemon || !use_stderr ? bpftune_log_syslog : bpftune_log_stderr);
 
 	support_level = bpftune_bpf_support();
+	print_support_level(support_level);
 	if (support_level < BPFTUNE_LEGACY) {
 		bpftune_log(LOG_ERR, "bpftune is not supported on this system; exiting\n");
 		return 1;
