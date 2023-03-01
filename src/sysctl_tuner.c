@@ -17,6 +17,10 @@ int init(struct bpftuner *tuner)
 	int prog_fd, cgroup_fd, err;
 	const char *cgroup_dir;
 
+	if (bpftune_bpf_support < BPFTUNE_NORMAL) {
+		bpftune_log(LOG_DEBUG, "sysctl tuner requires support for reading memory in sysctl BPF progams, cannot run in legacy mode\n");
+		return -ENOTSUP;
+	}
 	bpftuner_bpf_init(sysctl, tuner);
 
 	/* attach to root cgroup */
