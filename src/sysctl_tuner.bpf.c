@@ -28,8 +28,7 @@ int BPF_KPROBE(trace_sysctl_write, struct ctl_table_header *head,
 	parent = BPF_CORE_READ(head, parent);
 	if (!parent)
 		return 0;
-	tbl = BPF_CORE_READ(parent, header.ctl_table);
-	procname = BPF_CORE_READ(tbl, procname);
+	procname = BPF_CORE_READ(table, procname);
 	if (!procname)
 		return 0;
 	if (bpf_probe_read(event.str, sizeof(event.str), procname) < 0)
