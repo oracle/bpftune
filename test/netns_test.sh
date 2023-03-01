@@ -18,13 +18,17 @@ test_setup "true"
 
 test_run_cmd_local "$BPFTUNE -ds &" true
 
-sleep $SLEEPTIME
-ip netns add testns.$$
-ip netns del testns.$$
-sleep $SLEEPTIME
-grep "netns created" $TESTLOG_LAST
-grep "netns destroyed" $TESTLOG_LAST
-test_pass
+if [[ ${BPFTUNE_NETNS} -eq 0 ]]; then
+	echo "bpftune does not support per-netns policy, skipping..."
+	test_pass
+else
+	sleep $SLEEPTIME
+	ip netns add testns.$$
+	ip netns del testns.$$
+	sleep $SLEEPTIME
+	grep "netns created" $TESTLOG_LAST
+	grep "netns destroyed" $TESTLOG_LAST
+	test_pass
+fi
 test_cleanup
-
 test_exit

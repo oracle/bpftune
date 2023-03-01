@@ -79,7 +79,11 @@ for FAMILY in ipv4 ipv6 ; do
 			echo "netns rmem before ${rmem_orig_netns[1]} ; after ${rmem_post_netns[2]}"
 		else
 			echo "netns rmem before ${rmem_orig_netns[1]} ; after ${rmem_post_netns[2]}"
-			test_cleanup
+			if [[ ${BPFTUNE_NETNS} -eq 0 ]]; then
+				echo "bpftune does not support per-netns policy, skipping..."
+			else
+				test_cleanup
+			fi
 		fi
 	else
 		test_cleanup

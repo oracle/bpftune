@@ -44,6 +44,8 @@ export QPERF=$(which qperf 2>/dev/null)
 check_prog "$QPERF" qperf qperf
 export FIREWALL_CMD=$(which firewall-cmd 2>/dev/null)
 export LOGFILE=${LOGFILE:-"/var/log/messages"}
+export BPFTUNE_LEGACY=${BPFTUNE_LEGACY:-0}
+export BPFTUNE_NETNS=${BPFTUNE_NETNS:-1}
 
 export B=$(tput -Tvt100 bold)
 export N=$(tput -Tvt100 sgr0)
@@ -143,6 +145,13 @@ test_setup_local()
 	CMD=$1
 	TIMEOUT=$2
 
+	BPFTUNE_SUPPORT="$(${BPFTUNE} -S)"
+	if [[ "${BPFTUNE_SUPPORT}" =~ "legacy mode" ]]; then
+		BPFTUNE_LEGACY=1
+	fi
+	if [[ "${BPFTUNE_SUPPORT}" =~ "does not support per-netns" ]]; then
+		BPFTUNE_NETNS=0
+	fi
 	if [[ ! -d $CGROUPDIR ]]; then
 		mkdir -p $CGROUPDIR
 	fi
