@@ -13,6 +13,15 @@
 #include <bpf/bpf_tracing.h>
 #include <bpf/bpf_core_read.h>
 
+#ifndef __bpf_printk
+#define __bpf_printk(fmt, ...)				\
+({							\
+	static const char ____fmt[] = fmt;	\
+	bpf_trace_printk(____fmt, sizeof(____fmt),	\
+			 ##__VA_ARGS__);		\
+})
+#endif
+
 /* provide BPF_KPROBE/BPF_KRETPROBE to simplify legacy support */
 
 #ifndef BPF_KPROBE
