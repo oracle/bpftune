@@ -45,6 +45,28 @@ struct ring_buffer *ring_buffer;
 int ring_buffer_map_fd;
 int corr_map_fd;
 
+struct bpftune_support supported[] = {
+	{ BPFTUNE_PROG,	"kprobe prog",	BPF_PROG_TYPE_KPROBE,
+							true, true },
+	{ BPFTUNE_PROG, "raw_tracepoint prog",	BPF_PROG_TYPE_RAW_TRACEPOINT,
+							true, true },
+	{ BPFTUNE_PROG, "sock_ops prog",	BPF_PROG_TYPE_SOCK_OPS,
+							true, true },
+	{ BPFTUNE_PROG, "cgroup_sysctl prog",	BPF_PROG_TYPE_CGROUP_SYSCTL,
+							true, true },
+	{ BPFTUNE_MAP,	"hashmap",		BPF_MAP_TYPE_HASH,
+							true, true },
+	{ BPFTUNE_MAP,	"per-cpu hashmap",	BPF_MAP_TYPE_PERCPU_HASH,
+							true, true },
+	{ BPFTUNE_MAP,  "ringbuf",		BPF_MAP_TYPE_RINGBUF,
+							true, true },
+	{ BPFTUNE_NETNS, "netns support",	0,
+							false, false },
+	/* all features below are required for BPFTUNE_NORMAL support */
+	{ BPFTUNE_PROG, "tracing prog",		BPF_PROG_TYPE_TRACING,
+							true, false },
+};
+
 int bpftune_log_level(void)
 {
 	return bpftune_loglevel;
@@ -177,15 +199,82 @@ void bpftuner_force_bpf_legacy(void)
 	force_bpf_legacy = true;
 }
 
+bool bpftune_netns_cookie_supported(void)
+{
+	int s = socket(AF_INET, SOCK_STREAM, 0);
+	unsigned long netns_cookie;
+	int ret = 0;
+
+	if (s < 0) {
+		bpftune_log(LOG_ERR, "could not open socket: %s\n",
+			   strerror(errno));
+	} else {
+		socklen_t cookie_sz = sizeof(netns_cookie);
+
+		ret = getsockopt(s, SOL_SOCKET, SO_NETNS_COOKIE, &netns_cookie,
+				 &cookie_sz);
+		if (ret < 0) {
+			if (ret == -ENOPROTOOPT) {
+				bpftune_log(LOG_DEBUG, "netns cookie not supported, cannot monitor per-netns events\n");
+				return false;
+			}
+		}
+        }
+	return true;
+}
+
+enum bpftune_support_level bpftune_bpf_support(void)
+{
+	enum bpftune_support_level support_level = BPFTUNE_NORMAL;
+	unsigned int i;
+	bool ret;
+
+	for (i = 0; i < ARRAY_SIZE(supported); i++) {
+		switch (supported[i].entity) {
+		case BPFTUNE_PROG:
+#if LIBBPF_MAJOR_VERSION > 0
+			ret = libbpf_probe_bpf_prog_type(supported[i].id, NULL)  == 1;
+#else
+			ret = bpf_probe_prog_type(supported[i].id, 0) == 0;
+#endif
+			break;
+		case BPFTUNE_MAP:
+#if LIBBPF_MAJOR_VERSION > 0
+			ret = libbpf_probe_bpf_map_type(supported[i].id, NULL)  == 1;
+#else
+			ret = bpf_probe_map_type(supported[i].id, 0) == 0;
+#endif
+			break;
+		case BPFTUNE_NETNS:
+			ret = bpftune_netns_cookie_supported();
+			break;
+		}
+		if (!ret && supported[i].legacy_required) {
+			bpftune_log(LOG_INFO, "%s required for legacy bpftune support\n",
+				    supported[i].name); 
+			return BPFTUNE_NONE;
+		}
+		if (!ret && supported[i].required) {
+			bpftune_log(LOG_INFO, "%s required for full bpftune support; falling back to legacy support\n",
+				    supported[i].name);
+			support_level = BPFTUNE_LEGACY;
+		}
+		if (ret)
+			bpftune_log(LOG_DEBUG, "%s is supported\n",
+				    supported[i].name);
+	}
+	bpftune_log(LOG_DEBUG, "%s support\n",
+		    support_level == BPFTUNE_NORMAL ? "normal" :
+		    support_level == BPFTUNE_LEGACY ? "legacy" : "none");
+	return support_level;
+}
+
 bool bpftuner_bpf_legacy(void)
 {
 	if (force_bpf_legacy)
 		return true;
-#if LIBBPF_MAJOR_VERSION > 0
-	return libbpf_probe_bpf_prog_type(BPF_PROG_TYPE_TRACING, NULL)  == 0;
-#else
-	return bpf_probe_prog_type(BPF_PROG_TYPE_TRACING, 0) == 0;
-#endif
+
+	return bpftune_bpf_support() < BPFTUNE_NORMAL;
 }
 
 int __bpftuner_bpf_load(struct bpftuner *tuner)
@@ -907,31 +996,6 @@ static int bpftune_netns_find(unsigned long cookie)
 int bpftune_netns_fd_from_cookie(unsigned long cookie)
 {
 	return bpftune_netns_find(cookie);
-}
-
-bool bpftune_netns_cookie_supported(void)
-{
-	int s = socket(AF_INET, SOCK_STREAM, 0);
-	unsigned long netns_cookie;
-	int ret = 0;
-
-	if (s < 0) {
-		ret = -errno;
-		bpftune_log(LOG_ERR, "could not open socket: %s\n",
-			    strerror(errno));
-	} else {
-		socklen_t cookie_sz = sizeof(netns_cookie);
-
-		ret = getsockopt(s, SOL_SOCKET, SO_NETNS_COOKIE, &netns_cookie,
-				 &cookie_sz);
-		if (ret < 0)
-			ret = -errno;
-		if (ret == -ENOPROTOOPT) {
-			bpftune_log(LOG_DEBUG, "netns cookie not supported");
-			return false;
-		}
-	}
-	return true;
 }
 
 static bool netns_cookie_supported;

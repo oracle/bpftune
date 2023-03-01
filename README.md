@@ -87,6 +87,16 @@ Tests are supplied for each tuner in the tests/ subdirectory.
 "make tests" runs all the tests.  Tests use network namespaces
 to simulate interactions with remote hosts.
 
+# Does my system support bpftune?
+
+Simply run "bpftune -S" to see:
+
+```
+$ bpftune -S
+bpftune works fully
+bpftune supports per-netns policy (via netns cookie)
+```
+
 # For more info
 
 See the docs/ subdirectory for manual pages covering bpftune

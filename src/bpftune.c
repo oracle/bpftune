@@ -131,7 +131,9 @@ void do_help(void)
 		"		     { -c|--cgroup_path cgroup_path}\n"
 		"		     { -L|--legacy}\n"
 		"		     {-h|--help}}\n"
-		"		     { -l|--library_path library_path\n"
+		"		     { -l|--library_path library_path}\n"
+		"		     { -s|--stderr}\n"
+		"		     { -S|--suppport}\n"
 		"		     { -V|--version}}\n",
 		bin_name);
 }
@@ -157,11 +159,13 @@ int main(int argc, char *argv[])
 		{ "help",	no_argument,		NULL,	'h' },
 		{ "libdir",	required_argument,	NULL,	'l' },
 		{ "stderr", 	no_argument,		NULL,	's' },
+		{ "support",	no_argument,		NULL,	'S' },
 		{ "version",	no_argument,		NULL,	'V' },
 		{ 0 }
 	};
 	char *cgroup_dir = BPFTUNER_CGROUP_DIR;
 	char *library_dir = BPFTUNER_LIB_DIR;
+	enum bpftune_support_level support_level;
 	int log_level = LOG_INFO;
 	bool is_daemon = false;
 	int interval = 100;
@@ -169,7 +173,7 @@ int main(int argc, char *argv[])
 
 	bin_name = argv[0];
 
-	while ((opt = getopt_long(argc, argv, "a:c:dDhl:LsV", options, NULL))
+	while ((opt = getopt_long(argc, argv, "a:c:dDhl:LsSV", options, NULL))
 		>= 0) {
 		switch (opt) {
 		case 'a':
@@ -201,6 +205,26 @@ int main(int argc, char *argv[])
 		case 's':
 			use_stderr = true;
 			break;
+		case 'S':
+			use_stderr = true;
+			support_level = bpftune_bpf_support();
+			switch (support_level) {
+			case BPFTUNE_NONE:
+				fprintf(stderr, "bpftune is not supported\n");
+				break;
+			case BPFTUNE_LEGACY:
+				fprintf(stderr, "bpftune works in legacy mode\n");
+				break;
+			case BPFTUNE_NORMAL:
+				fprintf(stderr, "bpftune works fully\n");
+				break;
+			}
+			if (support_level > BPFTUNE_NONE) {
+				fprintf(stderr, "bpftune %s per-netns policy (via netns cookie)\n",
+					bpftune_netns_cookie_supported() ?
+					"supports" : "does not support");
+			}
+			return support_level > BPFTUNE_NONE ? 0 : 1;
 		case 'V':
 			do_version();
 			return 0;
@@ -213,6 +237,11 @@ int main(int argc, char *argv[])
 
 	bpftune_set_log(log_level, is_daemon || !use_stderr ? bpftune_log_syslog : bpftune_log_stderr);
 
+	support_level = bpftune_bpf_support();
+	if (support_level < BPFTUNE_LEGACY) {
+		bpftune_log(LOG_ERR, "bpftune is not supported on this system; exiting\n");
+		return 1;
+	}
 	if (init(cgroup_dir, library_dir))
 		exit(EXIT_FAILURE);
 

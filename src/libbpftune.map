@@ -12,6 +12,7 @@ LIBBPFTUNE_0.1.1 {
 		bpftune_cgroup_fini;
 		bpftune_tuner;
 		bpftune_tuner_num;
+		bpftune_bpf_support;
 		bpftuner_init;
 		bpftuner_force_bpf_legacy;
 		bpftuner_bpf_legacy;

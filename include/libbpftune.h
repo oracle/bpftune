@@ -172,6 +172,27 @@ void bpftuner_tunables_fini(struct bpftuner *tuner);
 	} while (0)
 
 
+enum bpftune_support_level {
+	BPFTUNE_NONE = -1,
+	BPFTUNE_LEGACY,
+	BPFTUNE_NORMAL
+};
+
+enum bpftune_entity {
+	BPFTUNE_PROG,
+	BPFTUNE_MAP,
+	BPFTUNE_NETNS,
+};
+
+struct bpftune_support {
+	enum bpftune_entity entity;
+	const char *name;
+	int id;
+	bool required;
+	bool legacy_required;
+};
+
+enum bpftune_support_level bpftune_bpf_support(void);
 void bpftuner_force_bpf_legacy(void);
 bool bpftuner_bpf_legacy(void);
 int bpftuner_ring_buffer_map_fd(struct bpftuner *tuner);

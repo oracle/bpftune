@@ -57,6 +57,18 @@ build a version with BPFTUNE_LEGACY defined.  This corresponds
 to around v5.6 of the kernel, but for Oracle Linux it corresponds
 to UEK6U3 since it includes backports of ringbuf support.
 
+To test what level of bpftune support (if any) is provided
+on your system, run "bpftune -S"; it provides feedback like this:
+
+```
+$ bpftune -S
+bpftune works fully
+bpftune supports per-netns policy (via netns cookie)
+```
+
+If you add new BPF features, check the supported[] array in
+libbpftune.c; it may require updating.
+
 If the BPF program just consists of fentry programs, simply use
 the BPF_FENTRY() wrapper - it will convert to kprobes
 for the legacy version.  For other cases see these examples:
