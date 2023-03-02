@@ -187,6 +187,7 @@ int main(int argc, char *argv[])
 	char *library_dir = BPFTUNER_LIB_DIR;
 	enum bpftune_support_level support_level;
 	int log_level = LOG_INFO;
+	bool support_only = false;
 	bool is_daemon = false;
 	int interval = 100;
 	int err, opt;
@@ -227,9 +228,8 @@ int main(int argc, char *argv[])
 			break;
 		case 'S':
 			use_stderr = true;
-			support_level = bpftune_bpf_support();
-			print_support_level(support_level);
-			return support_level > BPFTUNE_NONE ? 0 : 1;
+			support_only = true;
+			break;
 		case 'V':
 			do_version();
 			return 0;
@@ -248,6 +248,8 @@ int main(int argc, char *argv[])
 		bpftune_log(LOG_ERR, "bpftune is not supported on this system; exiting\n");
 		return 1;
 	}
+	if (support_only)
+		return 0;
 	if (init(cgroup_dir, library_dir))
 		exit(EXIT_FAILURE);
 
