@@ -280,19 +280,21 @@ enum bpftune_support_level bpftune_bpf_support(void)
 	bool ret;
 
 	for (i = 0; i < ARRAY_SIZE(supported); i++) {
+		/* reset each time. */
+		errno = 0;
 		switch (supported[i].entity) {
 		case BPFTUNE_PROG:
 #if LIBBPF_MAJOR_VERSION > 0
-			ret = libbpf_probe_bpf_prog_type(supported[i].id, NULL)  == 1;
+			ret = (libbpf_probe_bpf_prog_type(supported[i].id, NULL)  == 1);
 #else
-			ret = bpf_probe_prog_type(supported[i].id, 0) == 0;
+			ret = bpf_probe_prog_type(supported[i].id, 0);
 #endif
 			break;
 		case BPFTUNE_MAP:
 #if LIBBPF_MAJOR_VERSION > 0
-			ret = libbpf_probe_bpf_map_type(supported[i].id, NULL)  == 1;
+			ret = (libbpf_probe_bpf_map_type(supported[i].id, NULL)  == 1);
 #else
-			ret = bpf_probe_map_type(supported[i].id, 0) == 0;
+			ret = bpf_probe_map_type(supported[i].id, 0);
 #endif
 			break;
 		case BPFTUNE_NETNS:
