@@ -85,7 +85,8 @@ Each tuner defines an init(), fini() and event_handler() function.
 
 Tests are supplied for each tuner in the tests/ subdirectory.
 "make tests" runs all the tests.  Tests use network namespaces
-to simulate interactions with remote hosts.
+to simulate interactions with remote hosts. See ./TESTING.md
+for more details.
 
 # Does my system support bpftune?
 

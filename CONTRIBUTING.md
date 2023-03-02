@@ -57,6 +57,12 @@ build a version with BPFTUNE_LEGACY defined.  This corresponds
 to around v5.6 of the kernel, but for Oracle Linux it corresponds
 to UEK6U3 since it includes backports of ringbuf support.
 
+To support per-namespace policies, support for netns cookies
+is required, and this is orthogonal to legacy/full support.
+So legacy support does not necessarily imply no netns cookie
+support (currently the aarch64 platform is legacy as it
+does not support BPF trampoline).
+
 To test what level of bpftune support (if any) is provided
 on your system, run "bpftune -S"; it provides feedback like this:
 
@@ -172,4 +178,5 @@ lots of examples.  The test framework uses network namespaces to
 support iperf3 runs within the same system.  Tests should validate
 tuning behaviour works, and ideally improves performance.  In
 addition, ensure to test both legacy (where legacy mode is forced
-via "-L") and non-legacy modes.
+via "-L") and non-legacy modes.  See ./TESTING.md for more details
+on tests.
