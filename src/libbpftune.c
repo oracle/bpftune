@@ -192,6 +192,57 @@ void bpftune_cgroup_fini(void)
 		close(__bpftune_cgroup_fd);
 }
 
+int bpftuner_cgroup_attach(struct bpftuner *tuner, const char *prog_name,
+			   enum bpf_attach_type attach_type)
+{
+	int prog_fd, cgroup_fd, err;
+	struct bpf_program *prog;
+	const char *cgroup_dir;
+
+	/* attach to root cgroup */
+	cgroup_dir = bpftune_cgroup_name();
+
+	if (!cgroup_dir) {
+		bpftune_log(LOG_ERR, "cannot get cgroup_dir\n");
+		return 1;
+	}
+	cgroup_fd = bpftune_cgroup_fd();
+	prog = bpf_object__find_program_by_name(tuner->obj, prog_name);
+	if (!prog) {
+		bpftune_log(LOG_ERR, "no prog '%s'\n", prog_name);
+		return -EINVAL;
+	}
+	prog_fd = bpf_program__fd(prog);
+
+	if (bpf_prog_attach(prog_fd, cgroup_fd, attach_type,
+			    BPF_F_ALLOW_MULTI)) {
+		err = -errno;
+		bpftune_log(LOG_ERR, "cannot attach '%s' to cgroup '%s': %s\n",
+			    prog_name, cgroup_dir, strerror(-err));
+		return 1;
+	}
+	return 0;
+}
+
+void bpftuner_cgroup_detach(struct bpftuner *tuner, const char *prog_name,
+			   enum bpf_attach_type attach_type)
+{
+	int prog_fd, cgroup_fd, err;
+	struct bpf_program *prog;
+
+	prog = bpf_object__find_program_by_name(tuner->obj, prog_name);
+	if (prog) {
+		prog_fd = bpf_program__fd(prog);
+		cgroup_fd = bpftune_cgroup_fd();
+
+		if (bpf_prog_detach2(prog_fd, cgroup_fd, attach_type)) {
+                        err = -errno;
+                        bpftune_log(LOG_ERR, "error detaching prog fd %d, cgroup fd %d: %s\n",
+                                prog_fd, cgroup_fd, strerror(-err));
+                }
+        }
+}
+
 static bool force_bpf_legacy;
 
 void bpftuner_force_bpf_legacy(void)

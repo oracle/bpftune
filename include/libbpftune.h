@@ -53,6 +53,11 @@ int bpftune_cgroup_init(const char *cgroup_path);
 const char *bpftune_cgroup_name(void);
 int bpftune_cgroup_fd(void);
 void bpftune_cgroup_fini(void);
+int bpftuner_cgroup_attach(struct bpftuner *tuner, const char *prog_name,
+			   enum bpf_attach_type attach_type);
+void bpftuner_cgroup_detach(struct bpftuner *tuner, const char *prog_name,
+			    enum bpf_attach_type attach_type);
+
 
 struct bpftuner *bpftuner_init(const char *path);
 int __bpftuner_bpf_load(struct bpftuner *tuner);

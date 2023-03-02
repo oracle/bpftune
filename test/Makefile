@@ -13,7 +13,7 @@ TUNER_TESTS =	log_test \
 		mem_exhaust_test mem_exhaust_legacy_test \
 		wmem_test wmem_legacy_test \
 		rmem_test rmem_legacy_test \
-		cong_test
+		cong_test cong_legacy_test
 
 DEFAULT_TESTS = $(TUNER_TESTS) $(PERF_TESTS)
 

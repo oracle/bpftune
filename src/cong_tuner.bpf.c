@@ -45,26 +45,23 @@ remote_host_retransmit_threshold(struct remote_host *remote_host)
 
 static __always_inline int get_sk_key(struct sock *sk, struct in6_addr *key)
 {
-	switch (sk->sk_family) {
+	int family = BPF_CORE_READ(sk, sk_family);
+	switch (family) {
 	case AF_INET:
 		return bpf_probe_read_kernel(key, sizeof(sk->sk_daddr),
-					     &sk->sk_daddr);
+					     sk + offsetof(struct sock, sk_daddr));
 		
 	case AF_INET6:
 		return bpf_probe_read_kernel(key, sizeof(*key),
-					     &sk->sk_v6_daddr);
+					     sk + offsetof(struct sock, sk_v6_daddr));
 	default:
 		return -EINVAL;
 	}
 }
 
-static __always_inline struct remote_host *get_remote_host(struct sock *sk,
-							   struct in6_addr *key)
+static __always_inline struct remote_host *get_remote_host(struct in6_addr *key)
 {
 	struct remote_host *remote_host = NULL;
-
-	if (get_sk_key(sk, key))
-		return NULL;
 
 	remote_host = bpf_map_lookup_elem(&remote_host_map, key);
         if (!remote_host) {
@@ -77,8 +74,53 @@ static __always_inline struct remote_host *get_remote_host(struct sock *sk,
 	return remote_host;
 }
 
+#ifdef BPFTUNE_LEGACY
+/* in legacy mode, use sockops prog to set cong algoritm when retransmit
+ * threshold is passed.  Because we need to enable retransmit sock ops
+ * events on socket accept/connect, this does not work for existing
+ * connections which were initiated prior to bpftune starting.
+ */
+SEC("sockops")
+int bpf_sockops(struct bpf_sock_ops *ops)
+{
+	struct remote_host *remote_host;
+	struct sockaddr_in6 sin6 = {};
+	struct in6_addr *key = &sin6.sin6_addr;
+
+	switch (ops->op) {
+	case BPF_SOCK_OPS_ACTIVE_ESTABLISHED_CB:
+	case BPF_SOCK_OPS_PASSIVE_ESTABLISHED_CB:
+		/* enable retransmission events */
+		bpf_sock_ops_cb_flags_set(ops, BPF_SOCK_OPS_RETRANS_CB_FLAG);
+		return 1;
+	case BPF_SOCK_OPS_RETRANS_CB:
+		break;
+	default:
+		return 1;
+	}
+	sin6.sin6_family = ops->family;
+	sin6.sin6_addr.s6_addr32[0] = ops->remote_ip6[0];
+	sin6.sin6_addr.s6_addr32[1] = ops->remote_ip6[1];
+	sin6.sin6_addr.s6_addr32[2] = ops->remote_ip6[2];
+	sin6.sin6_addr.s6_addr32[3] = ops->remote_ip6[3];
+
+	remote_host = get_remote_host(key);
+	if (!remote_host)
+		return 1;
+	if (!remote_host_retransmit_threshold(remote_host))
+		return 1;
+
+	bpf_setsockopt(ops, SOL_TCP, TCP_CONGESTION,
+		       &remote_host->cong_alg, sizeof(remote_host->cong_alg));
+
+	return 1;
+}
+
 /* count retransmits here per remote addr here... */
+SEC("raw_tracepoint/tcp_retransmit_skb")
+#else
 SEC("tp_btf/tcp_retransmit_skb")
+#endif
 int BPF_PROG(cong_retransmit, struct sock *sk, struct sk_buff *skb)
 {
 	struct remote_host *remote_host;
@@ -88,11 +130,13 @@ int BPF_PROG(cong_retransmit, struct sock *sk, struct sk_buff *skb)
 	struct in6_addr *key = &sin6->sin6_addr;
 	__u32 segs_out = 0, total_retrans = 0;
 	const char bbr[CONG_MAXNAME] = "bbr";
-	const char htcp[CONG_MAXNAME] = "htcp";
 	int id = TCP_CONG_BBR;
-	__u64 bdp = 0;
+	struct net *net;
 
-	remote_host = get_remote_host(sk, key);
+	if (get_sk_key(sk, key))
+		return 0;
+
+	remote_host = get_remote_host(key);
 	if (!remote_host)
 		return 0;
 
@@ -107,58 +151,19 @@ int BPF_PROG(cong_retransmit, struct sock *sk, struct sk_buff *skb)
 				  (void *)sk + offsetof(struct tcp_sock, total_retrans)))
 		return 0;
 
-	/* with a retransmission rate of > 1%, BBR performs much better;
-	 * below translates to ~ 3.125%.  With a high bandwidth delay
-	 * product (BDP), use h-tcp.
-	 */
+	/* with a retransmission rate of > 1%, BBR performs much better. */
 	if (total_retrans > (segs_out >> 5)) {
-		__u32 rate_delivered, rate_interval_us;
-		__u32 mss_cache, srtt_us;
-		__u64 bdp;
-
-		remote_host->retransmit_threshold = true;
-		remote_host->last_retransmit = bpf_ktime_get_ns();
-		if (!bpf_probe_read_kernel(&rate_delivered, sizeof(rate_delivered),
-					 (void *)sk + offsetof(struct tcp_sock, rate_delivered)) &&
-		    !bpf_probe_read_kernel(&rate_interval_us, sizeof(rate_interval_us),
-					   (void *)sk + offsetof(struct tcp_sock, rate_interval_us)) &&
-		    !bpf_probe_read_kernel(&mss_cache, sizeof(mss_cache),
-					   (void *)sk + offsetof(struct tcp_sock, mss_cache)) &&
-		    !bpf_probe_read_kernel(&srtt_us, sizeof(srtt_us),
-					   (void *)sk + offsetof(struct tcp_sock, srtt_us))) {
-			srtt_us  = srtt_us >> 3;
-			bpftune_log("rate_delivered %d, rate_interval_us %d\n",
-				    rate_delivered, rate_interval_us);
-			bpftune_log("srtt %d mss_cache %d\n",
-				    srtt_us, mss_cache);
-			bdp = rate_interval_us > 0 ?
-			      (__u64)(rate_delivered * mss_cache * srtt_us)/rate_interval_us :
-				     0;
-			bpftune_log("bdp estimate: %ld: LFP: %d\n",
-				    bdp, BDP_LFP);
-		}
-		/* a long fat pipe is defined as having a BDP of > 10^5;
-		 * it implies latency plus high bandwith.  In such cases,
-		 * use htcp.  Note we multiply the usual LFP metric (10^5)
-		 * by 5 to be conservative.
-		 */
-
-		if (bdp > BDP_LFP * 5) {
-			__builtin_memcpy(remote_host->cong_alg, htcp,
-					 sizeof(remote_host->cong_alg));
-			id = TCP_CONG_HTCP;
-		} else {
-			__builtin_memcpy(remote_host->cong_alg, bbr,
-				 sizeof(remote_host->cong_alg));
-		}
+		__builtin_memcpy(remote_host->cong_alg, bbr,
+			 sizeof(remote_host->cong_alg));
 	} else {
 		return 0;
 	}
 
-	sin6->sin6_family = sk->sk_family;
+	sin6->sin6_family = BPF_CORE_READ(sk, sk_family);
 	event.tuner_id = tuner_id;
 	event.scenario_id = id;
-	event.netns_cookie = get_netns_cookie(sk->sk_net.net);
+	net = BPF_CORE_READ(sk, sk_net.net);
+	event.netns_cookie = get_netns_cookie(net);
 	if (event.netns_cookie < 0)
 		return 0;
 	bpf_ringbuf_output(&ring_buffer_map, &event, sizeof(event), 0);
@@ -166,6 +171,7 @@ int BPF_PROG(cong_retransmit, struct sock *sk, struct sk_buff *skb)
 	return 0;
 }
 
+#ifndef BPFTUNE_LEGACY
 /* specify congestion control algorithm here via iterator (to catch
  * existing + new TCP connections) for connections to remote hosts which
  * have seen retransmits in the past.  The event sent from the retransmit
@@ -187,7 +193,10 @@ int bpftune_cong_iter(struct bpf_iter__tcp *ctx)
 	if (!tp || !sk)
 		return 0;
 
-	remote_host = get_remote_host(sk, &key);
+	if (get_sk_key(sk, &key))
+		return 0;
+
+	remote_host = get_remote_host(&key);
 	if (!remote_host)
 		return 0;
 
@@ -196,6 +205,6 @@ int bpftune_cong_iter(struct bpf_iter__tcp *ctx)
 
 	bpf_setsockopt(tp, SOL_TCP, TCP_CONGESTION,
 		       &remote_host->cong_alg, sizeof(remote_host->cong_alg));
-
 	return 0;
 }
+#endif

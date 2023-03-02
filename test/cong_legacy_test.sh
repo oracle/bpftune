@@ -28,7 +28,7 @@ for DROP_PERCENT in 10 0 ; do
 	;;
    esac
 
-   test_start "$0|cong test (drop $DROP_PERCENT %) to $ADDR:$PORT $FAMILY opts $CLIENT_OPTS $LATENCY"
+   test_start "$0|cong legacy test (drop $DROP_PERCENT %) to $ADDR:$PORT $FAMILY opts $CLIENT_OPTS $LATENCY"
 
    if [[ $DROP_PERCENT -gt 0 ]]; then
 	DROP=$DROP_PERCENT
@@ -42,7 +42,7 @@ for DROP_PERCENT in 10 0 ; do
 	echo "Running ${MODE}..."
 	test_run_cmd_local "ip netns exec $NETNS $IPERF3 -p $PORT -s -1 &"
 	if [[ $MODE != "baseline" ]]; then
-		test_run_cmd_local "$BPFTUNE -s &" true
+		test_run_cmd_local "$BPFTUNE -sL &" true
 	fi
 	sleep $SLEEPTIME
 	set +e

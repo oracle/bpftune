@@ -10,6 +10,8 @@ LIBBPFTUNE_0.1.1 {
 		bpftune_cgroup_name;
 		bpftune_cgroup_fd;
 		bpftune_cgroup_fini;
+		bpftuner_cgroup_attach;
+		bpftuner_cgroup_detach;
 		bpftune_tuner;
 		bpftune_tuner_num;
 		bpftune_bpf_support;
