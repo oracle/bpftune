@@ -171,7 +171,7 @@ void bpftuner_tunables_fini(struct bpftuner *tuner);
                                                                              \
                 __err = __bpftuner_bpf_attach(tuner);			     \
 		if (__err && optionals != NULL) {			     \
-			bpftuner_bpf_destroy(tuner_name, tuner);	     \
+			bpftuner_bpf_fini(tuner);			     \
 			bpftuner_bpf_open(tuner_name, tuner);		     \
 			_bpftuner_bpf_load(tuner_name, tuner, optionals);    \
 			__err = __bpftuner_bpf_attach(tuner);		     \
