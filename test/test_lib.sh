@@ -11,6 +11,8 @@ export TESTDIR="/tmp/bpftunetest"
 export TESTLOG=${TESTLOG:-"${TESTDIR}/testlog.${PPID}"}
 export TESTLOG_LAST="${TESTDIR}/testlog.last"
 
+export SLEEPTIME=1
+
 export PASSED=${PASSED:-0}
 
 # 1: more output, >1: xtrace

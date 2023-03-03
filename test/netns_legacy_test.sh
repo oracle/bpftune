@@ -9,7 +9,7 @@
 . ./test_lib.sh
 
 
-SLEEPTIME=1
+SLEEPTIME=2
 
 
 test_start "$0|netns test: does adding/removing netns generate event?"

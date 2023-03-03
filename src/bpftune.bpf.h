@@ -192,7 +192,10 @@ static __always_inline long get_netns_cookie(struct net *net)
 {
 	if (bpf_core_field_exists(net->net_cookie))
 		return BPF_CORE_READ(net, net_cookie);
-	return 0;
+	if (net == &init_net)
+		return 0;
+	/* not global ns, no cookie support. */
+	return -1;
 }
  
 #define last_event_key(nscookie, tuner, event)	\
