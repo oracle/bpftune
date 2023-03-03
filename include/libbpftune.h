@@ -151,7 +151,7 @@ void bpftuner_tunables_fini(struct bpftuner *tuner);
 		struct tuner_name##_tuner_bpf_legacy *__lskel = tuner->skel; \
 		int __err;						     \
 									     \
-		__err = __bpftuner_bpf_load(tuner, NULL);		     \
+		__err = __bpftuner_bpf_load(tuner, optionals);		     \
 		if (__err) {						     \
 			bpftuner_bpf_destroy(tuner_name, tuner);	     \
 			return __err;					     \

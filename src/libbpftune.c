@@ -329,12 +329,14 @@ bool bpftuner_bpf_legacy(void)
 	return bpftune_bpf_support() < BPFTUNE_NORMAL;
 }
 
+static unsigned int bpftune_num_active_tuners;
+
 int __bpftuner_bpf_load(struct bpftuner *tuner, const char **optionals)
 {
 	struct bpf_map *map;
 	int err;	
 
-	if (ring_buffer_map_fd > 0) {
+	if (ring_buffer_map_fd > 0 && bpftune_num_active_tuners > 1) {
 		err = bpf_map__reuse_fd(tuner->ring_buffer_map,
 					ring_buffer_map_fd);
 		if (err < 0) {
@@ -344,7 +346,7 @@ int __bpftuner_bpf_load(struct bpftuner *tuner, const char **optionals)
 		tuner->ring_buffer_map_fd = ring_buffer_map_fd;
 	}
 	
-	if (corr_map_fd > 0) {
+	if (corr_map_fd > 0 && bpftune_num_active_tuners > 1) {
 		err = bpf_map__reuse_fd(tuner->corr_map, corr_map_fd);
 		if (err < 0) {
 			bpftune_log_bpf_err(err, "could not reuse corr fd: %s\n");
@@ -461,6 +463,7 @@ struct bpftuner *bpftuner_init(const char *path)
 	bpftune_tuners[bpftune_num_tuners++] = tuner;
 	bpftune_log(LOG_DEBUG, "sucessfully initialized tuner %s[%d]\n",
 		    tuner->name, tuner->id);
+	bpftune_num_active_tuners++;
 	return tuner;
 }
 
@@ -494,6 +497,7 @@ void bpftuner_fini(struct bpftuner *tuner, enum bpftune_state state)
 		tuner->fini(tuner);
 
 	tuner->state = state;
+	bpftune_num_active_tuners--;
 }
 
 struct bpftuner *bpftune_tuner(unsigned int index)
