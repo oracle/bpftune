@@ -27,7 +27,11 @@ else
 	ip netns del testns.$$
 	sleep $SLEEPTIME
 	grep "netns created" $TESTLOG_LAST
-	grep "netns destroyed" $TESTLOG_LAST
+	have_destroy=$(cat /proc/kallsyms |awk '$3 ~ /^net_free$/{ print $3}')
+	# net_free() not present on some platforms
+	if [[ -n "$have_destroy" ]]; then
+		grep "netns destroyed" $TESTLOG_LAST
+	fi
 	test_pass
 fi
 test_cleanup
