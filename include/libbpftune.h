@@ -190,6 +190,21 @@ void bpftuner_tunables_fini(struct bpftuner *tuner);
 	} while (0)
 
 
+#define bpftuner_bpf_var_set(tuner_name, tuner, var, val)		     \
+	do {								     \
+		struct tuner_name##_tuner_bpf *__skel = tuner->skel;	     \
+                struct tuner_name##_tuner_bpf_legacy *__lskel = tuner->skel; \
+		if (tuner->bpf_legacy)					     \
+			__skel->bss->var = val;				     \
+		else							     \
+			__lskel->bss->var = val;			     \
+	} while (0)
+
+#define bpftuner_bpf_var_get(tuner_name, tuner, var)			     \
+	(tuner->bpf_legacy ?						     \
+	 ((struct tuner_name##_tuner_bpf_legacy *)tuner->skel)->bss->var :   \
+	 ((struct tuner_name##_tuner_bpf *)tuner->skel)->bss->var)
+
 enum bpftune_support_level {
 	BPFTUNE_NONE = -1,
 	BPFTUNE_LEGACY,

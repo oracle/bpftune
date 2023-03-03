@@ -127,28 +127,22 @@ long nr_free_buffer_pages(bool initial)
 
 int init(struct bpftuner *tuner)
 {
-	struct tcp_buffer_tuner_bpf *skel;
 	int pagesize;
 
 	bpftuner_bpf_open(tcp_buffer, tuner);
 	bpftuner_bpf_load(tcp_buffer, tuner);
 
-	skel = tuner->skel;
-
 	pagesize = sysconf(_SC_PAGESIZE);
 	if (pagesize < 0)
 		pagesize = 4096;
-	skel->bss->kernel_page_size = pagesize;
-	skel->bss->kernel_page_shift = ilog2(pagesize);
-	skel->bss->sk_mem_quantum = SK_MEM_QUANTUM;
-	skel->bss->sk_mem_quantum_shift = ilog2(SK_MEM_QUANTUM);
-	skel->bss->nr_free_buffer_pages = nr_free_buffer_pages(true);
-	bpftune_log(LOG_DEBUG,
-		    "set pagesize/shift to %d/%d; sk_mem_quantum/shift %d/%d\n",
-		    pagesize, skel->bss->kernel_page_shift, SK_MEM_QUANTUM,
-		    skel->bss->sk_mem_quantum_shift);
-	bpftune_log(LOG_DEBUG,
-		    "set nr_free_buffer_pages to %ld\n", skel->bss->nr_free_buffer_pages);
+	bpftuner_bpf_var_set(tcp_buffer, tuner, kernel_page_size, pagesize);
+	bpftuner_bpf_var_set(tcp_buffer, tuner, kernel_page_shift,
+			     ilog2(pagesize));
+	bpftuner_bpf_var_set(tcp_buffer, tuner, sk_mem_quantum, SK_MEM_QUANTUM);
+	bpftuner_bpf_var_set(tcp_buffer, tuner, sk_mem_quantum_shift,
+			     ilog2(SK_MEM_QUANTUM));
+	bpftuner_bpf_var_set(tcp_buffer, tuner, nr_free_buffer_pages,
+			     nr_free_buffer_pages(true));
 	bpftuner_bpf_attach(tcp_buffer, tuner, NULL);
 	return bpftuner_tunables_init(tuner, TCP_BUFFER_NUM_TUNABLES, descs,
 				      ARRAY_SIZE(scenarios), scenarios);
@@ -164,9 +158,9 @@ void event_handler(struct bpftuner *tuner,
 		   struct bpftune_event *event,
 		   __attribute__((unused))void *ctx)
 {
-	struct tcp_buffer_tuner_bpf *skel = tuner->skel;
 	const char *lowmem = "normal memory conditions";
 	const char *reason = "unknown reason";
+	bool near_memory_exhaustion, under_memory_pressure, near_memory_pressure;
 	int scenario = event->scenario_id;
 	struct corr c = { 0 };
 	long double corr = 0;
@@ -194,11 +188,17 @@ void event_handler(struct bpftuner *tuner,
 		bpftune_log(LOG_DEBUG, "unknown tunable [%d] for tcp_buffer_tuner\n", id);
 		return;
 	}
-	if (skel->bss->near_memory_exhaustion)
+	near_memory_exhaustion = bpftuner_bpf_var_get(tcp_buffer, tuner,
+						     near_memory_exhaustion);
+	under_memory_pressure = bpftuner_bpf_var_get(tcp_buffer, tuner,
+					            under_memory_pressure);
+	near_memory_pressure = bpftuner_bpf_var_get(tcp_buffer, tuner,
+						   near_memory_pressure);
+	if (near_memory_exhaustion)
 		lowmem = "near memory exhaustion";
-	else if (skel->bss->under_memory_pressure)
+	else if (under_memory_pressure)
 		lowmem = "under memory pressure";
-	else if (skel->bss->near_memory_pressure)
+	else if (near_memory_pressure)
 		lowmem = "near memory pressure";
 
 	key.id = (__u64)id;
