@@ -33,6 +33,9 @@
 #include <bpf/libbpf.h>
 #include <bpf/libbpf_version.h>
 
+#include "probe.skel.h"
+#include "probe.skel.legacy.h"
+
 #ifndef SO_NETNS_COOKIE
 #define SO_NETNS_COOKIE 71
 #endif
@@ -44,28 +47,6 @@ int bpftune_loglevel = LOG_INFO;
 struct ring_buffer *ring_buffer;
 int ring_buffer_map_fd;
 int corr_map_fd;
-
-struct bpftune_support supported[] = {
-	{ BPFTUNE_PROG,	"kprobe prog",	BPF_PROG_TYPE_KPROBE,
-							true, true },
-	{ BPFTUNE_PROG, "raw_tracepoint prog",	BPF_PROG_TYPE_RAW_TRACEPOINT,
-							true, true },
-	{ BPFTUNE_PROG, "sock_ops prog",	BPF_PROG_TYPE_SOCK_OPS,
-							true, true },
-	{ BPFTUNE_PROG, "cgroup_sysctl prog",	BPF_PROG_TYPE_CGROUP_SYSCTL,
-							true, true },
-	{ BPFTUNE_MAP,	"hashmap",		BPF_MAP_TYPE_HASH,
-							true, true },
-	{ BPFTUNE_MAP,	"per-cpu hashmap",	BPF_MAP_TYPE_PERCPU_HASH,
-							true, true },
-	{ BPFTUNE_MAP,  "ringbuf",		BPF_MAP_TYPE_RINGBUF,
-							true, true },
-	{ BPFTUNE_NETNS, "netns support",	0,
-							false, false },
-	/* all features below are required for BPFTUNE_NORMAL support */
-	{ BPFTUNE_PROG, "tracing prog",		BPF_PROG_TYPE_TRACING,
-							true, false },
-};
 
 int bpftune_log_level(void)
 {
@@ -278,46 +259,23 @@ enum bpftune_support_level bpftune_bpf_support(void)
 	enum bpftune_support_level support_level = BPFTUNE_NORMAL;
 	unsigned int i;
 	bool ret;
+	struct probe_bpf *probe_bpf = probe_bpf__open_and_load();
+	struct probe_bpf_legacy *probe_bpf_legacy;
 
-	for (i = 0; i < ARRAY_SIZE(supported); i++) {
-		/* reset each time. */
-		errno = 0;
-		switch (supported[i].entity) {
-		case BPFTUNE_PROG:
-#if LIBBPF_MAJOR_VERSION > 0
-			ret = (libbpf_probe_bpf_prog_type(supported[i].id, NULL)  == 1);
-#else
-			ret = bpf_probe_prog_type(supported[i].id, 0);
-#endif
-			break;
-		case BPFTUNE_MAP:
-#if LIBBPF_MAJOR_VERSION > 0
-			ret = (libbpf_probe_bpf_map_type(supported[i].id, NULL)  == 1);
-#else
-			ret = bpf_probe_map_type(supported[i].id, 0);
-#endif
-			break;
-		case BPFTUNE_NETNS:
-			ret = bpftune_netns_cookie_supported();
-			break;
+	if (probe_bpf == NULL) {
+		support_level = BPFTUNE_LEGACY;
+		bpftune_log(LOG_DEBUG, "full bpftune support not available: %s\n",
+			    strerror(errno));
+		probe_bpf_legacy = probe_bpf_legacy__open_and_load();		
+		if (!probe_bpf_legacy) {
+			support_level = BPFTUNE_NONE;
+			bpftune_log(LOG_DEBUG, "legacy bpftune support not available: %s\n",
+				    strerror(errno));
 		}
-		if (!ret && supported[i].legacy_required) {
-			bpftune_log(LOG_INFO, "%s required for legacy bpftune support\n",
-				    supported[i].name); 
-			return BPFTUNE_NONE;
-		}
-		if (!ret && supported[i].required) {
-			bpftune_log(LOG_INFO, "%s required for full bpftune support; falling back to legacy support\n",
-				    supported[i].name);
-			support_level = BPFTUNE_LEGACY;
-		}
-		if (ret)
-			bpftune_log(LOG_DEBUG, "%s is supported\n",
-				    supported[i].name);
 	}
-	bpftune_log(LOG_DEBUG, "%s support\n",
-		    support_level == BPFTUNE_NORMAL ? "normal" :
-		    support_level == BPFTUNE_LEGACY ? "legacy" : "none");
+	ret = bpftune_netns_cookie_supported();
+	if (!ret)
+		bpftune_log(LOG_DEBUG, "netns cookie not supported\n");
 	return support_level;
 }
 

@@ -61,7 +61,9 @@ TUNER_LIBS = $(patsubst %,%.so,$(TUNERS))
 
 BPF_TUNERS = $(patsubst %,%.bpf.o,$(TUNERS))
 
-BPF_SKELS = $(patsubst %,%.skel.h,$(TUNERS))
+BPF_OBJS = $(BPF_TUNERS) probe.bpf.o
+
+BPF_SKELS = $(patsubst %,%.skel.h,$(TUNERS)) probe.skel.h
 
 .DELETE_ON_ERROR:
 
@@ -102,7 +104,7 @@ $(TUNER_LIBS): libbpftune.so $(BPF_SKELS) $(TUNER_OBJS)
 	$(CC) $(CFLAGS) -shared -o $(@) $(patsubst %.so,%.c,$(@)) \
 		$(LDLIBS) -lbpftune $(LDFLAGS)
 
-libbpftune.o:
+libbpftune.o: probe.skel.h probe.skel.legacy.h
 	$(QUIET_CC)$(CC) $(CFLAGS) -c libbpftune.c -o $@
 
 bpftune.o: libbpftune.so
@@ -111,14 +113,14 @@ bpftune.o: libbpftune.so
 %.skel.h: %.bpf.o
 	$(QUIET_GEN)$(BPFTOOL) gen skeleton $< > $@
 
-$(BPF_TUNERS): $(patsubst %.o,%.c,$(BPF_TUNERS))
+$(BPF_OBJS): $(patsubst %.o,%.c,$(BPF_OBJS))
 	$(CLANG) -g -D__TARGET_ARCH_$(SRCARCH) -O2 -target bpf			\
 		$(INCLUDES) -c $(patsubst %.o,%.c,$(@)) -o $(@);
 	$(CLANG) -g -D__TARGET_ARCH_$(SRCARCH) -DBPFTUNE_LEGACY -O2 -target bpf \
 		$(INCLUDES) -c $(patsubst %.o,%.c,$(@)) \
 		-o $(patsubst %.o,%.legacy.o,$(@))
 
-$(BPF_SKELS): $(BPF_TUNERS)
+$(BPF_SKELS): $(BPF_OBJS)
 	$(BPFTOOL) gen skeleton $(subst .skel.h,.bpf.o,$@) > $@ ;\
 	$(BPFTOOL) gen skeleton $(subst .skel.h,.bpf.legacy.o,$@) > $(subst .skel.h,.skel.legacy.h,$@)
 
