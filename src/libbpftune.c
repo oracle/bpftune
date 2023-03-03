@@ -417,7 +417,7 @@ void bpftuner_bpf_fini(struct bpftuner *tuner)
 {
 	bpf_object__destroy_skeleton(tuner->skeleton);
 	free(tuner->skel);
-	if (bpftune_num_tuners == 1) {
+	if (bpftune_num_tuners == 0) {
 		if (ring_buffer_map_fd > 0)
 			close(ring_buffer_map_fd);
 		if (corr_map_fd > 0)
