@@ -27,8 +27,8 @@ int init(struct bpftuner *tuner)
 		return -ENOTSUP;
 
 	bpftuner_bpf_open(netns, tuner);
-	bpftuner_bpf_load(netns, tuner, optionals);
-	bpftuner_bpf_attach(netns, tuner);
+	bpftuner_bpf_load(netns, tuner);
+	bpftuner_bpf_attach(netns, tuner, optionals);
 
 	return bpftuner_tunables_init(tuner, ARRAY_SIZE(descs), descs,
 				      ARRAY_SIZE(scenarios), scenarios);

@@ -352,8 +352,7 @@ int __bpftuner_bpf_load(struct bpftuner *tuner, const char **optionals)
 		}
 		tuner->corr_map_fd = corr_map_fd;
 	}
-	err = bpf_object__load_skeleton(tuner->skeleton);
-	if (err && optionals) {
+	if (optionals) {
 		int i;
 
 		for (i = 0; optionals[i] != NULL; i++) {
@@ -367,8 +366,8 @@ int __bpftuner_bpf_load(struct bpftuner *tuner, const char **optionals)
 				bpf_program__set_autoload(prog, false);
 			}
 		}
-		err = bpf_object__load_skeleton(tuner->skeleton);
 	}
+	err = bpf_object__load_skeleton(tuner->skeleton);
 	if (err) {
 		bpftune_log_bpf_err(err, "could not load skeleton: %s\n");
 		return err;

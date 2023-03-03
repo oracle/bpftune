@@ -145,13 +145,13 @@ void bpftuner_tunables_fini(struct bpftuner *tuner);
 			tuner_name##_tuner_bpf_legacy__destroy(tuner->skel); \
 	} while (0)
 
-#define bpftuner_bpf_load(tuner_name, tuner, optionals)			     \
+#define bpftuner_bpf_load(tuner_name, tuner)				     \
 	do {								     \
 		struct tuner_name##_tuner_bpf *__skel = tuner->skel;	     \
 		struct tuner_name##_tuner_bpf_legacy *__lskel = tuner->skel; \
 		int __err;						     \
 									     \
-		__err = __bpftuner_bpf_load(tuner, optionals);		     \
+		__err = __bpftuner_bpf_load(tuner, NULL);		     \
 		if (__err) {						     \
 			bpftuner_bpf_destroy(tuner_name, tuner);	     \
 			return __err;					     \
@@ -162,11 +162,16 @@ void bpftuner_tunables_fini(struct bpftuner *tuner);
 			__lskel->bss->tuner_id = bpftune_tuner_num();	     \
 	} while (0)
 
-#define bpftuner_bpf_attach(tuner_name, tuner)				     \
+#define bpftuner_bpf_attach(tuner_name, tuner, optionals)		     \
 	do {								     \
                 int __err;                                                   \
                                                                              \
                 __err = __bpftuner_bpf_attach(tuner);			     \
+		if (__err && optionals != NULL) {			     \
+			__err =  __bpftuner_bpf_load(tuner, optionals);	     \
+			if (!__err)					     \
+				__err = __bpftuner_bpf_attach(tuner);	     \
+		}							     \
                 if (__err) {                                                 \
 			bpftuner_bpf_destroy(tuner_name, tuner);	     \
                         return __err;                                        \
@@ -176,8 +181,8 @@ void bpftuner_tunables_fini(struct bpftuner *tuner);
 #define bpftuner_bpf_init(tuner_name, tuner, optionals)			     \
 	do {								     \
 		bpftuner_bpf_open(tuner_name, tuner);			     \
-		bpftuner_bpf_load(tuner_name, tuner, optionals);	     \
-		bpftuner_bpf_attach(tuner_name, tuner);			     \
+		bpftuner_bpf_load(tuner_name, tuner);			     \
+		bpftuner_bpf_attach(tuner_name, tuner, optionals);	     \
 	} while (0)
 
 

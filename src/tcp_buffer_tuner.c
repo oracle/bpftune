@@ -131,7 +131,7 @@ int init(struct bpftuner *tuner)
 	int pagesize;
 
 	bpftuner_bpf_open(tcp_buffer, tuner);
-	bpftuner_bpf_load(tcp_buffer, tuner, NULL);
+	bpftuner_bpf_load(tcp_buffer, tuner);
 
 	skel = tuner->skel;
 
@@ -149,7 +149,7 @@ int init(struct bpftuner *tuner)
 		    skel->bss->sk_mem_quantum_shift);
 	bpftune_log(LOG_DEBUG,
 		    "set nr_free_buffer_pages to %ld\n", skel->bss->nr_free_buffer_pages);
-	bpftuner_bpf_attach(tcp_buffer, tuner);
+	bpftuner_bpf_attach(tcp_buffer, tuner, NULL);
 	return bpftuner_tunables_init(tuner, TCP_BUFFER_NUM_TUNABLES, descs,
 				      ARRAY_SIZE(scenarios), scenarios);
 }
