@@ -393,6 +393,33 @@ int __bpftuner_bpf_attach(struct bpftuner *tuner)
 	return 0;
 }
 
+void bpftuner_bpf_optional_attach(struct bpftuner *tuner, const char *name)
+{
+	struct bpf_program *prog = bpf_object__find_program_by_name(tuner->obj, name);
+	struct bpf_object_skeleton *s = tuner->skeleton;
+	int i, err;
+
+	if (!prog) {
+		bpftune_log(LOG_ERR, "no such prog '%s'\n", name);
+		return;
+	}
+	bpf_program__set_autoload(prog, false);
+	for (i = 0; i < s->prog_cnt; i++) {
+		struct bpf_link **link = s->progs[i].link;
+		
+		if (*(s->progs[i].prog) != prog)
+			continue;
+		*link = bpf_program__attach(prog);
+		err = libbpf_get_error(*link);
+		if (err) {
+			bpftune_log(LOG_DEBUG, "optional attach for '%s' failed\n",
+				    name);
+			*link = NULL;
+		}
+		return;
+	}
+}
+
 void bpftuner_bpf_fini(struct bpftuner *tuner)
 {
 	bpf_object__destroy_skeleton(tuner->skeleton);

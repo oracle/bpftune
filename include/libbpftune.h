@@ -63,6 +63,8 @@ struct bpftuner *bpftuner_init(const char *path);
 int __bpftuner_bpf_load(struct bpftuner *tuner);
 int __bpftuner_bpf_attach(struct bpftuner *tuner);
 int __bpftuner_bpf_load_and_attach(struct bpftuner *tuner);
+void bpftuner_bpf_optional_attach(struct bpftuner *tuner, const char *name);
+
 int bpftuner_tunables_init(struct bpftuner *tuner, unsigned int num_descs,
 			   struct bpftunable_desc *descs,
 			   unsigned int num_scenarios,

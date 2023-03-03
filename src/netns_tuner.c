@@ -25,7 +25,10 @@ int init(struct bpftuner *tuner)
 	if (!bpftune_netns_cookie_supported())
 		return -ENOTSUP;
 
-	bpftuner_bpf_init(netns, tuner);
+	bpftuner_bpf_open(netns, tuner);
+	bpftuner_bpf_load(netns, tuner);
+	bpftuner_bpf_optional_attach(tuner, "net_free");
+	bpftuner_bpf_attach(netns, tuner);
 
 	return bpftuner_tunables_init(tuner, ARRAY_SIZE(descs), descs,
 				      ARRAY_SIZE(scenarios), scenarios);
