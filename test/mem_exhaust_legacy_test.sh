@@ -42,6 +42,7 @@ for FAMILY in ipv4 ipv6 ; do
 	test_run_cmd_local "ip netns exec $NETNS $IPERF3 -s -p $PORT -1 &"
 	if [[ $MODE != "baseline" ]]; then
 		test_run_cmd_local "$BPFTUNE -L -a tcp_buffer_tuner.so -s &" true
+		sleep $SETUPTIME
 	else
 		LOGSZ=$(wc -l $LOGFILE | awk '{print $1}')
 	fi

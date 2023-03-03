@@ -44,11 +44,11 @@ for FAMILY in ipv4 ipv6 ; do
 	test_run_cmd_local "ip netns exec $NETNS $IPERF3 -s -p $PORT -1 &"
 	if [[ $MODE != "baseline" ]]; then
 		test_run_cmd_local "$BPFTUNE &"
+		sleep $SETUPTIME
 	else
 		LOGSZ=$(wc -l $LOGFILE | awk '{print $1}')
 		LOGSZ=$(expr $LOGSZ + 1)
 	fi
-	sleep $SLEEPTIME
 	test_run_cmd_local "$IPERF3 -fm $CLIENT_OPTS -p $PORT -c $ADDR" true
 
 	sleep $SLEEPTIME

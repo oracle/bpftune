@@ -32,7 +32,7 @@ for TUNER in neigh_table ; do
 
    test_run_cmd_local "$BPFTUNE $OPTIONS &" true
 
-   sleep $SLEEPTIME
+   sleep $SETUPTIME
    grep "bpftune works" $LOGFILE
    if [[ "$OPTIONS" == "-ds" ]]; then
 	# should see multiple lines for debug

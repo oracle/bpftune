@@ -43,8 +43,10 @@ for DROP_PERCENT in 10 0 ; do
 	test_run_cmd_local "ip netns exec $NETNS $IPERF3 -p $PORT -s -1 &"
 	if [[ $MODE != "baseline" ]]; then
 		test_run_cmd_local "$BPFTUNE -sL &" true
+		sleep $SETUPTIME
+	else
+		sleep $SLEEPTIME
 	fi
-	sleep $SLEEPTIME
 	set +e
 	test_run_cmd_local "$IPERF3 -fm $CLIENT_OPTS -p $PORT -c $ADDR" true
 	set -e

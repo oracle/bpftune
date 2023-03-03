@@ -26,7 +26,7 @@ for TUNER in neigh_table ; do
 
    test_run_cmd_local "$BPFTUNE -ds &" true
 
-   sleep $SLEEPTIME
+   sleep $SETUPTIME
 
    if [[ $NS != "global" ]]; then
 	PREFIX_CMD="ip netns exec $NETNS "

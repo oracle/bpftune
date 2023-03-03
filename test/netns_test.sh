@@ -22,7 +22,7 @@ if [[ ${BPFTUNE_NETNS} -eq 0 ]]; then
 	echo "bpftune does not support per-netns policy, skipping..."
 	test_pass
 else
-	sleep $SLEEPTIME
+	sleep $SETUPTIME
 	ip netns add testns.$$
 	ip netns del testns.$$
 	sleep $SLEEPTIME

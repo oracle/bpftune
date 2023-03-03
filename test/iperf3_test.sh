@@ -42,8 +42,10 @@ for LATENCY in "" "latency 20ms" ; do
 	test_run_cmd_local "ip netns exec $NETNS $IPERF3 -s -p $PORT -1 &"
 	if [[ $MODE == "test" ]]; then
 		test_run_cmd_local "$BPFTUNE -s &" true
+		sleep $SETUPTIME
+	else
+		sleep $SLEEPTIME
 	fi
-	sleep $SLEEPTIME
 	test_run_cmd_local "$IPERF3 -fm $CLIENT_OPTS -p $PORT -c $ADDR" true
 
 	sresults=$(grep -E "sender" ${CMDLOG} | awk '{print $7}')
