@@ -359,8 +359,8 @@ int __bpftuner_bpf_load(struct bpftuner *tuner, const char **optionals)
 		for (i = 0; optionals[i] != NULL; i++) {
 			struct bpf_program *prog;
 
-			prog = bpf_object__find_program_by_name(tuner->obj, name);
-
+			prog = bpf_object__find_program_by_name(tuner->obj,
+								optionals[i]);
 			if (prog) {
 				bpftune_log(LOG_DEBUG, "marking '%s' as optional\n",
 					    optionals[i]);
