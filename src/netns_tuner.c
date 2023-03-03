@@ -22,12 +22,12 @@ static struct bpftunable_scenario scenarios[] = {
 
 int init(struct bpftuner *tuner)
 {
+	const char *optionals[] = { "entry__net_free", NULL };
 	if (!bpftune_netns_cookie_supported())
 		return -ENOTSUP;
 
 	bpftuner_bpf_open(netns, tuner);
-	bpftuner_bpf_load(netns, tuner);
-	bpftuner_bpf_optional_attach(tuner, "net_free");
+	bpftuner_bpf_load(netns, tuner, optionals);
 	bpftuner_bpf_attach(netns, tuner);
 
 	return bpftuner_tunables_init(tuner, ARRAY_SIZE(descs), descs,

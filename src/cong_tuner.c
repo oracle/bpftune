@@ -38,7 +38,7 @@ int init(struct bpftuner *tuner)
 	if (err != -EEXIST)
 		bpftune_log(LOG_DEBUG, "could not load tcp_bbr module\n");
 
-	bpftuner_bpf_init(cong, tuner);
+	bpftuner_bpf_init(cong, tuner, NULL);
 
 	if (tuner->bpf_legacy) {
 

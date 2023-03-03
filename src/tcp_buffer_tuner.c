@@ -131,7 +131,7 @@ int init(struct bpftuner *tuner)
 	int pagesize;
 
 	bpftuner_bpf_open(tcp_buffer, tuner);
-	bpftuner_bpf_load(tcp_buffer, tuner);
+	bpftuner_bpf_load(tcp_buffer, tuner, NULL);
 
 	skel = tuner->skel;
 

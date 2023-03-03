@@ -60,10 +60,8 @@ void bpftuner_cgroup_detach(struct bpftuner *tuner, const char *prog_name,
 
 
 struct bpftuner *bpftuner_init(const char *path);
-int __bpftuner_bpf_load(struct bpftuner *tuner);
+int __bpftuner_bpf_load(struct bpftuner *tuner, const char **optionals);
 int __bpftuner_bpf_attach(struct bpftuner *tuner);
-int __bpftuner_bpf_load_and_attach(struct bpftuner *tuner);
-void bpftuner_bpf_optional_attach(struct bpftuner *tuner, const char *name);
 
 int bpftuner_tunables_init(struct bpftuner *tuner, unsigned int num_descs,
 			   struct bpftunable_desc *descs,
@@ -147,13 +145,13 @@ void bpftuner_tunables_fini(struct bpftuner *tuner);
 			tuner_name##_tuner_bpf_legacy__destroy(tuner->skel); \
 	} while (0)
 
-#define bpftuner_bpf_load(tuner_name, tuner)				     \
+#define bpftuner_bpf_load(tuner_name, tuner, optionals)			     \
 	do {								     \
 		struct tuner_name##_tuner_bpf *__skel = tuner->skel;	     \
 		struct tuner_name##_tuner_bpf_legacy *__lskel = tuner->skel; \
 		int __err;						     \
 									     \
-		__err = __bpftuner_bpf_load(tuner);			     \
+		__err = __bpftuner_bpf_load(tuner, optionals);		     \
 		if (__err) {						     \
 			bpftuner_bpf_destroy(tuner_name, tuner);	     \
 			return __err;					     \
@@ -175,10 +173,10 @@ void bpftuner_tunables_fini(struct bpftuner *tuner);
 		}							     \
 	} while (0)
 
-#define bpftuner_bpf_init(tuner_name, tuner)				     \
+#define bpftuner_bpf_init(tuner_name, tuner, optionals)			     \
 	do {								     \
 		bpftuner_bpf_open(tuner_name, tuner);			     \
-		bpftuner_bpf_load(tuner_name, tuner);			     \
+		bpftuner_bpf_load(tuner_name, tuner, optionals);	     \
 		bpftuner_bpf_attach(tuner_name, tuner);			     \
 	} while (0)
 

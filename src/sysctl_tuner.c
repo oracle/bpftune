@@ -13,7 +13,7 @@
 
 int init(struct bpftuner *tuner)
 {
-	bpftuner_bpf_init(sysctl, tuner);
+	bpftuner_bpf_init(sysctl, tuner, NULL);
 
 	/* attach to root cgroup */
 	if (bpftuner_cgroup_attach(tuner, "sysctl_write", BPF_CGROUP_SYSCTL))

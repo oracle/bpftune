@@ -329,7 +329,7 @@ bool bpftuner_bpf_legacy(void)
 	return bpftune_bpf_support() < BPFTUNE_NORMAL;
 }
 
-int __bpftuner_bpf_load(struct bpftuner *tuner)
+int __bpftuner_bpf_load(struct bpftuner *tuner, const char **optionals)
 {
 	struct bpf_map *map;
 	int err;	
@@ -353,10 +353,27 @@ int __bpftuner_bpf_load(struct bpftuner *tuner)
 		tuner->corr_map_fd = corr_map_fd;
 	}
 	err = bpf_object__load_skeleton(tuner->skeleton);
+	if (err && optionals) {
+		int i;
+
+		for (i = 0; optionals[i] != NULL; i++) {
+			struct bpf_program *prog;
+
+			prog = bpf_object__find_program_by_name(tuner->obj, name);
+
+			if (prog) {
+				bpftune_log(LOG_DEBUG, "marking '%s' as optional\n",
+					    optionals[i]);
+				bpf_program__set_autoload(prog, false);
+			}
+		}
+		err = bpf_object__load_skeleton(tuner->skeleton);
+	}
 	if (err) {
-		bpftune_log_bpf_err(err, "could not load skeleton: %s\n");      
+		bpftune_log_bpf_err(err, "could not load skeleton: %s\n");
 		return err;
 	}
+	
 	if (ring_buffer_map_fd == 0) {
 		map = bpf_object__find_map_by_name(*tuner->skeleton->obj,
 						   "ring_buffer_map");
@@ -391,33 +408,6 @@ int __bpftuner_bpf_attach(struct bpftuner *tuner)
 	tuner->ring_buffer_map_fd = bpf_map__fd(tuner->ring_buffer_map);
 
 	return 0;
-}
-
-void bpftuner_bpf_optional_attach(struct bpftuner *tuner, const char *name)
-{
-	struct bpf_program *prog = bpf_object__find_program_by_name(tuner->obj, name);
-	struct bpf_object_skeleton *s = tuner->skeleton;
-	int i, err;
-
-	if (!prog) {
-		bpftune_log(LOG_ERR, "no such prog '%s'\n", name);
-		return;
-	}
-	bpf_program__set_autoload(prog, false);
-	for (i = 0; i < s->prog_cnt; i++) {
-		struct bpf_link **link = s->progs[i].link;
-		
-		if (*(s->progs[i].prog) != prog)
-			continue;
-		*link = bpf_program__attach(prog);
-		err = libbpf_get_error(*link);
-		if (err) {
-			bpftune_log(LOG_DEBUG, "optional attach for '%s' failed\n",
-				    name);
-			*link = NULL;
-		}
-		return;
-	}
 }
 
 void bpftuner_bpf_fini(struct bpftuner *tuner)
