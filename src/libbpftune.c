@@ -257,7 +257,6 @@ bool bpftune_netns_cookie_supported(void)
 enum bpftune_support_level bpftune_bpf_support(void)
 {
 	enum bpftune_support_level support_level = BPFTUNE_NORMAL;
-	unsigned int i;
 	bool ret;
 	struct probe_bpf *probe_bpf = probe_bpf__open_and_load();
 	struct probe_bpf_legacy *probe_bpf_legacy;

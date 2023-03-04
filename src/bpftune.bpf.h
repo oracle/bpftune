@@ -111,7 +111,7 @@ static __always_inline typeof(name(0)) ____##name(struct pt_regs *ctx, ##args)
 #include "bpftune.h"
 #include "corr.h"
 
-BPF_RINGBUF(ring_buffer_map, 64 * 1024);
+BPF_RINGBUF(ring_buffer_map, 128 * 1024);
 
 BPF_MAP_DEF(corr_map, BPF_MAP_TYPE_HASH, struct corr_key, struct corr, 1024);
 
