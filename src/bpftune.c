@@ -17,6 +17,7 @@
 #include <unistd.h>
 #include <sys/time.h>
 #include <sys/types.h>
+#include <sys/resource.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <dirent.h>
@@ -183,6 +184,7 @@ int main(int argc, char *argv[])
 		{ "version",	no_argument,		NULL,	'V' },
 		{ 0 }
 	};
+	struct rlimit r = {RLIM_INFINITY, RLIM_INFINITY};
 	char *cgroup_dir = BPFTUNER_CGROUP_DIR;
 	char *library_dir = BPFTUNER_LIB_DIR;
 	enum bpftune_support_level support_level;
@@ -242,6 +244,12 @@ int main(int argc, char *argv[])
 
 	bpftune_set_log(log_level, is_daemon || !use_stderr ? bpftune_log_syslog : bpftune_log_stderr);
 
+	if (setrlimit(RLIMIT_MEMLOCK, &r)) {
+		err = -errno;
+		bpftune_log(LOG_DEBUG, "cannot unlock memory limit: %s\n",
+			    strerror(-err));
+		return err;
+	}
 	support_level = bpftune_bpf_support();
 	print_support_level(support_level);
 	if (support_level < BPFTUNE_LEGACY) {
