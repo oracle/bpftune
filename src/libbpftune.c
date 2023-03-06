@@ -228,6 +228,7 @@ void bpftuner_cgroup_detach(struct bpftuner *tuner, const char *prog_name,
 }
 
 static bool force_bpf_legacy;
+static bool netns_cookie_supported;
 
 void bpftuner_force_bpf_legacy(void)
 {
@@ -1036,8 +1037,6 @@ int bpftune_netns_fd_from_cookie(unsigned long cookie)
 {
 	return bpftune_netns_find(cookie);
 }
-
-static bool netns_cookie_supported;
 
 int bpftune_netns_init_all(void)
 {
