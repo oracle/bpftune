@@ -144,10 +144,13 @@ int bpftune_cgroup_init(const char *cgroup_path)
 		if (err != -EEXIST) {
 			bpftune_log(LOG_ERR, "couldnt mount cgroup2 for '%s': %s\n",
 				    strerror(-err));
+			if (__bpftune_cgroup_fd > 0)
+				close(__bpftune_cgroup_fd);
 			return err;
 		}
 	}
-	__bpftune_cgroup_fd = open(cgroup_path, O_RDONLY);
+	if (__bpftune_cgroup_fd < 0)
+		__bpftune_cgroup_fd = open(cgroup_path, O_RDONLY);
 	if (__bpftune_cgroup_fd < 0) {
 		err = -errno;
 		bpftune_log(LOG_ERR, "cannot open cgroup dir '%s': %s\n",
@@ -246,6 +249,7 @@ bool bpftune_netns_cookie_supported(void)
 
 		ret = getsockopt(s, SOL_SOCKET, SO_NETNS_COOKIE, &netns_cookie,
 				 &cookie_sz);
+		close(s);
 		if (ret < 0) {
 			bpftune_log(LOG_DEBUG, "netns cookie not supported, cannot monitor per-netns events\n");
 			return false;
@@ -951,7 +955,7 @@ static int bpftune_netns_find(unsigned long cookie)
 	int ret = -ENOENT;
 	DIR *dir;
 
-	if (cookie == 0 || (global_netns_cookie && cookie == global_netns_cookie))
+	if (!netns_cookie_supported || cookie == 0 || (global_netns_cookie && cookie == global_netns_cookie))
 		return 0;
 
 	mounts = setmntent("/proc/mounts", "r");
