@@ -55,7 +55,8 @@ Here "legacy" implies lack of fentry, fexit, tp_btf and BPF
 iter programs.  BPF ringbuf is assumed.  For each tuner, we
 build a version with BPFTUNE_LEGACY defined.  This corresponds
 to around v5.6 of the kernel, but for Oracle Linux it corresponds
-to UEK6U3 since it includes backports of ringbuf support.
+to UEK6U3 (v5.4-based) since it includes backports of ringbuf
+support.
 
 To support per-namespace policies, support for netns cookies
 is required, and this is orthogonal to legacy/full support.
@@ -72,8 +73,8 @@ bpftune works fully
 bpftune supports per-netns policy (via netns cookie)
 ```
 
-If you add new BPF features, check the supported[] array in
-libbpftune.c; it may require updating.
+If you add new BPF features, check the probe program
+probe.bpf.c; it may need updating.
 
 If the BPF program just consists of fentry programs, simply use
 the BPF_FENTRY() wrapper - it will convert to kprobes

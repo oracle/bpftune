@@ -3,7 +3,7 @@
 ## Completed tasks
 
 ### Basic bpftune framework support
- - add configurable logging support syslog/stdout (tested)
+ - add configurable logging support syslog/stdout
  - add support for adding tuners dynamically via shared object
  - add support for adding BPF programs via skeleton
  - add support for specifying tunables associated with tuner
@@ -93,13 +93,13 @@
 
 ## To do tasks
 
-### switch off tuners on per-ns basis
+### general: switch off tuners on per-ns basis
 - we should not switch of global tuner if someone fiddles with
   a tunable in a namespace, so make sure we have per-namespace
   disable for tuners.  Also do we need to spot initial namespace
   config of tunables from sysctl.conf and ignore it?
 
-### add a configurable learning rate
+### general: add a configurable learning rate
 - currently we check for limit approach and up values based
   on a 25% value; i.e. within 25% of limit, adjust up by 25%.
   This is computed efficiently via (limit - (limit >> 2)). We
@@ -116,6 +116,13 @@ At the lower end of the scale, change would be more frequent but
 also more gradual, so probably better for the risk-averse; we
 would only update buffer sizes for example if we came within
 1.5% of buffer limit, and only increase buffer size by 1.5%.
+
+### general: notice new tuners appearing/disappearing from
+/usr/lib64/bpftune
+
+- we should watch the above directory for tuner addition
+  or removal to allow packages to deliver a tuner separately
+  (need a bpftune-devel package?)
 
 ### TCP buffer tuner improvements
 - one problem is hard to have a one max buffer size to fit all;
