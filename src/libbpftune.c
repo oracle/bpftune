@@ -275,7 +275,11 @@ enum bpftune_support_level bpftune_bpf_support(void)
 			support_level = BPFTUNE_NONE;
 			bpftune_log(LOG_DEBUG, "legacy bpftune support not available: %s\n",
 				    strerror(errno));
+		} else {
+			probe_bpf_legacy__destroy(probe_bpf_legacy);
 		}
+	} else {
+		probe_bpf__destroy(probe_bpf);
 	}
 	ret = bpftune_netns_cookie_supported();
 	if (!ret)
