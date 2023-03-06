@@ -83,7 +83,7 @@ static inline const char *bpftuner_tunable_name(struct bpftuner *tuner,
 int bpftuner_tunable_sysctl_write(struct bpftuner *tuner,
 				  unsigned int tunable,
 				  unsigned int scenario,
-				  int netns_fd,
+				  unsigned long netns_cookie,
 				  __u8 num_values, long *values,
 				  const char *fmt, ...);
 
@@ -120,6 +120,7 @@ void bpftuner_tunables_fini(struct bpftuner *tuner);
 			tuner->obj = __skel->obj;			     \
 			tuner->ring_buffer_map = __skel->maps.ring_buffer_map;\
 			tuner->corr_map = __skel->maps.corr_map;	     \
+			tuner->netns_map = __skel->maps.netns_map;	     \
 		} else {						     \
 			tuner->skel = __lskel = tuner_name##_tuner_bpf_legacy__open();\
 			tuner->skeleton = __lskel->skeleton;		     \
@@ -128,6 +129,7 @@ void bpftuner_tunables_fini(struct bpftuner *tuner);
 			tuner->obj = __lskel->obj;			     \
 			tuner->ring_buffer_map = __lskel->maps.ring_buffer_map;\
 			tuner->corr_map = __lskel->maps.corr_map;	     \
+			tuner->netns_map = __lskel->maps.netns_map;	     \
 		}							     \
                 __err = libbpf_get_error(tuner->skel);                       \
                 if (__err) {                                                 \
@@ -228,9 +230,9 @@ int bpftune_netns_set(int fd, int *orig_fd);
 int bpftune_netns_info(int pid, int *fd, unsigned long *cookie);
 int bpftune_netns_init_all(void);
 void bpftuner_netns_init(struct bpftuner *tuner, unsigned long cookie);
-void bpftuner_netns_fini(struct bpftuner *tuner, unsigned long cookie);
+void bpftuner_netns_fini(struct bpftuner *tuner, unsigned long cookie, enum bpftune_state state);
 struct bpftuner_netns *bpftuner_netns_from_cookie(unsigned long tuner_id, unsigned long cookie);
-int bpftune_netns_fd_from_cookie(unsigned long cookie);
+int bpftuner_netns_fd_from_cookie(struct bpftuner *tuner, unsigned long cookie);
 
 #define bpftuner_for_each_netns(tuner, netns)				\
 	for (netns = &tuner->netns; netns != NULL; netns = netns->next)

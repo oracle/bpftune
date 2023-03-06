@@ -3,20 +3,21 @@
 
 #include "bpftune.bpf.h"
 
-#ifdef BPFTUNE_LEGACY
-/* legacy progs do not support BPF_CORE_READ(), so fall back to
- * tracing prog; we trace firing of cgroup prog instead.
+/* use kprobe here as it is not in fastpath and the function has a large
+ * number of args not well handled by fentry.  We trace the sysctl set
+ * because we cannot derive the net namespace easily from sysctl progs.
  */
 SEC("kprobe/__cgroup_bpf_run_filter_sysctl")
-int BPF_KPROBE(trace_sysctl_write, struct ctl_table_header *head,
-	       struct ctl_table *table, int write,
-	       char **buf)
+int BPF_KPROBE(bpftune_sysctl, struct ctl_table_header *head,
+	       struct ctl_table *table, int write, char **buf)
 {
 	struct bpftune_event event = {};
-	struct ctl_dir *parent;	
+	struct ctl_dir *root, *parent, *gparent, *ggparent;
+	struct ctl_dir *gggparent;
 	int current_pid = 0;
 	struct ctl_table *tbl;
 	const char *procname;
+	void *net;
 
 	if (!write)
 		return 0;
@@ -28,6 +29,26 @@ int BPF_KPROBE(trace_sysctl_write, struct ctl_table_header *head,
 	parent = BPF_CORE_READ(head, parent);
 	if (!parent)
 		return 0;
+	gparent = BPF_CORE_READ(parent, header.parent);
+	if (!gparent)
+		return 0;
+	ggparent = BPF_CORE_READ(gparent, header.parent);
+	if (!ggparent) {
+		root = gparent;
+	} else {
+		gggparent = BPF_CORE_READ(ggparent, header.parent);
+		if (!gggparent) {
+			root = ggparent;
+		} else {
+			root = BPF_CORE_READ(gggparent, header.parent);
+			if (!root)
+				root = gggparent;
+		}
+	}
+	net = (void *)root - offsetof(struct net, sysctls) -
+				    offsetof(struct ctl_table_set, dir);
+	__bpf_printk("got net 0x%lx, init_net 0x%lx\n", net, (void *)&init_net);
+	event.netns_cookie = get_netns_cookie(net);
 	procname = BPF_CORE_READ(table, procname);
 	if (!procname)
 		return 0;
@@ -45,32 +66,3 @@ int sysctl_write(struct bpf_sysctl *ctx)
 {
 	return 1;
 }
-
-#else
-/* should return 1 to allow read/write to proceed, 0 otherwise.
- * Currently just used to see if admin has fiddled with tunables
- * we're auto-tuning; if so, hands off for us...
- */
-SEC("cgroup/sysctl")
-int sysctl_write(struct bpf_sysctl *ctx)
-{
-	struct task_struct *current_task;
-	struct bpftune_event event = {};
-	int current_pid = 0, err;
-	__u32 write = ctx->write;
-
-	if (!write)
-		return 1;
-	event.tuner_id = tuner_id;
-	event.scenario_id = 0;
-	err = bpf_sysctl_get_name(ctx, event.str, sizeof(event.str), 0);
-	if (err <= 0 || err > BPFTUNE_MAX_NAME)
-		return 1;
-	/* bpf_get_current_pid_tgid() helper not allowed for sysctl */
-	current_task = (struct task_struct *)bpf_get_current_task();
-	current_pid = BPF_CORE_READ(current_task, pid);
-	if (current_pid != bpftune_pid)
-		bpf_ringbuf_output(&ring_buffer_map, &event, sizeof(event), 0);
-	return 1;
-}
-#endif

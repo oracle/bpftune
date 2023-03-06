@@ -55,7 +55,7 @@ void event_handler(__attribute__((unused))struct bpftuner *tuner,
 			
 			bpftune_log(LOG_DEBUG, "netns cookie from pid %d %ld != %ld (cookie from event)\n",
 				    event->pid, netns_cookie, event->netns_cookie);
-			netns_fd = bpftune_netns_fd_from_cookie(event->netns_cookie);
+			netns_fd = bpftuner_netns_fd_from_cookie(tuner, event->netns_cookie);
 			if (netns_fd < 0) {
 				bpftune_log(LOG_DEBUG, "netns fd not found for cookie %ld: %s\n",
 					    event->netns_cookie, strerror(-netns_fd));
@@ -70,9 +70,10 @@ void event_handler(__attribute__((unused))struct bpftuner *tuner,
 		break;
 	case NETNS_SCENARIO_DESTROY:
 		bpftune_for_each_tuner(t)
-			bpftuner_netns_fini(t, event->netns_cookie);
+			bpftuner_netns_fini(t, event->netns_cookie, BPFTUNE_GONE);
 		break;
-
+	default:
+		return;
 	}
 	bpftuner_tunable_update(tuner, NETNS, event->scenario_id, netns_fd,
 				"netns %s (cookie %ld)\n",

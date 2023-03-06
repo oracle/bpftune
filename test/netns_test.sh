@@ -12,7 +12,7 @@
 SLEEPTIME=2
 
 
-test_start "$0|netns test: does adding/removing netns generate event?"
+test_start "$0|netns test: does adding netns generate event?"
 
 test_setup "true"
 
@@ -27,11 +27,6 @@ else
 	ip netns del testns.$$
 	sleep $SLEEPTIME
 	grep "netns created" $TESTLOG_LAST
-	have_destroy=$(cat /proc/kallsyms |awk '$3 ~ /^net_free$/{ print $3}')
-	# net_free() not present on some platforms
-	if [[ -n "$have_destroy" ]]; then
-		grep "netns destroyed" $TESTLOG_LAST
-	fi
 	test_pass
 fi
 test_cleanup

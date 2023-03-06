@@ -167,7 +167,6 @@ void event_handler(struct bpftuner *tuner,
 	const char *tunable;
 	long new[3], old[3];
 	struct corr_key key;
-	int netns_fd = 0;
 	int id;
 
 	id = event->update[0].id;
@@ -175,14 +174,6 @@ void event_handler(struct bpftuner *tuner,
 	memcpy(new, event->update[0].new, sizeof(new));
 	memcpy(old, event->update[0].old, sizeof(old));
 
-	if (event->netns_cookie) {
-		netns_fd = bpftune_netns_fd_from_cookie(event->netns_cookie);
-		if (netns_fd < 0) {
-			bpftune_log(LOG_DEBUG, "could not get netns fd for cookie %ld\n",
-				    event->netns_cookie); 
-			return;
-		}
-	}
 	tunable = bpftuner_tunable_name(tuner, id);
 	if (!tunable) {
 		bpftune_log(LOG_DEBUG, "unknown tunable [%d] for tcp_buffer_tuner\n", id);
@@ -215,7 +206,7 @@ void event_handler(struct bpftuner *tuner,
 	switch (id) {
 	case TCP_BUFFER_TCP_MEM:
 		bpftuner_tunable_sysctl_write(tuner, id, scenario,
-					     netns_fd, 3, new,
+					      event->netns_cookie, 3, new,
 "Due to %s change %s(min pressure max) from (%d %d %d) -> (%d %d %d)\n",
 					     lowmem, tunable, old[0], old[1], old[2],
 					     new[0], new[1], new[2]);
@@ -236,7 +227,7 @@ void event_handler(struct bpftuner *tuner,
 			break;
 		}
 		bpftuner_tunable_sysctl_write(tuner, id, scenario,
-					     netns_fd, 3, new,
+					      event->netns_cookie, 3, new,
 "Due to %s change %s(min default max) from (%d %d %d) -> (%d %d %d)\n",
 					      reason, tunable,
 					      old[0], old[1], old[2],
@@ -244,7 +235,7 @@ void event_handler(struct bpftuner *tuner,
 		break;
 	case NETDEV_MAX_BACKLOG:
 		bpftuner_tunable_sysctl_write(tuner, id, scenario,
-					      netns_fd, 1, new,
+					      event->netns_cookie, 1, new,
 "Dropped more than 1/4 of the backlog queue size (%d) in last minute; "
 "increase backlog queue size from %d -> %d to support faster network device.\n",
 					      old[0], new[0]);
@@ -253,6 +244,4 @@ void event_handler(struct bpftuner *tuner,
 		break;
 	}
 
-	if (netns_fd)
-		close(netns_fd);
 }

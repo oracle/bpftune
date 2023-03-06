@@ -66,7 +66,7 @@ int BPF_PROG(bpftune_setup_net, struct net *net, struct user_namespace *user_ns,
 }
 #endif
 
-BPF_FENTRY(net_free, struct net *net)
+/*BPF_FENTRY(net_free, struct net *net)
 {
 	struct bpftune_event event = {};
 
@@ -80,4 +80,4 @@ BPF_FENTRY(net_free, struct net *net)
 		bpf_ringbuf_output(&ring_buffer_map, &event, sizeof(event), 0);
 
 	return 0;
-}
+} */

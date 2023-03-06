@@ -42,6 +42,7 @@ enum bpftune_state {
 	BPFTUNE_INACTIVE,
 	BPFTUNE_ACTIVE,		/* actively being tuned. */
 	BPFTUNE_MANUAL,		/* manual intervention observed. */
+	BPFTUNE_GONE,		/* resource gone */
 };
 
 struct bpftunable_scenario {
@@ -121,6 +122,8 @@ struct bpftuner {
 	int ring_buffer_map_fd;
 	void *corr_map;
 	int corr_map_fd;
+	void *netns_map;
+	int netns_map_fd;
 	void (*event_handler)(struct bpftuner *tuner,
 			      struct bpftune_event *event, void *ctx);
 	unsigned int num_tunables;

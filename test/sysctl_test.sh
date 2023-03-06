@@ -9,7 +9,7 @@
 . ./test_lib.sh
 
 
-SLEEPTIME=5
+SLEEPTIME=10
 
 for TUNER in neigh_table ; do
 
@@ -20,7 +20,7 @@ for TUNER in neigh_table ; do
    test_run_cmd_local "$BPFTUNE -ds &" true
 
    sleep $SETUPTIME
-   for SYSCTL in kernel.core_pattern net.ipv4.neigh.default.gc_thresh1 ; do
+   for SYSCTL in net.ipv4.neigh.default.gc_thresh1 kernel.core_pattern ; do
 	val=$(sysctl -qn $SYSCTL)
 	sysctl -qw ${SYSCTL}=${val}
    done

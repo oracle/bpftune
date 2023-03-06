@@ -17,6 +17,9 @@ DESCRIPTION
 
         On startup, the netns tuner iterates over the various sources of
         netns info to collate a list of network namespaces, and supplements
-        this by watching for addition and removal of network namespaces
-        via BPF observability.  Using this info, we can then maintain tuner
-        state on a per-namespace basis.
+        this by watching for addition of network namespaces via BPF.
+        Using this info, we can then maintain tuner state on a per-namespace
+        basis.
+
+        Per-namespace support requires netns cookie support; running
+        "bpftune -S" shows if this is present.

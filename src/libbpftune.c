@@ -47,6 +47,7 @@ int bpftune_loglevel = LOG_INFO;
 struct ring_buffer *ring_buffer;
 int ring_buffer_map_fd;
 int corr_map_fd;
+int netns_map_fd;
 
 int bpftune_log_level(void)
 {
@@ -320,6 +321,16 @@ int __bpftuner_bpf_load(struct bpftuner *tuner, const char **optionals)
 		}
 		tuner->corr_map_fd = corr_map_fd;
 	}
+	if (netns_map_fd > 0) {
+		bpftune_log(LOG_DEBUG, "reusing netns map fd %d\n", netns_map_fd);
+		err = bpf_map__reuse_fd(tuner->netns_map, netns_map_fd);
+		if (err < 0) {
+			bpftune_log_bpf_err(err, "could not reuse corr fd: %s\n");
+			return err;
+		}
+		tuner->netns_map_fd = netns_map_fd;
+        }
+
 	if (optionals) {
 		int i;
 
@@ -361,6 +372,16 @@ int __bpftuner_bpf_load(struct bpftuner *tuner, const char **optionals)
 			tuner->corr_map_fd = corr_map_fd;
 		}
 	}
+	if (netns_map_fd == 0) {
+		map = bpf_object__find_map_by_name(*tuner->skeleton->obj,
+						   "netns_map");
+		if (map) {
+			netns_map_fd = bpf_map__fd(map);
+			bpftune_log(LOG_DEBUG, "got netns_map fd %d\n",	
+				    netns_map_fd);
+			tuner->netns_map_fd = netns_map_fd;
+		}
+	}
 
 	return 0;
 }
@@ -388,7 +409,9 @@ void bpftuner_bpf_fini(struct bpftuner *tuner)
 			close(ring_buffer_map_fd);
 		if (corr_map_fd > 0)
 			close(corr_map_fd);
-		ring_buffer_map_fd = corr_map_fd = 0;
+		if (netns_map_fd > 0)
+			close(netns_map_fd);
+		ring_buffer_map_fd = corr_map_fd = netns_map_fd = 0;
 	}
 }
 
@@ -445,7 +468,7 @@ static void bpftuner_scenario_log(struct bpftuner *tuner, unsigned int tunable,
 				  bool summary,
 				  const char *fmt, va_list args);
 
-unsigned long global_netns_cookie;
+static unsigned long global_netns_cookie;
 
 void bpftuner_fini(struct bpftuner *tuner, enum bpftune_state state)
 {
@@ -779,19 +802,37 @@ static void bpftuner_scenario_log(struct bpftuner *tuner, unsigned int tunable,
 }
 
 int bpftuner_tunable_sysctl_write(struct bpftuner *tuner, unsigned int tunable,
-				  unsigned int scenario, int netns_fd,
+				  unsigned int scenario, unsigned long netns_cookie,
 				  __u8 num_values, long *values,
 				  const char *fmt, ...)
 {
 	struct bpftunable *t = bpftuner_tunable(tuner, tunable);
-	int ret = 0, fd;
+	struct bpftuner_netns *netns;
+	int ret = 0, fd, netns_fd;
 
 	if (!t) {
 		bpftune_log(LOG_ERR, "no tunable %d for tuner '%s'\n",
 			    tunable, tuner->name);
 		return -EINVAL;
 	}
-
+	netns = bpftuner_netns_from_cookie(tuner->id, netns_cookie);
+	if (netns) {
+		bpftune_log(LOG_DEBUG, "found netns (cookie %ld); state %d\n",
+			    netns_cookie, netns->state);
+		if (netns->state >= BPFTUNE_MANUAL) {
+			bpftune_log(LOG_INFO,
+				    "Skipping update of '%s' ; tuner '%s' is disabled in netns (cookie %ld)\n",
+				    t->desc.name, tuner->name, netns_cookie);
+			return 0;
+		}
+	}
+		
+	netns_fd = bpftuner_netns_fd_from_cookie(tuner, netns_cookie);
+	if (netns_fd < 0) {
+		bpftune_log(LOG_DEBUG, "could not get netns fd for cookie %ld\n",
+			    netns_cookie);
+		return 0;
+	}
 	fd = t->desc.namespaced ? netns_fd : 0;
 
 	ret = bpftune_sysctl_write(fd, t->desc.name, num_values, values);
@@ -807,6 +848,9 @@ int bpftuner_tunable_sysctl_write(struct bpftuner *tuner, unsigned int tunable,
 		for (i = 0; i < t->desc.num_values; i++)
 			t->current_values[i] = values[i];
 	}
+
+	if (netns_fd > 0)
+		close(netns_fd);
 
 	return ret;
 }
@@ -1037,8 +1081,16 @@ static int bpftune_netns_find(unsigned long cookie)
 	return ret;
 }
 
-int bpftune_netns_fd_from_cookie(unsigned long cookie)
+int bpftuner_netns_fd_from_cookie(struct bpftuner *tuner, unsigned long cookie)
 {
+	struct bpftuner_netns *netns = bpftuner_netns_from_cookie(tuner->id,
+								  cookie);
+
+	if (netns && netns->state >= BPFTUNE_MANUAL) {
+		bpftune_log(LOG_DEBUG, "netns (cookie %ld} manually disabled\n",
+			    cookie);
+		return -ENOENT;
+	}
 	return bpftune_netns_find(cookie);
 }
 
@@ -1072,24 +1124,37 @@ void bpftuner_netns_init(struct bpftuner *tuner, unsigned long cookie)
 		bpftune_log(LOG_ERR, "unable to allocate netns for bpftuner: %s\n",
 			    strerror(errno));
 	} else {
+		bpftune_log(LOG_DEBUG, "Added netns (cookie %ld) for tuner '%s'\n",
+				       cookie, tuner->name);
+
 		new->netns_cookie = cookie;
 		netns->next = new;
 	}
 }
 
-void bpftuner_netns_fini(struct bpftuner *tuner, unsigned long cookie)
+void bpftuner_netns_fini(struct bpftuner *tuner, unsigned long cookie, enum bpftune_state state)
 {
 	struct bpftuner_netns *netns, *prev = NULL;
 
+	if (cookie <= 0 || cookie == global_netns_cookie)
+		bpftuner_fini(tuner, state);
+
 	if (!netns_cookie_supported)
 		return;
-	
+
 	for (netns = &tuner->netns; netns != NULL; netns = netns->next) {
 		if (netns->netns_cookie == cookie) {
+			if (state == BPFTUNE_MANUAL) {
+				bpftune_log(LOG_DEBUG, "setting state of netns (cookie %ld) to manual for '%s'\n",
+					    cookie, tuner->name);
+				netns->state = BPFTUNE_MANUAL;
+				return;
+			}
 			if (prev)
 				prev->next = netns->next;
 			else
 				tuner->netns.next = netns->next;
+			free(netns);
 			return;
 		}
 		prev = netns;

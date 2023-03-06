@@ -32,6 +32,7 @@ LIBBPFTUNE_0.1.1 {
 		bpftuner_netns_init;
 		bpftuner_netns_fini;
 		bpftuner_netns_from_cookie;
+		bpftuner_netns_fd_from_cookie;
 	        bpftuner_ring_buffer_map_fd;
 		bpftune_ring_buffer_init;
 		bpftune_ring_buffer_poll;
@@ -42,7 +43,6 @@ LIBBPFTUNE_0.1.1 {
 		bpftune_netns_init_all;
 		bpftune_netns_set;
 		bpftune_netns_info;
-		bpftune_netns_fd_from_cookie;
 		bpftune_module_load;
 		bpftune_module_delete;
 	local:

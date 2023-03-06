@@ -8,6 +8,12 @@
  - add support for adding BPF programs via skeleton
  - add support for specifying tunables associated with tuner
  - bpftune systemd service specification
+ - switch off tuners on per-ns basis; we should not switch off
+   global tuners if someone fiddles with a tunable in a network
+   namespace; make sure we have per-namespace disable for tuners.
+   This assumes any customizations for namespace config of tunables
+   on container bringup will stop us auto-tuning; this may need to
+   be revisited in the future.
 
 ### sysctl tuner
  - add support for dynamically disabling relevant tuner if tunables change
@@ -41,8 +47,8 @@
  
 ### netns tuner
  - tuner iterates over network namespaces at init and watches
-   for netns add/remove events so that we can maintain tuner
-   state for non-global network namespaces also.
+   for netns add events so that we can maintain tuner state
+   for non-global network namespaces also.
 
 ### Summary mode on exit
  - bpftune reports what changes were made to tunables on exit
@@ -93,12 +99,6 @@
 
 ## To do tasks
 
-### general: switch off tuners on per-ns basis
-- we should not switch of global tuner if someone fiddles with
-  a tunable in a namespace, so make sure we have per-namespace
-  disable for tuners.  Also do we need to spot initial namespace
-  config of tunables from sysctl.conf and ignore it?
-
 ### general: add a configurable learning rate
 - currently we check for limit approach and up values based
   on a 25% value; i.e. within 25% of limit, adjust up by 25%.
@@ -121,8 +121,9 @@ would only update buffer sizes for example if we came within
 /usr/lib64/bpftune
 
 - we should watch the above directory for tuner addition
-  or removal to allow packages to deliver a tuner separately
-  (need a bpftune-devel package?)
+  or removal to allow packages to deliver a tuner separately.
+  We also may need a bpftune-devel package to facilitate separate
+  delivery of tunables.
 
 ### TCP buffer tuner improvements
 - one problem is hard to have a one max buffer size to fit all;
