@@ -19,13 +19,6 @@ for TUNER in neigh_table ; do
 
    rmem_orig=($(sysctl -n net.ipv4.tcp_rmem))
 
-   if [[ ${BPFTUNE_NETNS} -eq 0 ]]; then
-	echo "bpftune does not support per-netns policy, skipping..."
-	test_pass
-   fi
-
-   rmem_orig=($(sysctl -n net.ipv4.tcp_rmem))
-
    sysctl -qw net.ipv4.tcp_rmem="${rmem_orig[0]} ${rmem_orig[1]} ${rmem_orig[1]}"
 
    test_run_cmd_local "$BPFTUNE -ds &" true
@@ -34,6 +27,11 @@ for TUNER in neigh_table ; do
 
    # need to setup netns after bpftune starts...
    test_setup "true"
+
+   if [[ ${BPFTUNE_NETNS} -eq 0 ]]; then
+        echo "bpftune does not support per-netns policy, skipping..."
+        test_pass
+   fi
 
    rmem_orig_netns=($(ip netns exec $NETNS sysctl -n net.ipv4.tcp_rmem))
 

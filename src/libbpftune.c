@@ -1136,11 +1136,14 @@ void bpftuner_netns_fini(struct bpftuner *tuner, unsigned long cookie, enum bpft
 {
 	struct bpftuner_netns *netns, *prev = NULL;
 
-	if (cookie <= 0 || cookie == global_netns_cookie)
+	if (cookie == 0 || cookie == global_netns_cookie) {
 		bpftuner_fini(tuner, state);
-
-	if (!netns_cookie_supported)
 		return;
+	}
+	if (!netns_cookie_supported) {
+		bpftune_log(LOG_DEBUG, "no netns support and not global netns; ignoring...\n");
+		return;
+	}
 
 	for (netns = &tuner->netns; netns != NULL; netns = netns->next) {
 		if (netns->netns_cookie == cookie) {
