@@ -9,6 +9,10 @@ Tests should cover both normal and legacy mode where appropriate.
 Tests operate locally using network namespaces and veth pairs
 to generate traffic.
 
+Network namespace awareness requires support for netns cookies,
+which is not available in 5.4 kernels.  In such cases, tests
+requiring netns cookie support are skipped automatically.
+
 # General tests
 
 ## Logging tests
@@ -21,6 +25,8 @@ Verify logging works with syslog, stdout/stderr.
 
 Verify that calling sysctl with a tuner-managed value switches off
 the tuner in question (getting out of the way of the admin).
+Also verify that when a tunable is modified in a network namespace,
+only the network namespace tuning is switched off.
 
 ## neigh_table tests (gc_thresh[2])
 

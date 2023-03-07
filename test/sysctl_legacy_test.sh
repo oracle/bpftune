@@ -21,8 +21,8 @@ for TUNER in neigh_table ; do
 
    sleep $SETUPTIME
    for SYSCTL in net.ipv4.neigh.default.gc_thresh1 kernel.core_pattern ; do
-	val=$(sysctl -qn $SYSCTL)
-	sysctl -qw ${SYSCTL}=${val}
+	val="$(sysctl -qn $SYSCTL)"
+	sysctl -qw ${SYSCTL}="${val}"
    done
    sleep $SLEEPTIME
    grep "modified sysctl" $TESTLOG_LAST

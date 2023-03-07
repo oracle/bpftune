@@ -93,7 +93,8 @@ if [[ "$DEBUG" != 0 ]]; then
 	export BPFTUNE_FLAGS="${BPFTUNE_FLAGS} -d"
 fi
 export CGROUPDIR=${CGROUPDIR:-"/tmp/cgroupv2"}
-export BPFTUNE="../src/bpftune -c $CGROUPDIR $BPFTUNE_FLAGS"
+export BPFTUNE_PROG=${BPFTUNE_PROG:-"/usr/sbin/bpftune"}
+export BPFTUNE="${BPFTUNE_PROG} -c $CGROUPDIR $BPFTUNE_FLAGS"
 
 # Don't want __pycache__ files hanging around.
 export PYTHONCMD="python3 -B"
