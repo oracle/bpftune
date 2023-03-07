@@ -170,7 +170,7 @@ void event_handler(struct bpftuner *tuner,
 	int id;
 
 	/* netns cookie not supported; ignore */
-	if (event->netns_cookie < 0)
+	if (event->netns_cookie == (unsigned long)-1)
 		return;
 
 	id = event->update[0].id;
