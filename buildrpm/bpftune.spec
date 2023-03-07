@@ -3,6 +3,11 @@
 %define name        bpftune
 %define release     1%{?dist}
 %define version     0.1
+%if %{_unitdir}
+# _unitdir is not defined for aarch64 rpmbuild
+%else
+%define _unitdir    /usr/lib/systemd/system/	
+%endif
 
 License:        LGPL/BSD Dual License
 Name:           %{name}
