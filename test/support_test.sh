@@ -23,7 +23,7 @@ expected="bpftune is not supported"
 expected_netns="does not support per-netns policy"
 
 if [[ $MAJ_KVER -gt 4 ]]; then
-	if [[ "$MIN_KVER" -gt 4 ]]; then
+	if [[ "$MIN_KVER" -gt 3 ]]; then
 		expected="bpftune works in legacy mode"
 	fi
 	case $MAJ_KVER in
