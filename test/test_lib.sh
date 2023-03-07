@@ -198,6 +198,9 @@ test_setup_local()
 	else
 		echo "skipping netns setup, $NETNS already present"
 	fi
+	set +e
+	service bpftune stop 2>/dev/null
+	set -e
 	if [[ -f "$FIREWALL_CMD" ]]; then
 		set +e
 		running=$($FIREWALL_CMD --state)
