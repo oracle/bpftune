@@ -38,9 +38,6 @@ make
 rm -Rf %{buildroot}
 %make_install
 
-%post
-%systemd_post bpftune.service
-
 %files
 %defattr(-,root,root)
 %{_sbindir}/bpftune
