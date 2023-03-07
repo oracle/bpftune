@@ -1,10 +1,8 @@
 [Unit]
 Description=BPF-based auto-tuning of system parameters
-After=network.target
+After=systemd-sysctl.service network.target
 
 [Service]
-ExecStart=/usr/sbin/bpftune -d
+ExecStart=/usr/sbin/bpftune
 Restart=on-failure
 
-[Install]
-WantedBy=multi-user.target
