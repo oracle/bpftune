@@ -210,7 +210,7 @@ struct {
 	__type(value, __u64);
 } last_event_map SEC(".maps");
 
-static __always_inline void send_sysctl_event(struct sock *sk,
+static __always_inline long send_sysctl_event(struct sock *sk,
 					      int scenario_id, int event_id,
 					      long *old, long *new,
 					      struct bpftune_event *event)
@@ -223,13 +223,15 @@ static __always_inline void send_sysctl_event(struct sock *sk,
 	int ret = 0;
 
 	nscookie = get_netns_cookie(net);
+	if (nscookie < 0)
+		return nscookie;
 
 	event_key = last_event_key(nscookie, tuner_id, event_id);
 	/* avoid sending same event for same tuner+netns in < 25msec */
 	last_timep = bpf_map_lookup_elem(&last_event_map, &event_key);
 	if (last_timep) {
 		if ((now - *last_timep) < (25 * MSEC))
-			return;
+			return 0;
 		*last_timep = now;
 	} else {
 		bpf_map_update_elem(&last_event_map, &event_key, &now, 0);
@@ -250,6 +252,7 @@ static __always_inline void send_sysctl_event(struct sock *sk,
 		    tuner_id, scenario_id, ret);
 	bpftune_log("\told '%d %d %d'\n", old[0], old[1], old[2]);
 	bpftune_log("\tnew '%d %d %d'\n", new[0], new[1], new[2]);
+	return 0;
 }
 
 static inline void corr_update_bpf(__u64 id, __u64 netns_cookie,
