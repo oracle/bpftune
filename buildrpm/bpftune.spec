@@ -41,12 +41,6 @@ rm -Rf %{buildroot}
 %post
 %systemd_post bpftune.service
 
-%preun
-%systemd_preun bpftune.service
-
-%postun
-%systemd_postun_with_restart bpftune.service
-
 %files
 %defattr(-,root,root)
 %{_sbindir}/bpftune
