@@ -34,9 +34,10 @@ for FAMILY in ipv4 ipv6 ; do
    mem_orig=($(sysctl -n net.ipv4.tcp_mem))
 
    mem_test=($(echo 50 100 20000000))
-   test_setup true
 
    sysctl -w net.ipv4.tcp_mem="${mem_test[0]} ${mem_test[1]} ${mem_test[2]}"
+
+   test_setup true
 
    declare -A results
    for MODE in baseline test ; do
