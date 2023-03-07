@@ -169,6 +169,10 @@ void event_handler(struct bpftuner *tuner,
 	struct corr_key key;
 	int id;
 
+	/* netns cookie not supported; ignore */
+	if (event->netns_cookie < 0)
+		return;
+
 	id = event->update[0].id;
 
 	memcpy(new, event->update[0].new, sizeof(new));
