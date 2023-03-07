@@ -15,6 +15,12 @@ requiring netns cookie support are skipped automatically.
 
 # General tests
 
+## Support test
+
+Ensure "bpftune -S" shows right support level (none/legacy/full)
+for system, and shows if per-netns policy is supported (via
+netns cookie).
+
 ## Logging tests
 
 Verify logging works with syslog, stdout/stderr.

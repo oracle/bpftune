@@ -58,29 +58,18 @@
  - added a "make pkg" target which creates rpm
  - set up other/bpftune for ol8 builds
 
-### add support for aarch64/uek6
-- currently we only support x86_64+UEK7/LUCI/upstream due to
-  use of recent features (fentry/fexit, iterators etc).  Add
-  legacy kprobe support also as this will be needed for
-  UEK7 aarch64 support and UEK6 support where fentry does
-  not exist.  Also need to have an alternative to iterator
-  support for setting congestion control value; tcp-bpf
-  based seems the only workable way; enable retransmit
-  events for all connections and set cong control for
-  those that see >1 percent retransmits.  Downside is it
-  will not work for existing connections like iSCSI.
+### add support for aarch64/older kernels
+- Add legacy kprobe support also as this will be needed for
+  aarch64 which does not yet have BPF trampoline; legacy also
+  needed for older kernels that do not have fentry/fexit or
+  iterators.  Added "bpftune -S" support that auto-detects
+  level of support provided, and legacy tuners are used
+  if full support is not possible.
   This support is now present and each tuner builds a
   legacy version, using definition BPFTUNE_LEGACY to
   distinguish.  This replaces fentry with kprobes etc.
   See CONTRIBUTING.md for more details on how to support
   legacy mode.
-
-### set up project packaging and signing
-- filed https://ca-labops-help.us.oracle.com/show_bug.cgi?id=28072
-- package builds working now at other/bpftune
-- to do: ol7, ol9: for ol7 need to have alternative to skel
-  generation/stash newer bpftool; for ol9 need set up with
-  libbpf[-devel] as per ol7/8.
 
 ### Test suite
 
