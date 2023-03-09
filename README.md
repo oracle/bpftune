@@ -9,6 +9,52 @@ behaviour.  The key benefit it provides are
   than using coarse system-wide stats), we can tune at a finer grain
   too (individual socket policies, individual device policies etc)
 
+# The problem
+
+The Linux kernel contains a large number of tunables; these
+often take the form of sysctl(8) parameters, and are usually
+introduced for situations where there is no one "right" answer
+for a configuration choice.  The number of tunables available
+is quite daunting.  On a 6.2 kernel we see
+
+```
+# sysctl --all 2>/dev/null|wc -l
+1624
+```
+
+At the same time, individual systems get a lot less care
+and adminstrator attention than they used to; phrases like
+"cattle not pets" exemplify this.  Given the modern cloud
+architectures used for most deployments, most systems never
+have any human adminstrator interaction after initial
+provisioning; in fact given the scale requirements, this
+is often an explicit design goal - "no ssh'ing in!".
+
+These two observations are not unrelated; in an earlier
+era of fewer, larger systems, tuning by administrators was
+more feasible.
+
+These trends - system complexity combined with minimal
+admin interaction suggest a rethink in terms of tunable
+management.
+
+A lot of lore accumulates around these tunables, and to help
+clarify why we developed bpftune, we will use a straw-man
+version of the approach taken with tunables:
+
+"find the set of magic numbers that will work for the
+ system forever"
+
+This is obviously a caricature of how administrators
+approach the problem, but it does highlight a critical
+implicit assumption - that systems are static.
+
+And that gets to the "BPF" in bpftune; BPF provides means
+to carry out low-overhead observability of systems. So
+not only can we observe the system and tune appropriately,
+we can also observe the effect of that tuning and re-tune
+if necessary.
+
 # Key design principles
 
 - Minimize overhead.  Use observability features sparingly; do not
@@ -79,7 +125,9 @@ behaviour.  The key benefit it provides are
 Both core bpftune.c and individual tuners use the libbpftune library.
 It handles logging, tuner init/fini, and BPF init/fini.
 
-Each tuner defines an init(), fini() and event_handler() function.
+Each tuner shared object defines an init(), fini() and event_handler()
+function. These respectively set up and clean up BPF and handle events
+that originate from the BPF code.
 
 # Tests
 
@@ -97,6 +145,13 @@ $ bpftune -S
 bpftune works fully
 bpftune supports per-netns policy (via netns cookie)
 ```
+
+Two aspects are important here
+
+- does the system support fentry/fexit etc? If so full support
+  is likely.
+- does the system support network namespace cookies? If so
+  per-network-namespace policy is supported.
 
 # For more info
 
