@@ -8,8 +8,8 @@ that are used at runtime by an application built using this code.
 
 Third Party Runtime Dependencies
 ================================
-The following is the sole dependency of bpfevent - libbpf - which is
-dynamically linked.
+The following are dependencies of bpftune - libbpf and libnl3 - which are
+both dynamically linked.
 
 -------------------------------------------------------------------------------
 libbpf is dual-licensed using BSD-2-Clause or LGPL-2.1
