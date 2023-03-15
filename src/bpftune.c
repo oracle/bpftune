@@ -164,7 +164,7 @@ void print_support_level(enum bpftune_support_level support_level)
 		break;
 	}
 	if (support_level > BPFTUNE_NONE) {
-		bpftune_log(LOG_INFO, "bpftune %s per-netns policy (via netns cookie)\n",
+		bpftune_log(LOG_ALERT, "bpftune %s per-netns policy (via netns cookie)\n",
 			    bpftune_netns_cookie_supported() ?
 			    "supports" : "does not support");
 	}
