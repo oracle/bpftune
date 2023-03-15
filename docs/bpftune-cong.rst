@@ -29,20 +29,14 @@ DESCRIPTION
         to it we will likely see more retransmits, and potentially stay with
         it for a length of time until such losses shake out.
 
-        If however we see retransmits with a socket with a large bandwidth
-        delay product (BDP) - calculated via bandwidth estimate:
-
-            (tcp_rate_delivered_packets * tcp_mss)/tcp_rate_delivered_interval)
-
-        ...multiplied by the smoothed round-trip time.  If this value
-        indicates a long fat pipe (LFP), the htcp algorithm is used as
-        it works well for such networks.
-
         We use the tracepoint tcp_retransmit_skb to count retransmits by
         remote host, and a BPF iterator program to set congestion control
         algorithm, since it allows us to update congestion control for
         existing connections such as an iSCSI connection, which may exist
-        prior to bpftune starting.
+        prior to bpftune starting.  For legacy bpftune - where iterators
+        are not present - we fall back to using tcpbpf, but at a price;
+        only connections that are created after bpftune starts are supported
+        since we need to enable the retransmit sock op.
 
         Reference: https://blog.apnic.net/2020/01/10/when-to-use-and-not-use-bbr
 
