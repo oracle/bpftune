@@ -115,7 +115,7 @@ int init(const char *cgroup_dir, const char *library_dir)
 		if (!ring_buffer)
 			return -1;
 	} else {
-		bpftune_log(LOG_ERR, "no ringbuf events to watch, exiting.\n");
+		bpftune_log(LOG_ALERT, "no ringbuf events to watch, exiting.\n");
 		return -ENOENT;
 	}
 	bpftune_netns_init_all();
@@ -245,14 +245,14 @@ int main(int argc, char *argv[])
 
 	if (setrlimit(RLIMIT_MEMLOCK, &r)) {
 		err = -errno;
-		bpftune_log(LOG_ERR, "cannot unlock memory limit: %s\n",
+		bpftune_log(LOG_ALERT, "cannot unlock memory limit: %s.\nAre you running with CAP_SYS_ADMIN/via sudo/as root?\n",
 			    strerror(-err));
 		return err;
 	}
 	support_level = bpftune_bpf_support();
 	print_support_level(support_level);
 	if (support_level < BPFTUNE_LEGACY) {
-		bpftune_log(LOG_ERR, "bpftune is not supported on this system; exiting\n");
+		bpftune_log(LOG_ALERT, "bpftune is not supported on this system; exiting\n");
 		return 1;
 	}
 	if (support_only)
