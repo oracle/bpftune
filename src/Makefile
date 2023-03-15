@@ -84,7 +84,7 @@ install: libbpftune.so bpftune bpftune.service
 	$(INSTALL) -m 0755 -d $(INSTALLPATH)/lib64
 	$(INSTALL) libbpftune.so* $(INSTALLPATH)/lib64
 	$(INSTALL) -m 0755 -d $(installprefix)/lib/systemd/system
-	$(INSTALL) bpftune.service $(installprefix)/lib/systemd/system
+	$(INSTALL) -m 644 bpftune.service $(installprefix)/lib/systemd/system
 	$(INSTALL) -m 0755 -d $(INSTALLPATH)/lib64/bpftune
 	$(INSTALL) $(TUNER_LIBS) $(INSTALLPATH)/lib64/bpftune
 

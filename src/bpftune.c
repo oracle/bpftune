@@ -154,13 +154,13 @@ void print_support_level(enum bpftune_support_level support_level)
 {
 	switch (support_level) {
 	case BPFTUNE_NONE:
-		bpftune_log(LOG_INFO, "bpftune is not supported\n");
+		bpftune_log(LOG_ALERT, "bpftune is not supported\n");
 		break;
 	case BPFTUNE_LEGACY:
-		bpftune_log(LOG_INFO, "bpftune works in legacy mode\n");
+		bpftune_log(LOG_ALERT, "bpftune works in legacy mode\n");
 		break;
 	case BPFTUNE_NORMAL:
-		bpftune_log(LOG_INFO, "bpftune works fully\n");
+		bpftune_log(LOG_ALERT, "bpftune works fully\n");
 		break;
 	}
 	if (support_level > BPFTUNE_NONE) {
@@ -175,6 +175,7 @@ int main(int argc, char *argv[])
 	static const struct option options[] = {
 		{ "allowlist",	required_argument,	NULL,	'a' },
 		{ "cgroup",	required_argument,	NULL,	'c' },
+		{ "daemon", 	no_argument,		NULL,	'D' },
 		{ "debug",	no_argument,		NULL,	'd' },
 		{ "legacy",	no_argument,		NULL,	'L' },
 		{ "help",	no_argument,		NULL,	'h' },
@@ -188,9 +189,8 @@ int main(int argc, char *argv[])
 	char *cgroup_dir = BPFTUNER_CGROUP_DIR;
 	char *library_dir = BPFTUNER_LIB_DIR;
 	enum bpftune_support_level support_level;
-	int log_level = LOG_INFO;
+	int log_level = LOG_ALERT;
 	bool support_only = false;
-	bool is_daemon = false;
 	int interval = 100;
 	int err, opt;
 
@@ -214,7 +214,6 @@ int main(int argc, char *argv[])
 					strerror(errno));
 				return 1;
 			}
-			is_daemon = true;
 			break;
 		case 'h':
 			do_help();
@@ -242,11 +241,11 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	bpftune_set_log(log_level, is_daemon || !use_stderr ? bpftune_log_syslog : bpftune_log_stderr);
+	bpftune_set_log(log_level, use_stderr ? bpftune_log_stderr : bpftune_log_syslog);
 
 	if (setrlimit(RLIMIT_MEMLOCK, &r)) {
 		err = -errno;
-		bpftune_log(LOG_DEBUG, "cannot unlock memory limit: %s\n",
+		bpftune_log(LOG_ERR, "cannot unlock memory limit: %s\n",
 			    strerror(-err));
 		return err;
 	}

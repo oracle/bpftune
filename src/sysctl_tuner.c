@@ -50,7 +50,7 @@ void event_handler(struct bpftuner *tuner, struct bpftune_event *event,
 			bpftune_log(LOG_DEBUG, "checking path %s against %s\n",
 				    path, event->str);
 			if (strstr(path, event->str)) {
-				bpftune_log(LOG_INFO,
+				bpftune_log(LOG_ALERT,
 					    "user modified sysctl '%s' that tuner '%s' uses; disabling '%s' for namespace cookie %ld\n",
 					    event->str, t->name, t->name,
 					    event->netns_cookie);

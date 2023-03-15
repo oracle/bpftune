@@ -42,7 +42,7 @@
 
 void *bpftune_log_ctx;
 
-int bpftune_loglevel = LOG_INFO;
+int bpftune_loglevel = LOG_ALERT;
 
 struct ring_buffer *ring_buffer;
 int ring_buffer_map_fd;
@@ -768,7 +768,7 @@ static void bpftuner_scenario_log(struct bpftuner *tuner, unsigned int tunable,
 				    t->stats.nonglobal_ns[scenario];
 		if (!count)
 			return;
-		bpftune_log(LOG_INFO, "Summary: scenario '%s' occurred %ld times for tunable '%s' in %sglobal ns. %s\n",
+		bpftune_log(LOG_ALERT, "Summary: scenario '%s' occurred %ld times for tunable '%s' in %sglobal ns. %s\n",
 			    tuner->scenarios[scenario].name, count,
 			    t->desc.name,
 			    global_ns ? "" : "non-",
@@ -787,16 +787,16 @@ static void bpftuner_scenario_log(struct bpftuner *tuner, unsigned int tunable,
 					 t->current_values[i]);
 				strcat(newvals, s);
 			}
-			bpftune_log(LOG_INFO, "sysctl '%s' changed from (%s) -> (%s)\n",
+			bpftune_log(LOG_ALERT, "sysctl '%s' changed from (%s) -> (%s)\n",
 				    t->desc.name, oldvals, newvals);
 		}
 	} else {
-		bpftune_log(LOG_INFO, "Scenario '%s' occurred for tunable '%s' in %sglobal ns. %s\n",
+		bpftune_log(LOG_ALERT, "Scenario '%s' occurred for tunable '%s' in %sglobal ns. %s\n",
 			    tuner->scenarios[scenario].name,
 			    t->desc.name,
 			    global_ns ? "" : "non-",
 			    tuner->scenarios[scenario].description);
-		__bpftune_log(LOG_INFO, fmt, args);
+		__bpftune_log(LOG_ALERT, fmt, args);
 		bpftuner_tunable_stats_update(t, scenario, global_ns);
 	}
 }
@@ -820,7 +820,7 @@ int bpftuner_tunable_sysctl_write(struct bpftuner *tuner, unsigned int tunable,
 		bpftune_log(LOG_DEBUG, "found netns (cookie %ld); state %d\n",
 			    netns_cookie, netns->state);
 		if (netns->state >= BPFTUNE_MANUAL) {
-			bpftune_log(LOG_INFO,
+			bpftune_log(LOG_ALERT,
 				    "Skipping update of '%s' ; tuner '%s' is disabled in netns (cookie %ld)\n",
 				    t->desc.name, tuner->name, netns_cookie);
 			return 0;
