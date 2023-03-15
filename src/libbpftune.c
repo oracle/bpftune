@@ -92,9 +92,27 @@ void bpftune_log(int level, const char *fmt, ...)
 	va_end(args);
 }
 
-static int bpftune_printall(__attribute__((unused)) enum libbpf_print_level l,
-			    const char *format, va_list args)
+static int bpftune_libbpf_log(__attribute__((unused)) enum libbpf_print_level l,
+			       const char *format, va_list args)
 {
+	int level;
+
+	switch (l) {
+	case LIBBPF_WARN:
+		level = LOG_WARNING;
+		break;
+	case LIBBPF_INFO:
+		level = LOG_INFO;
+		break;
+	case LIBBPF_DEBUG:
+		level = LOG_DEBUG;
+		break;
+	default:
+		return 0;
+	}
+	if (bpftune_loglevel < level)
+		return 0;
+	
 	__bpftune_log(LOG_DEBUG, format, args);
         return 0;
 }
@@ -110,8 +128,7 @@ void bpftune_set_log(int level,
 		setlogmask(LOG_UPTO(level));
                 openlog("bpftune", LOG_NDELAY | LOG_PID, LOG_DAEMON);
 	}
-	if (level >= LOG_DEBUG)
-		libbpf_set_print(bpftune_printall);
+	libbpf_set_print(bpftune_libbpf_log);
 }
 
 void bpftune_log_bpf_err(int err, const char *fmt)
@@ -260,13 +277,15 @@ bool bpftune_netns_cookie_supported(void)
 	return true;
 }
 
+enum bpftune_support_level support_level = BPFTUNE_NONE;
+
 enum bpftune_support_level bpftune_bpf_support(void)
 {
-	enum bpftune_support_level support_level = BPFTUNE_NORMAL;
 	bool ret;
 	struct probe_bpf *probe_bpf = probe_bpf__open_and_load();
 	struct probe_bpf_legacy *probe_bpf_legacy;
 
+	support_level = BPFTUNE_NORMAL;
 	if (probe_bpf == NULL) {
 		support_level = BPFTUNE_LEGACY;
 		bpftune_log(LOG_DEBUG, "full bpftune support not available: %s\n",
@@ -293,7 +312,9 @@ bool bpftuner_bpf_legacy(void)
 	if (force_bpf_legacy)
 		return true;
 
-	return bpftune_bpf_support() < BPFTUNE_NORMAL;
+	if (support_level == BPFTUNE_NONE)
+		support_level = bpftune_bpf_support();
+	return support_level < BPFTUNE_NORMAL;
 }
 
 int __bpftuner_bpf_load(struct bpftuner *tuner, const char **optionals)
