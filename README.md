@@ -153,6 +153,40 @@ Two aspects are important here
 - does the system support network namespace cookies? If so
   per-network-namespace policy is supported.
 
+# Demo
+
+In one window, set tcp rmem max to a too-low value, and run bpftune
+as a program logging to stdout/stderr (-s):
+
+```
+$ sudo sysctl -w net.ipv4.tcp_rmem="4096 131072 1310720"
+net.ipv4.tcp_rmem = 4096 131072 1310720
+$ sudo bpftune -s
+```
+
+In another window, wget a large file:
+
+```
+$ wget https://yum.oracle.com/ISOS/OracleLinux/OL8/u7/x86_64/OracleLinux-R8-U7-x86_64-dvd.iso
+```
+
+In the first window, we see bpftune tuning up rmem:
+
+```
+bpftune: bpftune works in legacy mode
+bpftune: bpftune does not support per-netns policy (via netns cookie)
+bpftune: Scenario 'need to increase TCP buffer size(s)' occurred for tunable 'net.ipv4.tcp_rmem' in global ns. Need to increase buffer size(s) to maximize throughput
+bpftune: Due to need to increase max buffer size to maximize throughput change net.ipv4.tcp_rmem(min default max) from (4096 131072 1310720) -> (4096 131072 1638400)
+```
+
+This occurs multiple times, and on exit (Ctrl+C) we see
+the summary of changes made:
+
+```
+bpftune: Summary: scenario 'need to increase TCP buffer size(s)' occurred 9 times for tunable 'net.ipv4.tcp_rmem' in global ns. Need to increase buffer size(s) to maximize throughput
+bpftune: sysctl 'net.ipv4.tcp_rmem' changed from (4096 131072 1310720 ) -> (4096 131072 9765625 )
+```
+
 # For more info
 
 See the docs/ subdirectory for manual pages covering bpftune
