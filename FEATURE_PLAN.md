@@ -27,7 +27,10 @@
    higher rate will make larger changes less frequently, while a lower
    rate will make smaller changes more frequently, but only if limits
    are closely approached.
-   
+ - we notice new tuners appearing/disappearing from /usr/lib64/bpftune
+   via inotify.  We watch the above directory for tuner addition or
+   removal to allow packages to separately deliver their own tuners.
+
 ### sysctl tuner
  - add support for dynamically disabling relevant tuner if tunables change
    via sysctl tuner (tested)
@@ -100,14 +103,6 @@
   design constraints
 
 ## To do tasks
-
-### general: notice new tuners appearing/disappearing from
-/usr/lib64/bpftune
-
-- we should watch the above directory for tuner addition
-  or removal to allow packages to deliver a tuner separately.
-  We also may need a bpftune-devel package to facilitate separate
-  delivery of tunables.
 
 ### TCP buffer tuner improvements
 - one problem is hard to have a one max buffer size to fit all;

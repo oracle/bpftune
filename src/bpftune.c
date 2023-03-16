@@ -23,6 +23,9 @@
 #include <dirent.h>
 #include <libgen.h>
 #include <linux/types.h>
+#include <pthread.h>
+#include <sys/inotify.h>
+#include <ftw.h>
 
 #include "libbpftune.h"
 
@@ -36,13 +39,25 @@ bool use_stderr;
 
 char *allowlist[BPFTUNE_MAX_TUNERS];
 int nr_allowlist;
-
 char *bin_name;
+
+bool exiting;
+
+static int unlink_cb(const char *path,
+		     __attribute__((unused))const struct stat *sb,
+		     __attribute__((unused))int typeflag)
+{
+	remove(path);
+	return 0;
+}
 
 static void cleanup(int sig)
 {
+	exiting = true;
 	bpftune_log(LOG_DEBUG, "cleaning up, got signal %d\n", sig);
 	bpftune_ring_buffer_fini(ring_buffer);
+	ftw(BPFTUNE_PIN, unlink_cb, FTW_F | FTW_D);
+	unlink(BPFTUNE_PIN);
 	if (use_stderr)
 		fflush(stderr);
 }
@@ -56,10 +71,66 @@ void fini(void)
 	bpftune_cgroup_fini();
 }
 
+void *inotify_thread(void *arg)
+{
+	int inotify_fd, wd, len = 0, i = 0;
+	const char *library_dir = arg;
+	char library_path[512];
+	char buf[sizeof(struct inotify_event) * 32];
+	struct bpftuner *tuner;
+
+	inotify_fd = inotify_init();
+	if (inotify_fd < 0) {
+		bpftune_log(LOG_ALERT, "cannot monitor '%s' for changes: %s\n",
+			    library_path, strerror(errno));
+		return NULL;
+	}
+	wd = inotify_add_watch(inotify_fd, library_dir, IN_CREATE | IN_DELETE);
+
+	while (!exiting) {
+		len = read(inotify_fd, buf, sizeof(buf));
+
+		for (i = 0; i < len; i += sizeof(struct inotify_event)) {
+			struct inotify_event *event = (struct inotify_event *)&buf[i];
+
+			if (event->mask & IN_ISDIR ||
+			    !strstr(event->name, ".so"))
+				continue;
+			snprintf(library_path, sizeof(library_path), "%s/%s",
+				 library_dir, event->name);
+			if (event->mask & IN_CREATE) {
+				bpftune_log(LOG_ALERT, "found lib %s, init\n",
+					    library_path);
+				tuner = bpftuner_init(library_path);
+				if (!tuner)
+					continue;
+				if (ringbuf_map_fd == 0)
+					ringbuf_map_fd = bpftuner_ring_buffer_map_fd(tuner);
+			} else if (event->mask & IN_DELETE) {
+				bpftune_for_each_tuner(tuner) {
+					if (!strstr(event->name, tuner->name))
+						continue;
+					bpftune_log(LOG_ALERT, "removed '%s', fini tuner %s\n",
+						    library_path, tuner->name);
+					bpftuner_fini(tuner, BPFTUNE_MANUAL);
+				}
+			}
+		}
+	}
+	inotify_rm_watch(inotify_fd, wd);
+	close(inotify_fd);
+
+	return NULL;
+}
+
+
+	
 int init(const char *cgroup_dir, const char *library_dir)
 {
+	pthread_attr_t attr = {};
 	char library_path[512];
 	struct dirent *dirent;
+	pthread_t inotify_tid;
 	DIR *dir;
 	int err;
 
@@ -109,6 +180,11 @@ int init(const char *cgroup_dir, const char *library_dir)
 		if (ringbuf_map_fd == 0)
 			ringbuf_map_fd = bpftuner_ring_buffer_map_fd(tuner);
 	}
+
+	if (pthread_attr_init(&attr) ||
+	    pthread_create(&inotify_tid, &attr, inotify_thread, (void *)library_dir))
+		bpftune_log(LOG_ERR, "could not create inotify thread: %s\n",
+			    strerror(errno));
 
 	if (ringbuf_map_fd > 0) {
 		ring_buffer = bpftune_ring_buffer_init(ringbuf_map_fd, NULL);

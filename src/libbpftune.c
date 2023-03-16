@@ -319,40 +319,70 @@ bool bpftuner_bpf_legacy(void)
 	return support_level < BPFTUNE_NORMAL;
 }
 
-int __bpftuner_bpf_load(struct bpftuner *tuner, const char **optionals)
+static int bpftuner_map_reuse(const char *name, struct bpf_map *map,
+			      int fd, int *tuner_fdp)
 {
-	struct bpf_map *map;
-	int err;	
+	int err;
 
-	if (ring_buffer_map_fd > 0) {
-		bpftune_log(LOG_DEBUG, "reusing ring buffer fd %d\n", ring_buffer_map_fd);
-		err = bpf_map__reuse_fd(tuner->ring_buffer_map,
-					ring_buffer_map_fd);
+	if (fd > 0) {
+		bpftune_log(LOG_DEBUG, "reusing %s fd %d\n", name, fd);
+		err = bpf_map__reuse_fd(map, fd);
 		if (err < 0) {
 			bpftune_log_bpf_err(err, "could not reuse fd: %s\n");
 			return err;
 		}
-		tuner->ring_buffer_map_fd = ring_buffer_map_fd;
+		*tuner_fdp = fd;
 	}
-	
-	if (corr_map_fd > 0) {
-		bpftune_log(LOG_DEBUG, "reusing corr map fd %d\n", corr_map_fd);
-		err = bpf_map__reuse_fd(tuner->corr_map, corr_map_fd);
-		if (err < 0) {
-			bpftune_log_bpf_err(err, "could not reuse corr fd: %s\n");
-			return err;
+	return 0;
+}
+
+static void bpftuner_map_init(struct bpftuner *tuner, const char *name,
+			      void **mapp, int *fdp, int *tuner_fdp)
+{
+	struct bpf_map *m;
+	int err;
+
+	if (*fdp > 0)
+		return;
+
+	m = bpf_object__find_map_by_name(*tuner->skeleton->obj, name);
+	if (m) {
+		char pinpath[512];
+
+		*mapp = m;
+		/* pin first instance of map fd, since we
+		 * do not want it to go away if a tuner does.
+		 */
+		mkdir(BPFTUNE_PIN, 0700);
+		snprintf(pinpath, sizeof(pinpath), BPFTUNE_PIN "/%s", name);
+		err = bpf_map__pin(m, pinpath);
+		if (err) {
+			bpftune_log_bpf_err(err, "could not pin ringbuf map: %s\n");
+		} else {
+			*fdp = dup(bpf_map__fd(m));
+			if (*fdp < 0) {
+				bpftune_log(LOG_ERR, "could not get pin: %s\n",
+					    strerror(errno));
+			} else {
+				bpftune_log(LOG_DEBUG, "got %s map fd %d\n",
+					    name, *fdp);
+				*tuner_fdp = *fdp;
+			}
 		}
-		tuner->corr_map_fd = corr_map_fd;
 	}
-	if (netns_map_fd > 0) {
-		bpftune_log(LOG_DEBUG, "reusing netns map fd %d\n", netns_map_fd);
-		err = bpf_map__reuse_fd(tuner->netns_map, netns_map_fd);
-		if (err < 0) {
-			bpftune_log_bpf_err(err, "could not reuse corr fd: %s\n");
-			return err;
-		}
-		tuner->netns_map_fd = netns_map_fd;
-        }
+}
+
+int __bpftuner_bpf_load(struct bpftuner *tuner, const char **optionals)
+{
+	int err;	
+
+	if (bpftuner_map_reuse("ring_buffer", tuner->ring_buffer_map,
+			       ring_buffer_map_fd, &tuner->ring_buffer_map_fd) ||
+	    bpftuner_map_reuse("corr_map", tuner->corr_map,
+			       corr_map_fd, &tuner->corr_map_fd) ||
+	    bpftuner_map_reuse("netns_map", tuner->netns_map,
+			       netns_map_fd, &tuner->netns_map_fd))
+		return -1;
 
 	if (optionals) {
 		int i;
@@ -374,38 +404,13 @@ int __bpftuner_bpf_load(struct bpftuner *tuner, const char **optionals)
 		bpftune_log_bpf_err(err, "could not load skeleton: %s\n");
 		return err;
 	}
-	
-	if (ring_buffer_map_fd == 0) {
-		map = bpf_object__find_map_by_name(*tuner->skeleton->obj,
-						   "ring_buffer_map");
-		if (map) {
-			ring_buffer_map_fd = bpf_map__fd(map);
-			bpftune_log(LOG_DEBUG, "got ring_buffer_map fd %d\n",
-				    ring_buffer_map_fd);
-		}
-		tuner->ring_buffer_map_fd = ring_buffer_map_fd;
-	}
-	if (corr_map_fd == 0) {
-		map = bpf_object__find_map_by_name(*tuner->skeleton->obj,
-						   "corr_map");
-		if (map) {
-			corr_map_fd = bpf_map__fd(map);
-			bpftune_log(LOG_DEBUG, "got corr_map fd %d\n",
-				    corr_map_fd);
-			tuner->corr_map_fd = corr_map_fd;
-		}
-	}
-	if (netns_map_fd == 0) {
-		map = bpf_object__find_map_by_name(*tuner->skeleton->obj,
-						   "netns_map");
-		if (map) {
-			netns_map_fd = bpf_map__fd(map);
-			bpftune_log(LOG_DEBUG, "got netns_map fd %d\n",	
-				    netns_map_fd);
-			tuner->netns_map_fd = netns_map_fd;
-		}
-	}
 
+	bpftuner_map_init(tuner, "ring_buffer_map", &tuner->ring_buffer_map,
+			  &ring_buffer_map_fd, &tuner->ring_buffer_map_fd);
+	bpftuner_map_init(tuner, "corr_map", &tuner->corr_map,
+			  &corr_map_fd, &tuner->corr_map_fd);
+	bpftuner_map_init(tuner, "netns_map", &tuner->netns_map,
+			  &netns_map_fd, &tuner->netns_map_fd);
 	return 0;
 }
 

@@ -32,6 +32,8 @@
 
 #define BPFTUNE_PROC_SYS		"/proc/sys/"
 
+#define BPFTUNE_PIN			"/sys/fs/bpf/bpftune"
+
 #ifndef ARRAY_SIZE
 #define ARRAY_SIZE(arr)			(sizeof(arr) / sizeof((arr)[0])) 
 #endif
