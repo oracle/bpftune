@@ -231,6 +231,9 @@ test_cleanup_local()
 	ip link del $VETH2 2>/dev/null
 	set -e
 
+	if [[ ! -f /usr/lib64/bpftune/tcp_buffer_tuner.so ]]; then
+		mv /tmp/tcp_buffer_tuner.so /usr/lib64/bpftune
+	fi
 	if [[ $EXIT -ne 0 ]]; then
 		if [[ -f $TESTLOG_LAST ]]; then
 			echo "Output of last command:"

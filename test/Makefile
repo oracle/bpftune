@@ -5,7 +5,7 @@
 
 PERF_TESTS = iperf3_test qperf_test
 
-TUNER_TESTS =	support_test log_test \
+TUNER_TESTS =	support_test log_test inotify_test \
 		sysctl_test sysctl_legacy_test sysctl_netns_test \
 		netns_test netns_legacy_test \
 		neigh_table_test neigh_table_legacy_test \

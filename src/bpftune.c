@@ -99,7 +99,7 @@ void *inotify_thread(void *arg)
 			snprintf(library_path, sizeof(library_path), "%s/%s",
 				 library_dir, event->name);
 			if (event->mask & IN_CREATE) {
-				bpftune_log(LOG_ALERT, "found lib %s, init\n",
+				bpftune_log(LOG_ALERT, "added lib %s, init\n",
 					    library_path);
 				tuner = bpftuner_init(library_path);
 				if (!tuner)
