@@ -48,6 +48,9 @@ void bpftune_set_log(int level,
 				   va_list args));
 void bpftune_log_bpf_err(int err, const char *fmt);
 
+extern unsigned short bpftune_learning_rate;
+
+void bpftune_set_learning_rate(unsigned short rate);
 
 int bpftune_cgroup_init(const char *cgroup_path);
 const char *bpftune_cgroup_name(void);
@@ -117,6 +120,7 @@ void bpftuner_tunables_fini(struct bpftuner *tuner);
 			tuner->skeleton = __skel->skeleton;		     \
 			__skel->bss->debug = bpftune_log_level() >= LOG_DEBUG;\
 			__skel->bss->bpftune_pid = getpid();		     \
+			__skel->bss->bpftune_learning_rate = bpftune_learning_rate;\
 			tuner->obj = __skel->obj;			     \
 			tuner->ring_buffer_map = __skel->maps.ring_buffer_map;\
 			tuner->corr_map = __skel->maps.corr_map;	     \
@@ -125,6 +129,7 @@ void bpftuner_tunables_fini(struct bpftuner *tuner);
 			tuner->skel = __lskel = tuner_name##_tuner_bpf_legacy__open();\
 			tuner->skeleton = __lskel->skeleton;		     \
 			__lskel->bss->debug = bpftune_log_level() >= LOG_DEBUG;\
+			__lskel->bss->bpftune_learning_rate = bpftune_learning_rate;\
 			__lskel->bss->bpftune_pid = getpid();		     \
 			tuner->obj = __lskel->obj;			     \
 			tuner->ring_buffer_map = __lskel->maps.ring_buffer_map;\

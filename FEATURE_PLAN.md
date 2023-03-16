@@ -14,7 +14,20 @@
    This assumes any customizations for namespace config of tunables
    on container bringup will stop us auto-tuning; this may need to
    be revisited in the future.
-
+ - configurable learning rate: learning can be specified to bpftune
+   via the "-r" parameter; this ranges from 0-4.  The learning
+   rate values relate to when changes are made; i.e. within a
+   specific % of a limit, we increase the limit by the same %; so
+	- learning rate 0: within 1% of a limit, increase it by 1%
+	- learning rate 1: within 3% of a limit, increase it by 3%
+	- learning rate 2: withing 6% of a limit, increase it by 6%
+	- learning rate 3: within 12% of a limit, increase it by 12%
+	- learning rate 4: within 25% of a limit, increase it by 25%
+   There is an inherent tradeoff in learning rate selection; a
+   higher rate will make larger changes less frequently, while a lower
+   rate will make smaller changes more frequently, but only if limits
+   are closely approached.
+   
 ### sysctl tuner
  - add support for dynamically disabling relevant tuner if tunables change
    via sysctl tuner (tested)
@@ -87,24 +100,6 @@
   design constraints
 
 ## To do tasks
-
-### general: add a configurable learning rate
-- currently we check for limit approach and up values based
-  on a 25% value; i.e. within 25% of limit, adjust up by 25%.
-  This is computed efficiently via (limit - (limit >> 2)). We
-  could make the bitshift configurable, ranging from a learning
-  rate that works like this:
-
-	- 1; equivalent to limit >> 6, i.e. 1.5625% learning rate
-	- 2; equivalent to limit >> 5, i.e. 3.125% learning rate
-	- 3; equivlanet to limit >> 4, i.e. 6.25% learning rate
-	- 4; equivalent to limit >> 3, i.e  12.5% learning rate
-	- 5; equivalent to limit >> 2, i.e. 25% learning rate
-
-At the lower end of the scale, change would be more frequent but
-also more gradual, so probably better for the risk-averse; we
-would only update buffer sizes for example if we came within
-1.5% of buffer limit, and only increase buffer size by 1.5%.
 
 ### general: notice new tuners appearing/disappearing from
 /usr/lib64/bpftune

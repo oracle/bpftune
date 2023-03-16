@@ -27,6 +27,8 @@
 #include <sched.h>
 #include <mntent.h>
 
+unsigned short bpftune_learning_rate;
+
 #include "libbpftune.h"
 
 #include <bpf/bpf.h>
@@ -526,6 +528,11 @@ struct bpftuner *bpftune_tuner(unsigned int index)
 unsigned int bpftune_tuner_num(void)
 {
 	return bpftune_num_tuners;
+}
+
+void bpftune_set_learning_rate(unsigned short rate)
+{
+	bpftune_learning_rate = rate;
 }
 
 static int bpftune_ringbuf_event_read(void *ctx, void *data, size_t size)

@@ -133,6 +133,7 @@ void do_help(void)
 		"		     { -L|--legacy}\n"
 		"		     {-h|--help}}\n"
 		"		     { -l|--library_path library_path}\n"
+		"		     { -r|--learning_rate learning_rate}\n"
 		"		     { -s|--stderr}\n"
 		"		     { -S|--suppport}\n"
 		"		     { -V|--version}}\n",
@@ -180,6 +181,7 @@ int main(int argc, char *argv[])
 		{ "legacy",	no_argument,		NULL,	'L' },
 		{ "help",	no_argument,		NULL,	'h' },
 		{ "libdir",	required_argument,	NULL,	'l' },
+		{ "learning_rate", required_argument,	NULL,	'r' },
 		{ "stderr", 	no_argument,		NULL,	's' },
 		{ "support",	no_argument,		NULL,	'S' },
 		{ "version",	no_argument,		NULL,	'V' },
@@ -189,6 +191,7 @@ int main(int argc, char *argv[])
 	char *cgroup_dir = BPFTUNER_CGROUP_DIR;
 	char *library_dir = BPFTUNER_LIB_DIR;
 	enum bpftune_support_level support_level;
+	unsigned short rate = BPFTUNE_DELTA_MAX;
 	int log_level = LOG_ALERT;
 	bool support_only = false;
 	int interval = 100;
@@ -196,7 +199,7 @@ int main(int argc, char *argv[])
 
 	bin_name = argv[0];
 
-	while ((opt = getopt_long(argc, argv, "a:c:dDhl:LsSV", options, NULL))
+	while ((opt = getopt_long(argc, argv, "a:c:dDhl:Lr:sSV", options, NULL))
 		>= 0) {
 		switch (opt) {
 		case 'a':
@@ -223,6 +226,15 @@ int main(int argc, char *argv[])
 			break;
 		case 'L':
 			bpftuner_force_bpf_legacy();
+			break;
+		case 'r':
+			rate = atoi(optarg);
+			if (rate > BPFTUNE_DELTA_MAX) {
+				fprintf(stderr, "values %d-%d are supported\n",
+					BPFTUNE_DELTA_MIN, BPFTUNE_DELTA_MAX);
+				return 1;
+			}
+			bpftune_set_learning_rate(rate);
 			break;
 		case 's':
 			use_stderr = true;

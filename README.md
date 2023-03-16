@@ -103,6 +103,9 @@ if necessary.
   event handler and its event_handler() callback function is run.
 - init, fini and event_handler functions are loaded from the
   tuner .so object.
+- BPF components should include bpftune.bpf.h; it contains
+  the common map definitions (ringbuf, etc) and shared variables
+  such as learning rate and tuner ids that each tuner needs.
 
 # Supported tuners
 

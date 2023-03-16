@@ -2,6 +2,7 @@
 /* Copyright (c) 2023, Oracle and/or its affiliates. */
 
 #include <libbpftune.h>
+#include <bpftune.h>
 #include "sysctl_tuner.skel.h"
 #include "sysctl_tuner.skel.legacy.h"
 
@@ -10,6 +11,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+
+extern unsigned short learning_rate;
 
 int init(struct bpftuner *tuner)
 {

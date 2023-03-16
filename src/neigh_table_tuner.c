@@ -89,7 +89,7 @@ static int set_gc_thresh3(struct bpftuner *tuner, struct tbl_stats *stats)
 
 	NLA_PUT_STRING(m, NDTA_NAME, tbl_name);
 
-	new_gc_thresh3 = BPFTUNE_GROW_BY_QUARTER(stats->max);
+	new_gc_thresh3 = BPFTUNE_GROW_BY_DELTA(stats->max);
 	NLA_PUT_U32(m, NDTA_THRESH3, new_gc_thresh3);
 
 	parms = nlmsg_alloc();

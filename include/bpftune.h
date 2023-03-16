@@ -12,25 +12,39 @@
 
 #define BPFTUNE_MAX_SCENARIOS		16
 
-/* grow by 25% */
-#define BPFTUNE_GROW_BY_QUARTER(val)    ((val) + ((val) >> 2))
-#define BPFTUNE_GROW_BY_HALF(val)	((val) + ((val) >> 1))
+#define BPFTUNE_DELTA_MIN		0	/* 1% */
+#define BPFTUNE_DELTA_MAX		4	/* 25% */
 
-/* shrink by 25% */
-#define BPFTUNE_SHRINK_BY_QUARTER(val)	((val) - ((val) >> 2))
-#define BPFTUNE_SHRINK_BY_HALF(val)	((val) - ((val) >> 1))
+extern unsigned short bpftune_learning_rate;
+
+#ifndef min
+#define min(a, b)       ((a) < (b) ? (a) : (b))
+#endif
+
+/*
+ * convert learning rate to bitshift value
+ *
+ * 4 -> bitshift of 2 (25%)
+ * 3 -> bitshift of 3 (12.5%)
+ * 2 -> bitshift of 4 (6.25%)
+ * 1 -> bitshift of 5 (3.125%)
+ * 0 -> bitshift of 6 (1.0625%)
+ */
+#define BPFTUNE_BITSHIFT	\
+	((BPFTUNE_DELTA_MAX + 2) - min(bpftune_learning_rate, BPFTUNE_DELTA_MAX))
+
+#define BPFTUNE_GROW_BY_DELTA(val)    ((val) + ((val) >> BPFTUNE_BITSHIFT))
+
+/* shrink by delta (default 25%) */
+#define BPFTUNE_SHRINK_BY_DELTA(val)  ((val) - ((val) >> BPFTUNE_BITSHIFT))
 
 #define MSEC				((__u64)1000000)
 #define SECOND				((__u64)1000000000)
 #define MINUTE				(60 * SECOND)
 #define HOUR				(3600 * SECOND)
 
-/* 75% full */
 #define NEARLY_FULL(val, limit) \
-	((val) >= (limit) || (val) + ((limit) >> 2) >= (limit))
-
-#define min(a, b)       ((a) < (b) ? (a) : (b))
-
+	((val) >= (limit) || (val) + ((limit) >> BPFTUNE_BITSHIFT) >= (limit))
 
 enum bpftunable_type {
 	BPFTUNABLE_SYSCTL,

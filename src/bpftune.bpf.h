@@ -108,6 +108,9 @@ static __always_inline typeof(name(0)) ____##name(struct pt_regs *ctx, ##args)
 	} _name SEC(".maps")
 #endif /* BPFTUNE_LEGACY */
 
+/* must be specified prior to including bpftune.h */
+unsigned short bpftune_learning_rate;
+
 #include "bpftune.h"
 #include "corr.h"
 
