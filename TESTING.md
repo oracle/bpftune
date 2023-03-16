@@ -25,6 +25,11 @@ netns cookie).
 
 Verify logging works with syslog, stdout/stderr.
 
+## Inotify tests
+
+Verify that removing or adding a tuner is noticed and the tuner
+is cleaned up/initialized appropriately.
+
 # Per-tuner tests
 
 ## sysctl tests
