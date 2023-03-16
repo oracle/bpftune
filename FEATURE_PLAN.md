@@ -8,6 +8,9 @@
  - add support for adding BPF programs via skeleton
  - add support for specifying tunables associated with tuner
  - bpftune systemd service specification
+ - add support for legacy tuner fallback; if the system does
+   not support BPF features required, fall back to legacy version
+   of tuner if available.
  - switch off tuners on per-ns basis; we should not switch off
    global tuners if someone fiddles with a tunable in a network
    namespace; make sure we have per-namespace disable for tuners.
@@ -30,6 +33,8 @@
  - we notice new tuners appearing/disappearing from /usr/lib64/bpftune
    via inotify.  We watch the above directory for tuner addition or
    removal to allow packages to separately deliver their own tuners.
+   We will eventually deliver a bpftune-devel package to support this,
+   which will include headers required etc.
 
 ### sysctl tuner
  - add support for dynamically disabling relevant tuner if tunables change
