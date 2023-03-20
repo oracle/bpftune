@@ -134,6 +134,9 @@ int init(const char *cgroup_dir, const char *library_dir)
 	DIR *dir;
 	int err;
 
+	/* ensure no existing pin in place... */
+	ftw(BPFTUNE_PIN, unlink_cb, FTW_F | FTW_D);
+
 	err = bpftune_cgroup_init(cgroup_dir);
 	if (err)
 		return err;
