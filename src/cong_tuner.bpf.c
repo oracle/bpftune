@@ -142,9 +142,6 @@ int BPF_PROG(cong_retransmit, struct sock *sk, struct sk_buff *skb)
 
 	remote_host->retransmits++;
 
-	if (remote_host->retransmit_threshold)
-		return 0;
-
 	if (bpf_probe_read_kernel(&segs_out, sizeof(segs_out),
 				  __builtin_preserve_access_index(&tp->segs_out)) ||
 	    bpf_probe_read_kernel(&total_retrans, sizeof(total_retrans),
@@ -153,6 +150,7 @@ int BPF_PROG(cong_retransmit, struct sock *sk, struct sk_buff *skb)
 
 	/* with a retransmission rate of > 1%, BBR performs much better. */
 	if (total_retrans > (segs_out >> 5)) {
+		remote_host->retransmit_threshold = true;
 		__builtin_memcpy(remote_host->cong_alg, bbr,
 			 sizeof(remote_host->cong_alg));
 	} else {
