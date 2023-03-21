@@ -119,7 +119,7 @@ int bpf_sockops(struct bpf_sock_ops *ops)
 	/* check if cong alg already set */
 	if (bpf_getsockopt(ops, SOL_TCP, TCP_CONGESTION, &buf, sizeof(buf)))
 		return 1;
-	if (__builtin_memcmp(remote_host->cong_alg, buf, sizeof(buf)) == 0)
+	if (__strncmp(remote_host->cong_alg, buf, sizeof(buf)) == 0)
 		return 1;
 	bpf_setsockopt(ops, SOL_TCP, TCP_CONGESTION,
 		       &remote_host->cong_alg, sizeof(remote_host->cong_alg));
