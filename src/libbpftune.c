@@ -284,11 +284,13 @@ enum bpftune_support_level support_level = BPFTUNE_NONE;
 enum bpftune_support_level bpftune_bpf_support(void)
 {
 	bool ret;
+	int err;
 	struct probe_bpf *probe_bpf = probe_bpf__open_and_load();
 	struct probe_bpf_legacy *probe_bpf_legacy;
 
 	support_level = BPFTUNE_LEGACY;
-	if (probe_bpf != NULL) {
+	err = libbpf_get_error(probe_bpf);
+	if (!err) {
 		if (!probe_bpf__attach(probe_bpf))
 			support_level = BPFTUNE_NORMAL;
 		probe_bpf__destroy(probe_bpf);
@@ -296,16 +298,17 @@ enum bpftune_support_level bpftune_bpf_support(void)
 
 	if (support_level == BPFTUNE_LEGACY) {
 		bpftune_log(LOG_DEBUG, "full bpftune support not available: %s\n",
-			    strerror(errno));
+			    strerror(err));
 		probe_bpf_legacy = probe_bpf_legacy__open_and_load();		
-		if (!probe_bpf_legacy) {
+		err = libbpf_get_error(probe_bpf_legacy);
+		if (err) {
 			support_level = BPFTUNE_NONE;
-			bpftune_log(LOG_DEBUG, "legacy bpftune support not available: %s\n",
-				    strerror(errno));
+			bpftune_log(LOG_DEBUG, "legacy bpftune support not available (load): %s\n",
+				    strerror(err));
 		} else {
-			if (!probe_bpf_legacy__attach(probe_bpf_legacy)) {
+			if (probe_bpf_legacy__attach(probe_bpf_legacy)) {
 				support_level = BPFTUNE_NONE;
-				bpftune_log(LOG_DEBUG, "legacy bpftune support not available: %s\n",
+				bpftune_log(LOG_DEBUG, "legacy bpftune support not available (attach): %s\n",
 					    strerror(errno));
 			}
 			probe_bpf_legacy__destroy(probe_bpf_legacy);
