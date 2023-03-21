@@ -287,9 +287,14 @@ enum bpftune_support_level bpftune_bpf_support(void)
 	struct probe_bpf *probe_bpf = probe_bpf__open_and_load();
 	struct probe_bpf_legacy *probe_bpf_legacy;
 
-	support_level = BPFTUNE_NORMAL;
-	if (probe_bpf == NULL) {
-		support_level = BPFTUNE_LEGACY;
+	support_level = BPFTUNE_LEGACY;
+	if (probe_bpf != NULL) {
+		if (!probe_bpf__attach(probe_bpf))
+			support_level = BPFTUNE_NORMAL;
+		probe_bpf__destroy(probe_bpf);
+	}
+
+	if (support_level == BPFTUNE_LEGACY) {
 		bpftune_log(LOG_DEBUG, "full bpftune support not available: %s\n",
 			    strerror(errno));
 		probe_bpf_legacy = probe_bpf_legacy__open_and_load();		
@@ -298,10 +303,13 @@ enum bpftune_support_level bpftune_bpf_support(void)
 			bpftune_log(LOG_DEBUG, "legacy bpftune support not available: %s\n",
 				    strerror(errno));
 		} else {
+			if (!probe_bpf_legacy__attach(probe_bpf_legacy)) {
+				support_level = BPFTUNE_NONE;
+				bpftune_log(LOG_DEBUG, "legacy bpftune support not available: %s\n",
+					    strerror(errno));
+			}
 			probe_bpf_legacy__destroy(probe_bpf_legacy);
 		}
-	} else {
-		probe_bpf__destroy(probe_bpf);
 	}
 	ret = bpftune_netns_cookie_supported();
 	if (!ret)
