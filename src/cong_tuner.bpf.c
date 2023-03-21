@@ -86,6 +86,7 @@ int bpf_sockops(struct bpf_sock_ops *ops)
 	struct remote_host *remote_host;
 	struct sockaddr_in6 sin6 = {};
 	struct in6_addr *key = &sin6.sin6_addr;
+	char buf[CONG_MAXNAME] = {};
 
 	switch (ops->op) {
 	case BPF_SOCK_OPS_ACTIVE_ESTABLISHED_CB:
@@ -110,6 +111,14 @@ int bpf_sockops(struct bpf_sock_ops *ops)
 	if (!remote_host_retransmit_threshold(remote_host))
 		return 1;
 
+	/* desired cong alg not yet set... */
+	if (remote_host->cong_alg[0] == '\0')
+		return 1;
+	/* check if cong alg already set */
+	if (bpf_getsockopt(ops, SOL_TCP, TCP_CONGESTION, &buf, sizeof(buf)))
+		return 1;
+	if (__builtin_memcmp(remote_host->cong_alg, buf, sizeof(buf)) == 0)
+		return 1;
 	bpf_setsockopt(ops, SOL_TCP, TCP_CONGESTION,
 		       &remote_host->cong_alg, sizeof(remote_host->cong_alg));
 
@@ -142,14 +151,14 @@ int BPF_PROG(cong_retransmit, struct sock *sk, struct sk_buff *skb)
 
 	remote_host->retransmits++;
 
+	/* already sent ringbuf message */
+	if (remote_host_retransmit_threshold(remote_host))
+		return 0;
+
 	if (bpf_probe_read_kernel(&segs_out, sizeof(segs_out),
 				  __builtin_preserve_access_index(&tp->segs_out)) ||
 	    bpf_probe_read_kernel(&total_retrans, sizeof(total_retrans),
 				  __builtin_preserve_access_index(&tp->total_retrans)))
-		return 0;
-
-	/* already sent ringbuf message */
-	if (remote_host_retransmit_threshold(remote_host))
 		return 0;
 
 	/* with a retransmission rate of > 1%, BBR performs much better. */
