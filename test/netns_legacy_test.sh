@@ -16,12 +16,11 @@ test_start "$0|netns test: does adding/removing netns generate event?"
 
 test_setup "true"
 
-test_run_cmd_local "$BPFTUNE -dsL &" true
-
 if [[ ${BPFTUNE_NETNS} -eq 0 ]]; then
 	echo "bpftune does not support per-netns policy, skipping..."
 	test_pass
 else
+	test_run_cmd_local "$BPFTUNE -dsL &" true
 	sleep $SETUPTIME
 	ip netns add testns.$$
 	ip netns del testns.$$
