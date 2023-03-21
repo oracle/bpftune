@@ -11,6 +11,13 @@ SEC("kprobe/__cgroup_bpf_run_filter_sysctl")
 int BPF_KPROBE(bpftune_sysctl, struct ctl_table_header *head,
 	       struct ctl_table *table, int write, char **buf)
 {
+	/* these are used to get offsets of fields within structures to
+ 	 * get pointer to struct net from the struct ctl_table * we
+ 	 * are passed.
+ 	 */
+	struct ctl_table_set *dummy_ctl_table_set = NULL;
+	struct net *dummy_net = NULL;
+
 	struct bpftune_event event = {};
 	struct ctl_dir *root, *parent, *gparent, *ggparent;
 	struct ctl_dir *gggparent;
@@ -45,8 +52,9 @@ int BPF_KPROBE(bpftune_sysctl, struct ctl_table_header *head,
 				root = gggparent;
 		}
 	}
-	net = (void *)root - offsetof(struct net, sysctls) -
-				    offsetof(struct ctl_table_set, dir);
+	net = (void *)root -
+		(__u64)__builtin_preserve_access_index(&dummy_net->sysctls) -
+		(__u64)__builtin_preserve_access_index(&dummy_ctl_table_set->dir);
 	event.netns_cookie = get_netns_cookie(net);
 	if (event.netns_cookie == (unsigned long)-1)
 		return 0;
