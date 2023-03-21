@@ -38,6 +38,8 @@ remote_host_retransmit_threshold(struct remote_host *remote_host)
 	if (now - remote_host->last_retransmit > HOUR) {
 		remote_host->retransmits = 0;
 		remote_host->retransmit_threshold = false;
+	} else {
+		remote_host->last_retransmit = now;
 	}
 
 	return remote_host->retransmit_threshold;
