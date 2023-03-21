@@ -148,6 +148,10 @@ int BPF_PROG(cong_retransmit, struct sock *sk, struct sk_buff *skb)
 				  __builtin_preserve_access_index(&tp->total_retrans)))
 		return 0;
 
+	/* already sent ringbuf message */
+	if (remote_host_retransmit_threshold(remote_host))
+		return 0;
+
 	/* with a retransmission rate of > 1%, BBR performs much better. */
 	if (total_retrans > (segs_out >> 5)) {
 		remote_host->retransmit_threshold = true;
