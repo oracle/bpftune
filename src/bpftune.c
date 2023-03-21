@@ -313,7 +313,6 @@ int main(int argc, char *argv[])
 					BPFTUNE_DELTA_MIN, BPFTUNE_DELTA_MAX);
 				return 1;
 			}
-			bpftune_set_learning_rate(rate);
 			break;
 		case 's':
 			use_stderr = true;
@@ -333,6 +332,8 @@ int main(int argc, char *argv[])
 	}
 
 	bpftune_set_log(log_level, use_stderr ? bpftune_log_stderr : bpftune_log_syslog);
+
+	bpftune_set_learning_rate(rate);
 
 	if (setrlimit(RLIMIT_MEMLOCK, &r)) {
 		err = -errno;
