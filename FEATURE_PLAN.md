@@ -150,6 +150,9 @@ for h-tcp, otherwise use BBR.
 
 ## Future work
 
+- kernel support for tunable override via bpf? Have decision points
+  in kernel be over-rideable by BPF; would need to have sysctl
+  denote "BPF tuned" somehow...
 - mem tuning (min_free_kbytes etc)?
 - kernel tunables (numa balancing, pid max, threads_max, etc)
 - vm tunables?
