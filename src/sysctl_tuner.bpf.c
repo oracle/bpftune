@@ -47,8 +47,9 @@ int BPF_KPROBE(bpftune_sysctl, struct ctl_table_header *head,
 	}
 	net = (void *)root - offsetof(struct net, sysctls) -
 				    offsetof(struct ctl_table_set, dir);
-	__bpf_printk("got net 0x%lx, init_net 0x%lx\n", net, (void *)&init_net);
 	event.netns_cookie = get_netns_cookie(net);
+	if (event.netns_cookie == (unsigned long)-1)
+		return 0;
 	procname = BPF_CORE_READ(table, procname);
 	if (!procname)
 		return 0;

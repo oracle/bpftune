@@ -20,13 +20,12 @@ int sk_mem_quantum;
 int sk_mem_quantum_shift;
 unsigned long nr_free_buffer_pages;
 
-#define tcp_tunable_corr(__id, __cookie, __newval, __sk, __field_type, __field)\
+#define tcp_tunable_corr(__id, __cookie, __newval, __tp, __field_type, __field)\
 	{								\
 		__field_type __field;					\
 		if (!bpf_probe_read_kernel(&__field, sizeof(__field),	\
-				   (void *)__sk +			\
-				   offsetof(struct tcp_sock, __field)))	\
-                        corr_update_bpf(__id, __cookie, __newval,	\
+			__builtin_preserve_access_index(&tp->__field)))	\
+			corr_update_bpf(__id, __cookie, __newval,	\
 					__field);			\
 	}
 
@@ -179,6 +178,7 @@ BPF_FENTRY(tcp_sndbuf_expand, struct sock *sk)
 {
 	struct bpftune_event event = { 0 };
 	struct net *net = BPF_CORE_READ(sk, sk_net.net);
+	struct tcp_sock *tp = (struct tcp_sock *)sk;
 	long wmem[3], wmem_new[3];
 	long sndbuf;
 
@@ -208,7 +208,7 @@ BPF_FENTRY(tcp_sndbuf_expand, struct sock *sk)
 		 * latencies.
 		 */
 		tcp_tunable_corr(TCP_BUFFER_TCP_WMEM, event.netns_cookie,
-				 wmem[2], sk, __u32, srtt_us);
+				 wmem[2], tp, __u32, srtt_us);
 	}
 	return 0;
 }
@@ -221,6 +221,7 @@ BPF_FENTRY(tcp_rcv_space_adjust, struct sock *sk)
 {
 	struct bpftune_event event = { 0 };
 	struct net *net = BPF_CORE_READ(sk, sk_net.net);
+	struct tcp_sock *tp = (struct tcp_sock *)sk;
 	long rmem[3], rmem_new[3];
 	__u8 sk_userlocks = 0;
 	long rcvbuf;
@@ -254,7 +255,7 @@ BPF_FENTRY(tcp_rcv_space_adjust, struct sock *sk)
 		 * latencies.
 		 */
 		tcp_tunable_corr(TCP_BUFFER_TCP_RMEM, event.netns_cookie,
-				 rmem[2], sk, __u32, srtt_us);
+				 rmem[2], tp, __u32, srtt_us);
 
 	}
 	return 0;

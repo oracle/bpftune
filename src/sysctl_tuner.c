@@ -40,6 +40,9 @@ void event_handler(struct bpftuner *tuner, struct bpftune_event *event,
 	bpftune_log(LOG_DEBUG, "sysctl write for '%s' (scenario %d) for tuner %s\n",
 		    event->str, event->scenario_id, tuner->name);
 
+	if (event->netns_cookie == (unsigned long)-1)
+		return;
+
 	bpftune_for_each_tuner(t) {
 		struct bpftunable *tunable;
 

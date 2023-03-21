@@ -49,11 +49,11 @@ static __always_inline int get_sk_key(struct sock *sk, struct in6_addr *key)
 	switch (family) {
 	case AF_INET:
 		return bpf_probe_read_kernel(key, sizeof(sk->sk_daddr),
-					     sk + offsetof(struct sock, sk_daddr));
+					     __builtin_preserve_access_index(&sk->sk_daddr));
 		
 	case AF_INET6:
 		return bpf_probe_read_kernel(key, sizeof(*key),
-					     sk + offsetof(struct sock, sk_v6_daddr));
+					     __builtin_preserve_access_index(&sk->sk_v6_daddr));
 	default:
 		return -EINVAL;
 	}
@@ -146,9 +146,9 @@ int BPF_PROG(cong_retransmit, struct sock *sk, struct sk_buff *skb)
 		return 0;
 
 	if (bpf_probe_read_kernel(&segs_out, sizeof(segs_out),
-				  (void *)sk + offsetof(struct tcp_sock, segs_out)) ||
+				  __builtin_preserve_access_index(&tp->segs_out)) ||
 	    bpf_probe_read_kernel(&total_retrans, sizeof(total_retrans),
-				  (void *)sk + offsetof(struct tcp_sock, total_retrans)))
+				  __builtin_preserve_access_index(&tp->total_retrans)))
 		return 0;
 
 	/* with a retransmission rate of > 1%, BBR performs much better. */
