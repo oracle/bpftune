@@ -28,6 +28,14 @@ Prefix:         %{_prefix}
 Service consisting of daemon (bpftune) and plugins which
 support auto-tuning of Linux via BPF observability.
 
+%package devel
+Summary:        Development files for %{name}
+Requires:       %{name} = %{version}-%{release}
+
+%description devel
+The %{name}-devel package contains libraries header files for
+developing BPF shared object tuners that use %{name}
+
 %prep
 %setup -q -n bpftune-%{version}
 
@@ -42,13 +50,17 @@ rm -Rf %{buildroot}
 %defattr(-,root,root)
 %{_sbindir}/bpftune
 %{_unitdir}/bpftune.service
-%{_libdir}/libbpftune.so
 %{_libdir}/libbpftune.so.0.1.1
 %{_libdir}/bpftune/*
 %{_mandir}/*/*
 
-%license LICENSE
+%license LICENSE LICENSE.BSD-2-Clause LICENSE.LPGL-2.1
 
+%files devel
+%{_libdir}/libbpftune.so
+%{_includedir}/bpftune
+
+%license LICENSE LICENSE.BSD-2-Clause LICENSE.LPGL-2.1
 
 %changelog
 * Mon May 30 2022 Alan Maguire <alan.maguire@oracle.com> - 0.1-1

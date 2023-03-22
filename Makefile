@@ -18,7 +18,7 @@ INSTALLPATH = $(installprefix)
 
 .PHONY: all clean
 
-all: srcdir docdir
+all: srcdir docdir 
 	
 srcdir:
 	cd src; make
@@ -45,9 +45,11 @@ srcclean:
 docclean:
 	cd docs; make clean
 
-install: srcinstall docinstall
+install: srcinstall includeinstall docinstall
 	
 srcinstall:
 	cd src; make install
+includeinstall:
+	cd include; make install
 docinstall:
 	cd docs; make install
