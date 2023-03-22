@@ -19,8 +19,6 @@ static struct bpftunable_desc descs[] = {
 { TCP_BUFFER_TCP_MAX_ORPHANS,
 			BPFTUNABLE_SYSCTL, "net.ipv4.tcp_max_orphans",
 								false, 1 },
-{ NETDEV_MAX_BACKLOG,	BPFTUNABLE_SYSCTL, "net.core.netdev_max_backlog",
-								false, 1 },
 };
 
 static struct bpftunable_scenario scenarios[] = {
@@ -37,12 +35,6 @@ static struct bpftunable_scenario scenarios[] = {
 	"Since memory exhaustion is a highly unstable state, adjust TCP memory-related tunables to avoid exhaustion" },
 { TCP_MAX_ORPHANS_INCREASE,
 			"increase max number of orphaned sockets",
-			"" },
-{ NETDEV_MAX_BACKLOG_INCREASE,
-			"increase max backlog for received packets",
-			"" },
-{ NETDEV_MAX_BACKLOG_DECREASE,
-			"decrease max backlog for received packets",
 			"" },
 };
 
@@ -236,13 +228,6 @@ void event_handler(struct bpftuner *tuner,
 					      reason, tunable,
 					      old[0], old[1], old[2],
 					      new[0], new[1], new[2]);
-		break;
-	case NETDEV_MAX_BACKLOG:
-		bpftuner_tunable_sysctl_write(tuner, id, scenario,
-					      event->netns_cookie, 1, new,
-"Dropped more than 1/4 of the backlog queue size (%d) in last minute; "
-"increase backlog queue size from %d -> %d to support faster network device.\n",
-					      old[0], new[0]);
 		break;
 	case TCP_BUFFER_TCP_MAX_ORPHANS:
 		break;
