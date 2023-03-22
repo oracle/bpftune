@@ -33,8 +33,8 @@
  - we notice new tuners appearing/disappearing from /usr/lib64/bpftune
    via inotify.  We watch the above directory for tuner addition or
    removal to allow packages to separately deliver their own tuners.
-   We will eventually deliver a bpftune-devel package to support this,
-   which will include headers required etc.
+ - We deliver a bpftune-devel package to support separate tuner
+   development.
 
 ### sysctl tuner
  - add support for dynamically disabling relevant tuner if tunables change
