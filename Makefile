@@ -33,7 +33,7 @@ pkg:    all
 	git archive --format=tar --prefix=$(PKG_ARCHIVE)/ -o $(SRC_DIR)/$(PKG_ARCHIVE).tar HEAD;\
 	bzip2 $(SRC_DIR)/$(PKG_ARCHIVE).tar ; \
 	mkdir -p $(BUILD_DIR) $(BUILD_DIR)/$(prefix) $(LICENSEDIR);\
-	cp -pr LICENSE $(LICENSEDIR) ;\
+	cp -pr LICENSE* $(LICENSEDIR) ;\
 	DESTDIR=$(BUILD_DIR) installprefix=$(BUILD_DIR)/$(prefix) rpmbuild --define "_topdir $(PKG_DIR)" -ba buildrpm/bpftune.spec
 
 FORCE:
