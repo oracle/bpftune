@@ -64,7 +64,7 @@ for DROP_PERCENT in 10 0 ; do
 		read -r -a rtest_results <<< $rresults
 		if [[ -z "$CLIENT_OPTS" ]]; then
 			if [[ $DROP_PERCENT -gt 0 ]]; then
-				grep -E "(specify bbr|specify h-tcp)" $LOGFILE
+				grep -E "due to loss events for ${ADDR}, specify 'bbr'" $LOGFILE
 			fi
 		fi
 		if [[ $MODE == "test" ]]; then
