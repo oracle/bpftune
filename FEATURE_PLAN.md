@@ -35,6 +35,9 @@
    removal to allow packages to separately deliver their own tuners.
  - We deliver a bpftune-devel package to support separate tuner
    development.
+ - And also show a sample standalone tuner in sample_tuner/ ; it
+   demonstrates how to build a tuner .so and install it in
+   /usr/local/lib64/bpftune
 
 ### sysctl tuner
  - add support for dynamically disabling relevant tuner if tunables change
