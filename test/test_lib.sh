@@ -338,4 +338,9 @@ test_end()
 	fi
 }
 
+roundup()
+{
+	echo $1 | awk -F '.' '$2 >= 5 { print $1 + 1} $2 < 5 { print $1}'
+}
+
 test_init
