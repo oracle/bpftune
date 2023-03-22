@@ -93,20 +93,24 @@ for FAMILY in ipv4 ipv6 ; do
    printf "Results sender (${units}): "
    for (( i=0; i < ${#sbaseline_results[@]}; i++ ))
    do
-	if [[ ${sbaseline_results[$i]} -gt ${stest_results[$i]} ]]; then  
-		bold "Warning: baseline ${sbaseline_results[$i]} > test (${stest_results[$i]})"
+	sbase=$(roundup ${sbaseline_results[$i]})
+	stest=$(roundup ${stest_results[$i]})
+	if [[ ${sbase} -gt ${stest} ]]; then  
+		bold "Warning: baseline (${sbase}) > test (${stest})"
 	else
-		echo "baseline (${sbaseline_results[$i]}) < test (${stest_results[$i]})"
+		echo "baseline (${sbase}) < test (${stest})"
 	fi
    done
    printf "Results receiver (${units}): "
    for (( i=0; i < ${#rbaseline_results[@]}; i++ ))
    do
-	if [[ ${rbaseline_results[$i]} -gt ${rtest_results[$i]} ]]; then
-                bold "Warning: baseline ${rbaseline_results[$i]} > test (${rtest_results[$i]})"
+	rbase=$(roundup ${rbaseline_results[$i]})
+	rtest=$(roundup ${rtest_results[$i]})
+	if [[ ${rbase} -gt ${rtest} ]]; then
+                bold "Warning: baseline (${rbase}) > test (${rtest})"
 	else
-		echo "baseline (${rbaseline_results[$i]}) < test (${rtest_results[$i]})"
-	fi      
+		echo "baseline (${rbase}) < test (${rtest})"
+	fi
    done 
 
 
