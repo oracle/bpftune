@@ -51,8 +51,12 @@ OPTIONS
         -S, --support
                   Scan system to see what level of bpftune support is present.
         -l, --libdir
-                  bptune plugin directory; defaults to
-                  /usr/lib64 
+                  bptune extra plugin directory; defaults to
+                  /usr/local/lib64/bpftune . Both /usr/lib64/bpftune and
+                  /usr/local/lib64/bpftune can be used to install plugin tuners;
+                  if an alternative to /usr/local/lib64/bpftune is wanted,
+                  it must be specified via library path.
+
         -r, --learning_rate
 
                   Specify learning rate; supported values range from

@@ -123,9 +123,7 @@ void *inotify_thread(void *arg)
 	return NULL;
 }
 
-
-	
-int init(const char *cgroup_dir, const char *library_dir)
+int init(const char *library_dir)
 {
 	pthread_attr_t attr = {};
 	char library_path[512];
@@ -134,17 +132,10 @@ int init(const char *cgroup_dir, const char *library_dir)
 	DIR *dir;
 	int err;
 
-	/* ensure no existing pin in place... */
-	ftw(BPFTUNE_PIN, unlink_cb, FTW_F | FTW_D);
-
-	err = bpftune_cgroup_init(cgroup_dir);
-	if (err)
-		return err;
-
 	dir = opendir(library_dir);
 	if (!dir) {
 		err = -errno;
-		bpftune_log(LOG_ERR, "could not open dir '%s': %s\n",
+		bpftune_log(LOG_DEBUG, "could not open dir '%s': %s\n",
 			    library_dir, strerror(-err));
 		return err;
 	}
@@ -268,7 +259,7 @@ int main(int argc, char *argv[])
 	};
 	struct rlimit r = {RLIM_INFINITY, RLIM_INFINITY};
 	char *cgroup_dir = BPFTUNER_CGROUP_DIR;
-	char *library_dir = BPFTUNER_LIB_DIR;
+	char *library_dir = BPFTUNER_LOCAL_LIB_DIR;
 	enum bpftune_support_level support_level;
 	unsigned short rate = BPFTUNE_DELTA_MAX;
 	int log_level = LOG_ALERT;
@@ -349,8 +340,22 @@ int main(int argc, char *argv[])
 	}
 	if (support_only)
 		return 0;
-	if (init(cgroup_dir, library_dir))
+
+	/* ensure no existing pin in place... */
+	ftw(BPFTUNE_PIN, unlink_cb, FTW_F | FTW_D);
+
+	err = bpftune_cgroup_init(cgroup_dir);
+	if (err)
 		exit(EXIT_FAILURE);
+
+	if (init(BPFTUNER_LIB_DIR)) {
+		bpftune_log(LOG_ERR, "could not initialize tuners in '%s'\n",
+			    BPFTUNER_LIB_DIR);
+		exit(EXIT_FAILURE);
+	}
+	/* optional dir absence will not trigger failure */
+	if (library_dir)
+		init(library_dir);
 
 	signal(SIGINT, cleanup);
 	signal(SIGTERM, cleanup);

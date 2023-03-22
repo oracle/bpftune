@@ -28,6 +28,7 @@
 
 #define BPFTUNER_CGROUP_DIR		"/tmp/cgroupv2"
 #define BPFTUNER_LIB_DIR		"/usr/lib64/bpftune/"
+#define BPFTUNER_LOCAL_LIB_DIR		"/usr/local/lib64/bpftune/"
 #define BPFTUNER_LIB_SUFFIX		"_tuner.so"
 
 #define BPFTUNE_PROC_SYS		"/proc/sys/"
