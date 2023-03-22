@@ -127,12 +127,8 @@ static __always_inline bool tcp_nearly_out_of_memory(struct sock *sk,
 
 		mem_new[0] = mem[0];
 		mem_new[1] = mem[1];
-		bpftune_log("near/under pressure allocated %d/%d\n",
-			     allocated, limit_sk_mem_quantum[1]);
 		if (mem[0] < nr_free_buffer_pages >> 4)
 			mem_new[0] = BPFTUNE_GROW_BY_DELTA(mem[0]);
-		bpftune_log("mem[1] %d limit %d\n", mem[1],
-			      nr_free_buffer_pages >> 3);
 		if (mem[1] < nr_free_buffer_pages >> 3)
 			mem_new[1] = BPFTUNE_GROW_BY_DELTA(mem[1]);
 		mem_new[2] = min(nr_free_buffer_pages >> 2,

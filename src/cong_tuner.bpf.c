@@ -35,12 +35,12 @@ remote_host_retransmit_threshold(struct remote_host *remote_host)
 
 	now = bpf_ktime_get_ns();
 
-	if (now - remote_host->last_retransmit > HOUR) {
+	if (remote_host->last_retransmit &&
+	    (now - remote_host->last_retransmit) > HOUR) {
 		remote_host->retransmits = 0;
 		remote_host->retransmit_threshold = false;
-	} else {
-		remote_host->last_retransmit = now;
 	}
+	remote_host->last_retransmit = now;
 
 	return remote_host->retransmit_threshold;
 }
@@ -89,6 +89,7 @@ int bpf_sockops(struct bpf_sock_ops *ops)
 	struct sockaddr_in6 sin6 = {};
 	struct in6_addr *key = &sin6.sin6_addr;
 	char buf[CONG_MAXNAME] = {};
+	int ret;
 
 	switch (ops->op) {
 	case BPF_SOCK_OPS_ACTIVE_ESTABLISHED_CB:
@@ -110,7 +111,7 @@ int bpf_sockops(struct bpf_sock_ops *ops)
 	remote_host = get_remote_host(key);
 	if (!remote_host)
 		return 1;
-	if (!remote_host_retransmit_threshold(remote_host))
+	if (!remote_host->retransmit_threshold)
 		return 1;
 
 	/* desired cong alg not yet set... */
@@ -121,9 +122,9 @@ int bpf_sockops(struct bpf_sock_ops *ops)
 		return 1;
 	if (__strncmp(remote_host->cong_alg, buf, sizeof(buf)) == 0)
 		return 1;
-	bpf_setsockopt(ops, SOL_TCP, TCP_CONGESTION,
-		       &remote_host->cong_alg, sizeof(remote_host->cong_alg));
-
+	ret = bpf_setsockopt(ops, SOL_TCP, TCP_CONGESTION,
+			     &remote_host->cong_alg, sizeof(remote_host->cong_alg));
+	bpftune_debug("set cong '%s': %d\n", remote_host->cong_alg, ret);
 	return 1;
 }
 
@@ -195,9 +196,11 @@ int bpftune_cong_iter(struct bpf_iter__tcp *ctx)
 {
 	struct sock_common *skc = ctx->sk_common;
 	struct remote_host *remote_host;
+	char buf[CONG_MAXNAME] = {};
 	struct in6_addr key = {};
 	struct tcp_sock *tp;
         struct sock *sk = NULL;
+	int ret;
 
 	if (skc) {
 		tp = bpf_skc_to_tcp_sock(skc);
@@ -213,11 +216,18 @@ int bpftune_cong_iter(struct bpf_iter__tcp *ctx)
 	if (!remote_host)
 		return 0;
 
-	if (!remote_host_retransmit_threshold(remote_host))
+	if (!remote_host->retransmit_threshold ||
+	    remote_host->cong_alg[0] == '\0')
 		return 0;
 
-	bpf_setsockopt(tp, SOL_TCP, TCP_CONGESTION,
-		       &remote_host->cong_alg, sizeof(remote_host->cong_alg));
+	/* check if cong alg already set */
+	if (bpf_getsockopt(tp, SOL_TCP, TCP_CONGESTION, &buf, sizeof(buf)) ||
+	    __strncmp(remote_host->cong_alg, buf, sizeof(buf)) == 0)
+		return 0;
+
+	ret = bpf_setsockopt(tp, SOL_TCP, TCP_CONGESTION,
+			     &remote_host->cong_alg, sizeof(remote_host->cong_alg));
+	bpftune_debug("set cong '%s': %d\n", remote_host->cong_alg, ret);
 	return 0;
 }
 #endif

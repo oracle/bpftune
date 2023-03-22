@@ -189,7 +189,8 @@ unsigned int bpftune_pid;
 
 bool debug;
 
-#define bpftune_log(...)	if (debug) __bpf_printk(__VA_ARGS__)
+#define bpftune_log(...)	__bpf_printk(__VA_ARGS__)
+#define bpftune_debug(...)	if (debug) __bpf_printk(__VA_ARGS__)
 
 extern const void init_net __ksym;
 
