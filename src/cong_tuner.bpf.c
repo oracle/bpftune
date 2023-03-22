@@ -22,9 +22,6 @@ struct {
 } remote_host_map SEC(".maps");
 
 
-/* If last time we surpassed the retransmit threshold is greater than an hour,
- * reset.
- */
 static __always_inline bool
 remote_host_retransmit_threshold(struct remote_host *remote_host)
 {
@@ -35,6 +32,9 @@ remote_host_retransmit_threshold(struct remote_host *remote_host)
 
 	now = bpf_ktime_get_ns();
 
+	/* If last time we surpassed the retransmit threshold is greater than
+	 * an hour, reset.
+	 */
 	if (remote_host->last_retransmit &&
 	    (now - remote_host->last_retransmit) > HOUR) {
 		remote_host->retransmits = 0;
@@ -77,57 +77,6 @@ static __always_inline struct remote_host *get_remote_host(struct in6_addr *key)
 }
 
 #ifdef BPFTUNE_LEGACY
-/* in legacy mode, use sockops prog to set cong algoritm when retransmit
- * threshold is passed.  Because we need to enable retransmit sock ops
- * events on socket accept/connect, this does not work for existing
- * connections which were initiated prior to bpftune starting.
- */
-SEC("sockops")
-int bpf_sockops(struct bpf_sock_ops *ops)
-{
-	struct remote_host *remote_host;
-	struct sockaddr_in6 sin6 = {};
-	struct in6_addr *key = &sin6.sin6_addr;
-	char buf[CONG_MAXNAME] = {};
-	int ret;
-
-	switch (ops->op) {
-	case BPF_SOCK_OPS_ACTIVE_ESTABLISHED_CB:
-	case BPF_SOCK_OPS_PASSIVE_ESTABLISHED_CB:
-		/* enable retransmission events */
-		bpf_sock_ops_cb_flags_set(ops, BPF_SOCK_OPS_RETRANS_CB_FLAG);
-		return 1;
-	case BPF_SOCK_OPS_RETRANS_CB:
-		break;
-	default:
-		return 1;
-	}
-	sin6.sin6_family = ops->family;
-	sin6.sin6_addr.s6_addr32[0] = ops->remote_ip6[0];
-	sin6.sin6_addr.s6_addr32[1] = ops->remote_ip6[1];
-	sin6.sin6_addr.s6_addr32[2] = ops->remote_ip6[2];
-	sin6.sin6_addr.s6_addr32[3] = ops->remote_ip6[3];
-
-	remote_host = get_remote_host(key);
-	if (!remote_host)
-		return 1;
-	if (!remote_host->retransmit_threshold)
-		return 1;
-
-	/* desired cong alg not yet set... */
-	if (remote_host->cong_alg[0] == '\0')
-		return 1;
-	/* check if cong alg already set */
-	if (bpf_getsockopt(ops, SOL_TCP, TCP_CONGESTION, &buf, sizeof(buf)))
-		return 1;
-	if (__strncmp(remote_host->cong_alg, buf, sizeof(buf)) == 0)
-		return 1;
-	ret = bpf_setsockopt(ops, SOL_TCP, TCP_CONGESTION,
-			     &remote_host->cong_alg, sizeof(remote_host->cong_alg));
-	bpftune_debug("set cong '%s': %d\n", remote_host->cong_alg, ret);
-	return 1;
-}
-
 /* count retransmits here per remote addr here... */
 SEC("raw_tracepoint/tcp_retransmit_skb")
 #else
@@ -185,7 +134,68 @@ int BPF_PROG(cong_retransmit, struct sock *sk, struct sk_buff *skb)
 	return 0;
 }
 
-#ifndef BPFTUNE_LEGACY
+#ifdef BPFTUNE_LEGACY
+/* in legacy mode, use sockops prog to set cong algoritm when retransmit
+ * threshold is passed.  Because we need to enable retransmit sock ops
+ * events on socket accept/connect, this does not work for existing
+ * connections which were initiated prior to bpftune starting.
+ */
+SEC("sockops")
+int bpf_sockops(struct bpf_sock_ops *ops)
+{
+	struct remote_host *remote_host;
+	struct sockaddr_in6 sin6 = {};
+	struct in6_addr *key = &sin6.sin6_addr;
+	char buf[CONG_MAXNAME] = {};
+	int ret;
+
+	switch (ops->op) {
+	case BPF_SOCK_OPS_ACTIVE_ESTABLISHED_CB:
+	case BPF_SOCK_OPS_PASSIVE_ESTABLISHED_CB:
+		/* enable retransmission events */
+		bpf_sock_ops_cb_flags_set(ops, BPF_SOCK_OPS_RETRANS_CB_FLAG);
+		return 1;
+	case BPF_SOCK_OPS_RETRANS_CB:
+		break;
+	default:
+		return 1;
+	}
+	sin6.sin6_family = ops->family;
+	switch (ops->family) {
+	case AF_INET:
+		sin6.sin6_addr.s6_addr32[0] = ops->remote_ip4;
+		break;
+	case AF_INET6:
+		sin6.sin6_addr.s6_addr32[0] = ops->remote_ip6[0];
+		sin6.sin6_addr.s6_addr32[1] = ops->remote_ip6[1];
+		sin6.sin6_addr.s6_addr32[2] = ops->remote_ip6[2];
+		sin6.sin6_addr.s6_addr32[3] = ops->remote_ip6[3];
+		break;
+	default:
+		return 1;
+	}
+
+	remote_host = get_remote_host(key);
+	if (!remote_host)
+		return 1;
+
+	if (!remote_host->retransmit_threshold ||
+            remote_host->cong_alg[0] == '\0')
+		return 1;
+
+	/* check if cong alg already set */
+	if (bpf_getsockopt(ops, SOL_TCP, TCP_CONGESTION, &buf, sizeof(buf)) ||
+	    __strncmp(remote_host->cong_alg, buf, sizeof(buf)) == 0)
+                return 1;
+
+	ret = bpf_setsockopt(ops, SOL_TCP, TCP_CONGESTION,
+			     &remote_host->cong_alg, sizeof(remote_host->cong_alg));
+	bpftune_debug("cong_tuner: set cong '%s': %d\n", remote_host->cong_alg, ret);
+	return 1;
+}
+
+
+#else
 /* specify congestion control algorithm here via iterator (to catch
  * existing + new TCP connections) for connections to remote hosts which
  * have seen retransmits in the past.  The event sent from the retransmit
@@ -227,7 +237,7 @@ int bpftune_cong_iter(struct bpf_iter__tcp *ctx)
 
 	ret = bpf_setsockopt(tp, SOL_TCP, TCP_CONGESTION,
 			     &remote_host->cong_alg, sizeof(remote_host->cong_alg));
-	bpftune_debug("set cong '%s': %d\n", remote_host->cong_alg, ret);
+	bpftune_debug("cong_tuner: set cong '%s': %d\n", remote_host->cong_alg, ret);
 	return 0;
 }
 #endif
