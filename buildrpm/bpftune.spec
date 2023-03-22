@@ -54,13 +54,13 @@ rm -Rf %{buildroot}
 %{_libdir}/bpftune/*
 %{_mandir}/*/*
 
-%license LICENSE LICENSE.BSD-2-Clause LICENSE.LPGL-2.1
+%license LICENSE LICENSE.BSD-2-Clause LICENSE.LGPL-2.1
 
 %files devel
 %{_libdir}/libbpftune.so
 %{_includedir}/bpftune
 
-%license LICENSE LICENSE.BSD-2-Clause LICENSE.LPGL-2.1
+%license LICENSE LICENSE.BSD-2-Clause LICENSE.LGPL-2.1
 
 %changelog
 * Mon May 30 2022 Alan Maguire <alan.maguire@oracle.com> - 0.1-1
