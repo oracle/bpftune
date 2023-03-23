@@ -154,6 +154,9 @@ for h-tcp, otherwise use BBR.
 
 ## Future work
 
+- assessing tuner strategy: are we helping or making things
+  worse? Support multiple strategies per tuner, explore the
+  best?
 - kernel support for tunable override via bpf? Have decision points
   in kernel be over-rideable by BPF; would need to have sysctl
   denote "BPF tuned" somehow...

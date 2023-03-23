@@ -85,6 +85,25 @@ if necessary.
   round-trip time; if the correlation between these exceeds a
   threshould (0.7) we stop increasing buffer size.
 
+# Concepts
+
+The key components are
+
+- tuners: each tuner manages tunables and handles events sent
+  from BPF programs to userspace via the shared ring buffer.
+  Each tuner has an associated set of tunables that it manages.
+
+- events specify a
+	- tuner id: which tuner the event is destined for
+	- a scenario: what happened
+	- an associated netns (if supported)
+	- information about the event (IP address etc)
+
+- the tuner then responds to the event with a strategy; increase
+  or decrease a tunable value, etc.  Describing the event
+  in the log is key; this allows an admin to understand what
+  changed and why.
+
 # Architecture
 
 - bpftune is a daemon which manages a set of .so plugin tuners;

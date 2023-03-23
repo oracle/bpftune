@@ -16,6 +16,7 @@ test_start "$0|sample test: does sample tuner appear, trigger event and disappea
 
 test_setup "true"
 
+rm -f /usr/local/lib64/bpftune/sample_tuner.so
 test_run_cmd_local "$BPFTUNE -ds &" true
 sleep $SETUPTIME
 cd ../sample_tuner ; make install

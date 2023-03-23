@@ -70,7 +70,7 @@ clean:
 	$(Q)$(RM) -r .output
 
 install: all
-	$(INSTALL) -m 0755 -d $(INSTALLPATH)/lib64
+	$(INSTALL) -m 0755 -d $(INSTALLPATH)/local/lib64
 	$(INSTALL) -m 0755 -d $(INSTALLPATH)/local/lib64/bpftune
 	$(INSTALL) $(TUNER_LIBS) $(INSTALLPATH)/local/lib64/bpftune
 
