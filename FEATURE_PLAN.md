@@ -37,7 +37,8 @@
    development.
  - And also show a sample standalone tuner in sample_tuner/ ; it
    demonstrates how to build a tuner .so and install it in
-   /usr/local/lib64/bpftune
+   /usr/local/lib64/bpftune; it is monitored for tuner appearance
+   and disappearance also.
 
 ### sysctl tuner
  - add support for dynamically disabling relevant tuner if tunables change
