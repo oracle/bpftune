@@ -14,6 +14,9 @@ Tuners are added as plug-in .so objects built as tuner_name.c, and each tuner
 has a BPF program named tuner_name.bpf.c.  To add a new tuner, add these
 files and simply add tuner_name to TUNERS in src/Makefile.
 
+Tuners can also be built outside of bpftune; see the sample_tuner/
+subdirectory for a simple example and sample Makefile.
+
 # BPF component (tuner_name.bpf.c)
 
 The BPF code must

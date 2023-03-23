@@ -30,6 +30,18 @@ Verify logging works with syslog, stdout/stderr.
 Verify that removing or adding a tuner is noticed and the tuner
 is cleaned up/initialized appropriately.
 
+## Sample tests
+
+We provide a bare-bones sample tuner in sample_tuner/ ; it is
+an example of a user-provided tuner that is built using
+bpftune-devel and is installed in /usr/local/lib64/bpftune.
+The test verifies that
+ - installing it after bpftune has started triggers inotify
+   events to load the tuner
+ - events are successfully triggered for the tuner once
+   loaded
+ - it is unloaded on remove from the directory
+
 # Per-tuner tests
 
 ## sysctl tests

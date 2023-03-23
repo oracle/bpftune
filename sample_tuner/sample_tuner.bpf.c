@@ -1,10 +1,11 @@
 /* SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause) */
 /* Copyright (c) 2023, Oracle and/or its affiliates. */
 
-#include "bpftune.bpf.h"
+#include <bpftune/bpftune.bpf.h>
 
-/* fire when sysinfo is called. */
-BPF_FENTRY(do_sysinfo, struct sysinfo *sysinfo)
+/* fire when coredump sysctls are read */
+BPF_FENTRY(proc_dostring_coredump, struct ctl_table *table, int write,
+				   void *buffer, size_t *lenp, loff_t *ppos)
 {
 	struct bpftune_event event = {};
 	int ret, scenario_id = 0;
