@@ -18,12 +18,15 @@ INSTALLPATH = $(installprefix)
 
 .PHONY: all clean
 
-all: srcdir docdir 
+all: srcdir docdir sampledir
 	
 srcdir:
 	cd src; make
 docdir:
 	cd docs; make man
+
+sampledir:
+	cd sample_tuner; make
 
 test:	FORCE
 	cd test; make test
