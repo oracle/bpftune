@@ -43,7 +43,7 @@ int init(struct bpftuner *tuner)
 	if (tuner->bpf_legacy) {
 
 		/* attach to root cgroup */
-		if (bpftuner_cgroup_attach(tuner, "bpf_sockops", BPF_CGROUP_SOCK_OPS))
+		if (bpftuner_cgroup_attach(tuner, "cong_tuner_sockops", BPF_CGROUP_SOCK_OPS))
 			return 1;
 	} else {
 		struct bpf_link *link;
@@ -73,7 +73,7 @@ void fini(struct bpftuner *tuner)
 {
 	bpftune_log(LOG_DEBUG, "calling fini for %s\n", tuner->name);
 	if (tuner->bpf_legacy)
-		bpftuner_cgroup_detach(tuner, "bpf_sockops", BPF_CGROUP_SOCK_OPS);
+		bpftuner_cgroup_detach(tuner, "cong_tuner_sockops", BPF_CGROUP_SOCK_OPS);
 	if (tcp_iter_fd)
 		close(tcp_iter_fd);
 	bpftuner_bpf_fini(tuner);
