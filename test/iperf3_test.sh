@@ -9,6 +9,11 @@
 
 PORT=5201
 
+TUNER=${TUNER:-}
+if [[ -n "$TUNER" ]]; then
+	BPFTUNE_FLAGS="$BPFTUNE_FLAGS -a $TUNER"
+fi
+
 . ./test_lib.sh
 
 LOGFILE=$TESTLOG_LAST
