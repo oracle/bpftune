@@ -46,6 +46,7 @@ check_prog "$IPERF3" iperf3 iperf3
 export QPERF=$(which qperf 2>/dev/null)
 check_prog "$QPERF" qperf qperf
 export FIREWALL_CMD=$(which firewall-cmd 2>/dev/null)
+export AUDIT_CMD=$(which auditctl 2>/dev/null)
 export LOGFILE=${LOGFILE:-"/var/log/messages"}
 export BPFTUNE_LEGACY=${BPFTUNE_LEGACY:-0}
 export BPFTUNE_NETNS=${BPFTUNE_NETNS:-1}
@@ -208,6 +209,9 @@ test_setup_local()
 		if [[ "$running" == "running" ]]; then
 			$FIREWALL_CMD --add-port=${PORT}/tcp >/dev/null 2>&1
 		fi
+	fi
+	if [[ -f "$AUDIT_CMD" ]]; then
+		$AUDIT_CMD -e 0
 	fi
 	sysctl -qw net.ipv4.tcp_fin_timeout=5
 	test_run_cmd_local "$CMD" true
