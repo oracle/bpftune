@@ -32,6 +32,8 @@ static struct bpftunable_desc descs[] = {
 		"net.ipv6.neigh.default.gc_thresh2",    false, 1, },
 { NEIGH_TABLE_IPV6_GC_THRESH3,		BPFTUNABLE_SYSCTL,
 		"net.ipv6.neigh.default.gc_thresh3",    false, 1, },
+{ NEIGH_TABLE_IPV6_MAX_SIZE,		BPFTUNABLE_SYSCTL,
+		"net.ipv6.route.max_size",		false, 1 },
 };
 
 static struct bpftunable_scenario scenarios[] = {
@@ -131,6 +133,7 @@ void event_handler(struct bpftuner *tuner,
 		   __attribute__((unused))void *ctx)
 {
 	struct tbl_stats *stats = (struct tbl_stats *)&event->raw_data;
+
 
 	set_gc_thresh3(tuner, stats);
 }
