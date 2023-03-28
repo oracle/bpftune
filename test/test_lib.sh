@@ -211,7 +211,7 @@ test_setup_local()
 		fi
 	fi
 	if [[ -f "$AUDIT_CMD" ]]; then
-		$AUDIT_CMD -e 0
+		$AUDIT_CMD -e 0 >/dev/null 2>&1
 	fi
 	sysctl -qw net.ipv4.tcp_fin_timeout=5
 	test_run_cmd_local "$CMD" true
