@@ -7,6 +7,11 @@
 
 # run qperf test
 
+TUNERS=${TUNERS:-}
+if [[ -n "$TUNERS" ]]; then
+	BPFTUNE_FLAGS="$BPFTUNE_FLAGS -a $TUNERS"
+fi
+
 . ./test_lib.sh
 
 LOGFILE=$TESTLOG_LAST
