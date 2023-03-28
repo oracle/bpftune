@@ -44,9 +44,9 @@ for TUNER in neigh_table ; do
       ip6addr="fd::${ih}"
       macaddr="de:ad:be:ef:de:${ih}"
       if [[ $TBL == "arp_cache" ]]; then
-	$PREFIX_CMD ip neigh add $ipaddr lladdr $macaddr dev $INTF
+	$PREFIX_CMD ip neigh replace $ipaddr lladdr $macaddr dev $INTF
       else
-	$PREFIX_CMD ip neigh add $ip6addr lladdr $macaddr dev $INTF
+	$PREFIX_CMD ip neigh replace $ip6addr lladdr $macaddr dev $INTF
       fi
    done
    echo "Following changes were made:"
