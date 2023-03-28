@@ -100,8 +100,6 @@ void *inotify_thread(void *arg)
 			if (event->mask & IN_CREATE) {
 				bpftune_log(LOG_ALERT, "added lib %s, init\n",
 					    library_path);
-				/* may get a corrupt .so if we do not sleep */
-				sleep(1);
 				tuner = bpftuner_init(library_path);
 				if (!tuner)
 					continue;

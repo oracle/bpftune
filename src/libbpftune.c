@@ -462,14 +462,23 @@ static struct bpftuner *bpftune_tuners[BPFTUNE_MAX_TUNERS];
 struct bpftuner *bpftuner_init(const char *path)
 {
 	struct bpftuner *tuner = NULL;
-	int err;
+	int err, retries;
 
 	tuner = calloc(1, sizeof(*tuner));
 	if (!tuner) {
 		bpftune_log(LOG_ERR, "could not allocate tuner\n");
 		return NULL;
 	}
-	tuner->handle = dlopen(path, RTLD_NOW | RTLD_GLOBAL);
+
+	/* if file appears via inotify we may get "file too short" errors;
+	 * retry a few times to avoid this.
+	 */
+	for (retries = 0; retries < 5; retries++) {
+		tuner->handle = dlopen(path, RTLD_NOW | RTLD_GLOBAL);
+		if (tuner->handle)
+			break;
+		usleep(100);
+	}
 	if (!tuner->handle) {
 		bpftune_log(LOG_ERR, "could not dlopen '%s': %s\n",
 			    path, dlerror());
