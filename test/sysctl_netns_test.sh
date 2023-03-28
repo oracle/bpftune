@@ -47,7 +47,7 @@ for TUNER in neigh_table ; do
 
    test_run_cmd_local "ip netns exec $NETNS $IPERF3 -s -p $PORT -1 &"
    sleep $SLEEPTIME
-   test_run_cmd_local "$IPERF3 -fm -c $PORT -c $ADDR" true
+   test_run_cmd_local "$IPERF3 -fm -p $PORT -c $ADDR" true
    sleep $SLEEPTIME
 
    rmem_post=($(sysctl -n net.ipv4.tcp_rmem))
