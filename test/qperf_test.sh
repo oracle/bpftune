@@ -7,9 +7,9 @@
 
 # run qperf test
 
-TUNERS=${TUNERS:-}
-if [[ -n "$TUNERS" ]]; then
-	BPFTUNE_FLAGS="$BPFTUNE_FLAGS -a $TUNERS"
+TUNER=${TUNER:-}
+if [[ -n "$TUNER" ]]; then
+	BPFTUNE_FLAGS="$BPFTUNE_FLAGS -a $TUNER"
 fi
 
 . ./test_lib.sh
