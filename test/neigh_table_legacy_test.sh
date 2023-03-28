@@ -53,7 +53,7 @@ for TUNER in neigh_table ; do
    set +e  
    grep bpftune $LOGFILE
    set -e
-   grep "updated gc_thresh3 for $TBL" $LOGFILE
+   grep "table nearly full" $LOGFILE
    test_pass
   done
  done
