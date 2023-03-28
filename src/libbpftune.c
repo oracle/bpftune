@@ -480,8 +480,9 @@ struct bpftuner *bpftuner_init(const char *path)
 		usleep(100);
 	}
 	if (!tuner->handle) {
-		bpftune_log(LOG_ERR, "could not dlopen '%s': %s\n",
-			    path, dlerror());
+		bpftune_log(LOG_ERR,
+			    "could not dlopen '%s' after %d retries: %s\n",
+			    path, retries, dlerror());
 		free(tuner);
 		return NULL;
 	}
