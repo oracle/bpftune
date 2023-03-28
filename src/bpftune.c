@@ -19,7 +19,6 @@
 #include <sys/types.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
-#include <unistd.h>
 #include <dirent.h>
 #include <libgen.h>
 #include <linux/types.h>
@@ -101,6 +100,8 @@ void *inotify_thread(void *arg)
 			if (event->mask & IN_CREATE) {
 				bpftune_log(LOG_ALERT, "added lib %s, init\n",
 					    library_path);
+				/* may get a corrupt .so if we do not sleep */
+				sleep(1);
 				tuner = bpftuner_init(library_path);
 				if (!tuner)
 					continue;
