@@ -175,6 +175,20 @@ When choosing BPF events to instrument, please try to avoid very
 high-frequency events.  Try to use fentry instead of kprobe,
 tp_btf instead of tracepoint etc as these perform much better.
 
+To test overhead of your tuner, there are iperf3/qperf tests
+that compare baseline performance versus performance when
+bpftune runs.  For example:
+
+```
+$ cd test
+$ TUNER=tcp_buffer_tuner.so sh iperf3_test.sh
+...
+$ TUNER=tcp_buffer_tuner.so sh qperf_test.sh
+...
+```
+
+Replace TUNER value with the name of the tuner you want to assess.
+
 # Tests
 
 Tests are mandatory for tuners; in the test directory you can see
