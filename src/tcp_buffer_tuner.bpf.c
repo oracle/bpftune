@@ -87,9 +87,9 @@ static __always_inline bool tcp_nearly_out_of_memory(struct sock *sk,
 		 * otherwise shrink wmem/rmem.
 		 */
 		if (mem_new[2] <= (nr_free_buffer_pages >> 2)) {
-			send_sysctl_event(sk, TCP_MEM_EXHAUSTION,
-					  TCP_BUFFER_TCP_MEM, mem, mem_new,
-					  event);
+			send_sk_sysctl_event(sk, TCP_MEM_EXHAUSTION,
+					     TCP_BUFFER_TCP_MEM, mem, mem_new,
+					     event);
 			return true;
 		}
 		if (!net)
@@ -100,9 +100,9 @@ static __always_inline bool tcp_nearly_out_of_memory(struct sock *sk,
 		mem_new[0] = mem[0];
 		mem_new[1] = mem[1];
 		mem_new[2] = BPFTUNE_SHRINK_BY_DELTA(mem[2]);
-		send_sysctl_event(sk, TCP_BUFFER_DECREASE,
-				  TCP_BUFFER_TCP_WMEM,
-				  mem, mem_new, event);
+		send_sk_sysctl_event(sk, TCP_BUFFER_DECREASE,
+				     TCP_BUFFER_TCP_WMEM,
+				     mem, mem_new, event);
 		if (!net)
 			return true;
 		mem[0] = (long)BPF_CORE_READ(net, ipv4.sysctl_tcp_rmem[0]);
@@ -111,9 +111,9 @@ static __always_inline bool tcp_nearly_out_of_memory(struct sock *sk,
 		mem_new[0] = mem[0];
 		mem_new[1] = mem[1];
 		mem_new[2] = BPFTUNE_SHRINK_BY_DELTA(mem[2]);
-		send_sysctl_event(sk, TCP_BUFFER_DECREASE,
-				  TCP_BUFFER_TCP_RMEM,
-				  mem, mem_new, event);
+		send_sk_sysctl_event(sk, TCP_BUFFER_DECREASE,
+				     TCP_BUFFER_TCP_RMEM,
+				     mem, mem_new, event);
 		return true;
 	} else if (NEARLY_FULL(allocated, limit_sk_mem_quantum[1])) {
 		/* send approaching memory pressure event; we also increase
@@ -133,9 +133,9 @@ static __always_inline bool tcp_nearly_out_of_memory(struct sock *sk,
 			mem_new[1] = BPFTUNE_GROW_BY_DELTA(mem[1]);
 		mem_new[2] = min(nr_free_buffer_pages >> 2,
 				 BPFTUNE_GROW_BY_DELTA(mem[2]));
-		send_sysctl_event(sk, TCP_MEM_PRESSURE,
-				      TCP_BUFFER_TCP_MEM, mem, mem_new,
-				      event);
+		send_sk_sysctl_event(sk, TCP_MEM_PRESSURE,
+				     TCP_BUFFER_TCP_MEM, mem, mem_new,
+				     event);
 		near_memory_pressure = true;
 		return true;
 	}
@@ -195,9 +195,9 @@ BPF_FENTRY(tcp_sndbuf_expand, struct sock *sk)
 		wmem[1] = wmem_new[1] = BPF_CORE_READ(net, ipv4.sysctl_tcp_wmem[1]);
 		wmem_new[2] = BPFTUNE_GROW_BY_DELTA(wmem[2]);
 
-		if (send_sysctl_event(sk, TCP_BUFFER_INCREASE,
-				      TCP_BUFFER_TCP_WMEM,
-				      wmem, wmem_new, &event) < 0)
+		if (send_sk_sysctl_event(sk, TCP_BUFFER_INCREASE,
+					 TCP_BUFFER_TCP_WMEM,
+					 wmem, wmem_new, &event) < 0)
 			return 0;
 		/* correlate changes to wmem with round-trip time to spot
 		 * cases where buffer increase is correlated with longer
@@ -243,8 +243,8 @@ BPF_FENTRY(tcp_rcv_space_adjust, struct sock *sk)
 		rmem[0] = rmem_new[0] = BPF_CORE_READ(net, ipv4.sysctl_tcp_rmem[0]);
 		rmem[1] = rmem_new[1] = BPF_CORE_READ(net, ipv4.sysctl_tcp_rmem[1]);
 		rmem_new[2] = BPFTUNE_GROW_BY_DELTA(rmem[2]);
-		if (send_sysctl_event(sk, TCP_BUFFER_INCREASE, TCP_BUFFER_TCP_RMEM,
-				  rmem, rmem_new, &event) < 0)
+		if (send_sk_sysctl_event(sk, TCP_BUFFER_INCREASE, TCP_BUFFER_TCP_RMEM,
+					 rmem, rmem_new, &event) < 0)
 			return 0;
 		/* correlate changes to rmem with round-trip time to spot
 		 * cases where buffer increase is correlated with longer

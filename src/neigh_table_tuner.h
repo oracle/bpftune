@@ -24,6 +24,7 @@ enum neigh_table_tunables {
 
 enum neigh_table_scenarios {
 	NEIGH_TABLE_FULL,
+	DST_TABLE_FULL,
 };
 
 struct tbl_stats {

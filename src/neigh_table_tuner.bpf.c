@@ -64,3 +64,28 @@ int BPF_PROG(bpftune_neigh_create, struct neigh_table *tbl,
 	return 0;
 }
 
+
+BPF_FENTRY(ip6_dst_alloc, struct net *net, struct net_device *dev,
+			  int flags)
+{
+	int rt_alloc = BPF_CORE_READ(net, ipv6.rt6_stats, fib_rt_alloc.counter);
+	long max_size = BPF_CORE_READ(net, ipv6.sysctl.ip6_rt_max_size);
+	long new_max_size;
+	struct bpftune_event event = { };
+	long old[3];
+	long new[3];
+
+	if (!NEARLY_FULL(rt_alloc, max_size))
+		return 0;
+
+	old[0] = max_size;
+	new[0] = BPFTUNE_GROW_BY_DELTA(max_size);
+	event.tuner_id = tuner_id;
+	event.scenario_id = DST_TABLE_FULL;
+
+	if (send_net_sysctl_event(net, DST_TABLE_FULL,
+				  NEIGH_TABLE_IPV6_MAX_SIZE,
+				  old, new, &event) < 0)
+		return 0;
+	return 0;
+}

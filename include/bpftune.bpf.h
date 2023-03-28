@@ -225,12 +225,11 @@ struct {
 	__type(value, __u64);
 } last_event_map SEC(".maps");
 
-static __always_inline long send_sysctl_event(struct sock *sk,
-					      int scenario_id, int event_id,
-					      long *old, long *new,
-					      struct bpftune_event *event)
+static __always_inline long send_net_sysctl_event(struct net *net,
+						  int scenario_id, int event_id,
+						  long *old, long *new,
+						  struct bpftune_event *event)
 {
-	struct net *net = BPF_CORE_READ(sk, sk_net.net);
 	__u64 now = bpf_ktime_get_ns();
 	__u64 event_key = 0;
 	long nscookie = 0;
@@ -268,6 +267,17 @@ static __always_inline long send_sysctl_event(struct sock *sk,
 	bpftune_debug("\told '%d %d %d'\n", old[0], old[1], old[2]);
 	bpftune_debug("\tnew '%d %d %d'\n", new[0], new[1], new[2]);
 	return 0;
+}
+
+static __always_inline long send_sk_sysctl_event(struct sock *sk,
+                                              int scenario_id, int event_id,
+                                              long *old, long *new,
+                                              struct bpftune_event *event)
+{
+	struct net *net = BPF_CORE_READ(sk, sk_net.net);
+
+	return send_net_sysctl_event(net, scenario_id, event_id,
+				     old, new, event);
 }
 
 static inline void corr_update_bpf(__u64 id, __u64 netns_cookie,
