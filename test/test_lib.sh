@@ -7,14 +7,14 @@
 
 # Setup/teardown code for testing.
 
+export TEST_ID=${TEST_ID:-}
 export TESTDIR="/tmp/bpftunetest"
 export TESTLOG=${TESTLOG:-"${TESTDIR}/testlog.${PPID}"}
 export TESTLOG_LAST="${TESTDIR}/testlog.last"
+export TESTLOG_COUNT="${TESTDIR}/testcount.$TEST_ID"
 
 export SETUPTIME=5
 export SLEEPTIME=1
-
-export PASSED=${PASSED:-0}
 
 # 1: more output, >1: xtrace
 export VERBOSE=${VERBOSE:-0}
@@ -63,6 +63,14 @@ test_init()
 	set -o errexit
 
 	mkdir -p $TESTDIR
+	if [[ -n "$TEST_ID" ]]; then
+		if [[ ! -f $TESTLOG_COUNT ]]; then
+			echo 0 > $TESTLOG_COUNT
+		fi
+		export PASSED=${PASSED:-$(cat $TESTLOG_COUNT)}
+	else
+		export PASSED=${PASSED:-0}
+	fi
 }
 
 export CMD_PIDFILE="${TESTDIR}/.current_test_cmd.pid"
@@ -332,6 +340,9 @@ test_pass()
 {
 	EXITCODE=0
 	PASSED=$(expr $PASSED + 1)
+	if [[ -n "$TEST_ID" ]]; then
+		echo $PASSED > $TESTLOG_COUNT
+	fi
 	test_log_result
 }
 

@@ -55,6 +55,6 @@ install: $(INSTALLFILES)
 	$(install_sh_PROGRAM) $^ -t $(INSTALLPATH) ; \
 
 $(TESTS): %:%.sh
-	bash $<
+	TEST_ID=$$PPID  bash $<
 
 PHONY: clean
