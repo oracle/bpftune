@@ -3,6 +3,9 @@
 
 #include "bpftune.bpf.h"
 #include "tcp_buffer_tuner.h"
+#include "corr.h"
+
+BPF_MAP_DEF(corr_map, BPF_MAP_TYPE_HASH, struct corr_key, struct corr, 1024);
 
 bool under_memory_pressure = false;
 bool near_memory_pressure = false;
@@ -25,8 +28,8 @@ unsigned long nr_free_buffer_pages;
 		__field_type __field;					\
 		if (!bpf_probe_read_kernel(&__field, sizeof(__field),	\
 			__builtin_preserve_access_index(&tp->__field)))	\
-			corr_update_bpf(__id, __cookie, __newval,	\
-					__field);			\
+			corr_update_bpf(&corr_map, __id, __cookie,	\
+					__newval, __field);		\
 	}
 
 static __always_inline bool tcp_nearly_out_of_memory(struct sock *sk,

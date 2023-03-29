@@ -48,7 +48,6 @@ int bpftune_loglevel = LOG_ALERT;
 
 struct ring_buffer *ring_buffer;
 int ring_buffer_map_fd;
-int corr_map_fd;
 int netns_map_fd;
 
 int bpftune_log_level(void)
@@ -389,8 +388,6 @@ int __bpftuner_bpf_load(struct bpftuner *tuner, const char **optionals)
 
 	if (bpftuner_map_reuse("ring_buffer", tuner->ring_buffer_map,
 			       ring_buffer_map_fd, &tuner->ring_buffer_map_fd) ||
-	    bpftuner_map_reuse("corr_map", tuner->corr_map,
-			       corr_map_fd, &tuner->corr_map_fd) ||
 	    bpftuner_map_reuse("netns_map", tuner->netns_map,
 			       netns_map_fd, &tuner->netns_map_fd))
 		return -1;
@@ -418,8 +415,6 @@ int __bpftuner_bpf_load(struct bpftuner *tuner, const char **optionals)
 
 	bpftuner_map_init(tuner, "ring_buffer_map", &tuner->ring_buffer_map,
 			  &ring_buffer_map_fd, &tuner->ring_buffer_map_fd);
-	bpftuner_map_init(tuner, "corr_map", &tuner->corr_map,
-			  &corr_map_fd, &tuner->corr_map_fd);
 	bpftuner_map_init(tuner, "netns_map", &tuner->netns_map,
 			  &netns_map_fd, &tuner->netns_map_fd);
 	return 0;
@@ -446,11 +441,9 @@ void bpftuner_bpf_fini(struct bpftuner *tuner)
 	if (bpftune_num_tuners == 0) {
 		if (ring_buffer_map_fd > 0)
 			close(ring_buffer_map_fd);
-		if (corr_map_fd > 0)
-			close(corr_map_fd);
 		if (netns_map_fd > 0)
 			close(netns_map_fd);
-		ring_buffer_map_fd = corr_map_fd = netns_map_fd = 0;
+		ring_buffer_map_fd = netns_map_fd = 0;
 	}
 }
 

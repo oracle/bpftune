@@ -126,7 +126,6 @@ void bpftuner_tunables_fini(struct bpftuner *tuner);
 			__skel->bss->bpftune_learning_rate = bpftune_learning_rate;\
 			tuner->obj = __skel->obj;			     \
 			tuner->ring_buffer_map = __skel->maps.ring_buffer_map;\
-			tuner->corr_map = __skel->maps.corr_map;	     \
 			tuner->netns_map = __skel->maps.netns_map;	     \
 		} else {						     \
 			tuner->skel = __lskel = tuner_name##_tuner_bpf_legacy__open();\
@@ -136,7 +135,6 @@ void bpftuner_tunables_fini(struct bpftuner *tuner);
 			__lskel->bss->bpftune_pid = getpid();		     \
 			tuner->obj = __lskel->obj;			     \
 			tuner->ring_buffer_map = __lskel->maps.ring_buffer_map;\
-			tuner->corr_map = __lskel->maps.corr_map;	     \
 			tuner->netns_map = __lskel->maps.netns_map;	     \
 		}							     \
                 __err = libbpf_get_error(tuner->skel);                       \

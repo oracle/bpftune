@@ -116,8 +116,6 @@ unsigned short bpftune_learning_rate;
 
 BPF_RINGBUF(ring_buffer_map, 128 * 1024);
 
-BPF_MAP_DEF(corr_map, BPF_MAP_TYPE_HASH, struct corr_key, struct corr, 1024);
-
 BPF_MAP_DEF(netns_map, BPF_MAP_TYPE_HASH, __u64, __u64, 65536);
 
 unsigned int tuner_id;
@@ -280,18 +278,19 @@ static __always_inline long send_sk_sysctl_event(struct sock *sk,
 				     old, new, event);
 }
 
-static inline void corr_update_bpf(__u64 id, __u64 netns_cookie,
+static inline void corr_update_bpf(void *map, __u64 id,
+				   __u64 netns_cookie,
 				   __u64 x, __u64 y)
 {
 	struct corr_key key = { .id = id, .netns_cookie = netns_cookie };
-	struct corr *corrp = bpf_map_lookup_elem(&corr_map, &key);
+	struct corr *corrp = bpf_map_lookup_elem(map, &key);
 
 	if (!corrp) {
 		struct corr corr = {};
 
-		bpf_map_update_elem(&corr_map, &key, &corr, 0);
+		bpf_map_update_elem(map, &key, &corr, 0);
 
-		corrp = bpf_map_lookup_elem(&corr_map, &key);
+		corrp = bpf_map_lookup_elem(map, &key);
 		if (!corrp)
 			return;
 	}
