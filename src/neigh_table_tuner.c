@@ -45,11 +45,7 @@ static struct bpftunable_scenario scenarios[] = {
 
 int init(struct bpftuner *tuner)
 {
-	bpftuner_bpf_open(neigh_table, tuner);
-	bpftuner_bpf_load(neigh_table, tuner);
-	bpftuner_bpf_var_set(neigh_table, tuner, ncpus,
-			     libbpf_num_possible_cpus());	
-	bpftuner_bpf_attach(neigh_table, tuner, NULL);
+	bpftuner_bpf_init(neigh_table, tuner, NULL);
 	return bpftuner_tunables_init(tuner, ARRAY_SIZE(descs), descs,
 				      ARRAY_SIZE(scenarios), scenarios);
 }

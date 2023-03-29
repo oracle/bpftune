@@ -6,16 +6,16 @@
 
 #ifdef BPFTUNE_LEGACY
 
+struct setup_net {
+	struct net *net;
+};
+
 BPF_MAP_DEF(setup_net_map, BPF_MAP_TYPE_HASH, __u64, __u64, 65536);
 
 SEC("kprobe/setup_net")
 int BPF_KPROBE(bpftune_setup_net, struct net *net, struct user_namespace *user_ns)
 {
-	__u64 current = bpf_get_current_task();
-
-	if (!current)
-		return 0;
-	bpf_map_update_elem(&setup_net_map, &current, &net, 0);
+	save_entry_data(setup_net_map, setup_net, net, net);
 	return 0;
 }
 
@@ -28,13 +28,11 @@ int BPF_KRETPROBE(bpftune_setup_net_return, int ret)
 	
 	if (ret != 0)
 		return 0;
-	current = bpf_get_current_task();
 
-	netnsp = bpf_map_lookup_elem(&setup_net_map, &current);
-	if (!netnsp)
+	get_entry_data(setup_net_map, setup_net, net, netns);
+	if (!netns)
 		return 0;
 
-	netns = (struct net *)*netnsp;
 	event.tuner_id = tuner_id;
 	event.pid = bpf_get_current_pid_tgid() >> 32;
 	event.scenario_id = NETNS_SCENARIO_CREATE;

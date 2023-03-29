@@ -110,6 +110,26 @@ static __always_inline typeof(name(0)) ____##name(struct pt_regs *ctx, ##args)
 	} _name SEC(".maps")
 #endif /* BPFTUNE_LEGACY */
 
+/* used to save data on entry to be retrieved on return  */
+#define save_entry_data(save_map, save_struct, save_field, save_data)	\
+	do {								\
+		struct save_struct __s = {};				\
+		__u64 current = bpf_get_current_task();			\
+		__s.save_field = save_data;				\
+		bpf_map_update_elem(&save_map, &current, &__s, 0);	\
+	} while (0)
+
+#define get_entry_data(save_map, save_struct, save_field, save_result)	\
+	do {								\
+		__u64 current = bpf_get_current_task();			\
+		struct save_struct *__s = bpf_map_lookup_elem(&save_map,\
+							     &current);	\
+		if (__s)						\
+			save_result = __s->save_field;			\
+		else							\
+			save_result = 0;				\
+	} while (0)
+
 /* must be specified prior to including bpftune.h */
 unsigned short bpftune_learning_rate;
 

@@ -54,7 +54,8 @@ MAKEFLAGS += --no-print-directory
 submake_extras := feature_display=0
 endif
 
-TUNERS = tcp_buffer_tuner neigh_table_tuner sysctl_tuner cong_tuner netns_tuner
+TUNERS = tcp_buffer_tuner route_table_tuner neigh_table_tuner sysctl_tuner \
+	 cong_tuner netns_tuner
 
 TUNER_OBJS = $(patsubst %,%.o,$(TUNERS))
 TUNER_LIBS = $(patsubst %,%.so,$(TUNERS))
