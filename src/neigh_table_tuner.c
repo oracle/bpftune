@@ -45,7 +45,11 @@ static struct bpftunable_scenario scenarios[] = {
 
 int init(struct bpftuner *tuner)
 {
-	bpftuner_bpf_init(neigh_table, tuner, NULL);
+	bpftuner_bpf_open(neigh_table, tuner);
+	bpftuner_bpf_load(neigh_table, tuner);
+	bpftuner_bpf_var_set(neigh_table, tuner, ncpus,
+			     libbpf_num_possible_cpus());	
+	bpftuner_bpf_attach(neigh_table, tuner, NULL);
 	return bpftuner_tunables_init(tuner, ARRAY_SIZE(descs), descs,
 				      ARRAY_SIZE(scenarios), scenarios);
 }
@@ -146,6 +150,7 @@ void event_handler(struct bpftuner *tuner,
 		id = event->update[0].id;
 		memcpy(new, event->update[0].new, sizeof(new));
 		memcpy(old, event->update[0].old, sizeof(old));
+		
 		bpftuner_tunable_sysctl_write(tuner, id, DST_TABLE_FULL,
 					      event->netns_cookie, 1, new,
 "Due to dst table filling up, change net.ipv6.route.max_size from %d -> %d\n",

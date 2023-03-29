@@ -6,6 +6,8 @@
 
 BPF_MAP_DEF(tbl_map, BPF_MAP_TYPE_HASH, __u64, struct tbl_stats, 1024);
 
+int ncpus;
+
 #ifdef BPFTUNE_LEGACY
 SEC("raw_tracepoint/neigh_create")
 int BPF_PROG(bpftune_neigh_create, struct neigh_table *tbl,
@@ -64,28 +66,45 @@ int BPF_PROG(bpftune_neigh_create, struct neigh_table *tbl,
 	return 0;
 }
 
+/* forced gc is a signal that ipv6 route table space is low. */
+BPF_FENTRY(fib6_run_gc, unsigned long expires, struct net *net, bool force)
+{
+	long max_size;
+
+	if (force) {
+		struct bpftune_event event = {};
+		long old[3] = {};
+		long new[3] = {};
+		long max_size = BPF_CORE_READ(net, ipv6.sysctl.ip6_rt_max_size);
+
+		event.tuner_id = tuner_id;
+		event.scenario_id = DST_TABLE_FULL;
+
+		old[0] = max_size;
+		new[0] = BPFTUNE_GROW_BY_DELTA(max_size);
+		if (send_net_sysctl_event(net, DST_TABLE_FULL,
+					  NEIGH_TABLE_IPV6_MAX_SIZE,
+					  old, new, &event) < 0)
+			return 0;
+	}
+	return 0;
+}
 
 BPF_FENTRY(ip6_dst_alloc, struct net *net, struct net_device *dev,
 			  int flags)
 {
-	int rt_alloc = BPF_CORE_READ(net, ipv6.rt6_stats, fib_rt_alloc.counter);
+	__s64 total = BPF_CORE_READ(net, ipv6.ip6_dst_ops.pcpuc_entries.count);
 	long max_size = BPF_CORE_READ(net, ipv6.sysctl.ip6_rt_max_size);
-	long new_max_size;
-	struct bpftune_event event = { };
-	long old[3];
-	long new[3];
 
-	if (!NEARLY_FULL(rt_alloc, max_size))
-		return 0;
+	if (LINUX_KERNEL_VERSION >= KERNEL_VERSION(5, 15, 0)) {
+		s32 *counters = BPF_CORE_READ(net, ipv6.ip6_dst_ops.pcpuc_entries.counters);
+		long i;
+		for (i = 0; i < ncpus; i++) {
+			__s32 *countp = BPF_CORE_READ(net->ipv6.ip6_dst_ops.pcpuc_entries.counters, i);
+			total += *countp;
+		}
+	}
+	__bpf_printk("dst alloc count %d max %d\n", total, max_size);
 
-	old[0] = max_size;
-	new[0] = BPFTUNE_GROW_BY_DELTA(max_size);
-	event.tuner_id = tuner_id;
-	event.scenario_id = DST_TABLE_FULL;
-
-	if (send_net_sysctl_event(net, DST_TABLE_FULL,
-				  NEIGH_TABLE_IPV6_MAX_SIZE,
-				  old, new, &event) < 0)
-		return 0;
 	return 0;
 }

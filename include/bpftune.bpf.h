@@ -13,6 +13,8 @@
 #include <bpf/bpf_tracing.h>
 #include <bpf/bpf_core_read.h>
 
+extern __u32 LINUX_KERNEL_VERSION __kconfig;
+
 #ifndef __bpf_printk
 #define __bpf_printk(fmt, ...)				\
 ({							\
