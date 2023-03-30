@@ -3,9 +3,9 @@
 
 #define __KERNEL__
 #if defined(__TARGET_ARCH_x86)
-#include "vmlinux_x86_64.h"
+#include <bpftune/vmlinux_x86_64.h>
 #elif defined(__TARGET_ARCH_arm64)
-#include "vmlinux_aarch64.h"
+#include <bpftune/vmlinux_aarch64.h>
 #endif
 
 #include <bpf/bpf_endian.h>
@@ -146,8 +146,8 @@ static __always_inline typeof(name(0)) ____##name(struct pt_regs *ctx, ##args)
 /* must be specified prior to including bpftune.h */
 unsigned short bpftune_learning_rate;
 
-#include "bpftune.h"
-#include "corr.h"
+#include <bpftune/bpftune.h>
+#include <bpftune/corr.h>
 
 BPF_RINGBUF(ring_buffer_map, 128 * 1024);
 

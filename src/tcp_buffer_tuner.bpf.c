@@ -1,9 +1,9 @@
 /* SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause) */
 /* Copyright (c) 2023, Oracle and/or its affiliates. */
 
-#include "bpftune.bpf.h"
+#include <bpftune/bpftune.bpf.h>
 #include "tcp_buffer_tuner.h"
-#include "corr.h"
+#include <bpftune/corr.h>
 
 BPF_MAP_DEF(corr_map, BPF_MAP_TYPE_HASH, struct corr_key, struct corr, 1024);
 

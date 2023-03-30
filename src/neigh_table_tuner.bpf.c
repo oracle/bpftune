@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause) */
 /* Copyright (c) 2023, Oracle and/or its affiliates. */
 
-#include "bpftune.bpf.h"
+#include <bpftune/bpftune.bpf.h>
 #include "neigh_table_tuner.h"
 
 BPF_MAP_DEF(tbl_map, BPF_MAP_TYPE_HASH, __u64, struct tbl_stats, 1024);

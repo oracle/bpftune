@@ -29,7 +29,7 @@
 
 unsigned short bpftune_learning_rate;
 
-#include "libbpftune.h"
+#include <bpftune/libbpftune.h>
 
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>

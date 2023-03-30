@@ -26,7 +26,7 @@
 #include <sys/inotify.h>
 #include <ftw.h>
 
-#include "libbpftune.h"
+#include <bpftune/libbpftune.h>
 
 #ifndef BPFTUNE_VERSION
 #define BPFTUNE_VERSION  "0.1"

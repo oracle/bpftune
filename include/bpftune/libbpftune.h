@@ -21,7 +21,7 @@
 #include <libgen.h>
 #include <linux/types.h>
 
-#include "bpftune.h"
+#include <bpftune/bpftune.h>
 
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>

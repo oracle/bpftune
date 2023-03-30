@@ -4,13 +4,13 @@
 #
 
 
-INSTALLFILES = $(wildcard *.h)
+INSTALLFILES = $(wildcard bpftune/*.h)
 
 DESTDIR ?=
 prefix ?= /usr
 installprefix ?= $(DESTDIR)/$(prefix)
 
-INSTALLPATH = $(installprefix)/include/bpftune
+INSTALLPATH = $(installprefix)/include
 
 install_sh_HDR = install -m 0444
 install_sh_DIR = install -dv
@@ -18,6 +18,6 @@ install_sh_DIR = install -dv
 all:
 	
 install: $(INSTALLFILES)
-	$(install_sh_DIR) -d $(INSTALLPATH) ; \
-	$(install_sh_HDR) $^ -t $(INSTALLPATH) ; \
+	$(install_sh_DIR) -d $(INSTALLPATH)/bpftune ; \
+	$(install_sh_HDR) $^ -t $(INSTALLPATH)/bpftune ; \
 

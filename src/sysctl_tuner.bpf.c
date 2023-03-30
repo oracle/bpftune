@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause) */
 /* Copyright (c) 2023, Oracle and/or its affiliates. */
 
-#include "bpftune.bpf.h"
+#include <bpftune/bpftune.bpf.h>
 
 /* use kprobe here as it is not in fastpath and the function has a large
  * number of args not well handled by fentry.  We trace the sysctl set

@@ -54,7 +54,7 @@ MAKEFLAGS += --no-print-directory
 submake_extras := feature_display=0
 endif
 
-TUNERS = tcp_buffer_tuner route_table_tuner neigh_table_tuner sysctl_tuner \
+TUNERS = tcp_buffer_tuner neigh_table_tuner sysctl_tuner \
 	 cong_tuner netns_tuner
 
 TUNER_OBJS = $(patsubst %,%.o,$(TUNERS))
@@ -93,7 +93,7 @@ bpftune: bpftune.c bpftune.o libbpftune.so
 	$(QUIET_LINK)$(CC) $(CFLAGS) bpftune.o -o $@ \
 	$(LDFLAGS) $(LDLIBS) -lbpftune
 
-libbpftune.so: libbpftune.c ../include/libbpftune.h libbpftune.o
+libbpftune.so: libbpftune.c ../include/bpftune/libbpftune.h libbpftune.o
 	$(CC) $(CFLAGS) -Wl,--version-script=$(VERSION_SCRIPT) \
 			-Wl,--soname,libbpftune.so.$(VERSION) \
 			-shared -o $(@).$(VERSION) $(patsubst %.so,%.o,$(@)) \

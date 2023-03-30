@@ -1,12 +1,12 @@
 /* SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause) */
 /* Copyright (c) 2023, Oracle and/or its affiliates. */
 
-#include <libbpftune.h>
+#include <bpftune/libbpftune.h>
 #include "tcp_buffer_tuner.h"
 #include "tcp_buffer_tuner.skel.h"
 #include "tcp_buffer_tuner.skel.legacy.h"
 
-#include "corr.h"
+#include <bpftune/corr.h>
 
 #include <unistd.h>
 

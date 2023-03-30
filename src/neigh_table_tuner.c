@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause) */
 /* Copyright (c) 2023, Oracle and/or its affiliates. */
 
-#include <libbpftune.h>
+#include <bpftune/libbpftune.h>
 #include <time.h>
 #include <linux/netlink.h>
 #include <libnl3/netlink/route/neightbl.h>
