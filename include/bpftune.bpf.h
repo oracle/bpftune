@@ -119,6 +119,13 @@ static __always_inline typeof(name(0)) ____##name(struct pt_regs *ctx, ##args)
 		bpf_map_update_elem(&save_map, &current, &__s, 0);	\
 	} while (0)
 
+#define get_entry_struct(save_map, save_result)				\
+	do {								\
+		__u64 current = bpf_get_current_task();                 \
+                save_result =						\
+			bpf_map_lookup_elem(&save_map, &current);	\
+	} while (0)
+
 #define get_entry_data(save_map, save_struct, save_field, save_result)	\
 	do {								\
 		__u64 current = bpf_get_current_task();			\
@@ -128,6 +135,12 @@ static __always_inline typeof(name(0)) ____##name(struct pt_regs *ctx, ##args)
 			save_result = __s->save_field;			\
 		else							\
 			save_result = 0;				\
+	} while (0)
+
+#define del_entry_struct(save_map)					\
+	do {								\
+		__u64 current = bpf_get_current_task();			\
+		bpf_map_delete_elem(&save_map, &current);		\
 	} while (0)
 
 /* must be specified prior to including bpftune.h */

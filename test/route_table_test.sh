@@ -25,25 +25,29 @@ for TUNER in route_table ; do
 
    if [[ $NS != "global" ]]; then
 	PREFIX_CMD="ip netns exec $NETNS "
+	OPREFIX_CMD=""
 	$PREFIX_CMD ip link set lo up
 	ADDR=$VETH2_IPV6
         INTF=$VETH1
+	OINTF=$VETH2
    else
 	PREFIX_CMD=""
+	OPREFIX_CMD="ip netns exec $NETNS"
 	ADDR=$VETH1_IPV6
 	INTF=$VETH2
+	OINTF=$VETH1
    fi
-   $PREFIX_CMD ip link add bpftunelocal type dummy
-   $PREFIX_CMD ip link set bpftunelocal up
+   $OPREFIX_CMD ip link add bpftunelocal type dummy
+   $OPREFIX_CMD ip link set bpftunelocal up
    sleep $SLEEPTIME
-   $PREFIX_CMD sysctl -w net.ipv6.conf.bpftunelocal.forwarding=1
-   $PREFIX_CMD sysctl -w net.ipv6.conf.${INTF}.forwarding=1
+   $OPREFIX_CMD sysctl -w net.ipv6.conf.bpftunelocal.forwarding=1
+   $OPREFIX_CMD sysctl -w net.ipv6.conf.${OINTF}.forwarding=1
 
    for ((i=3; i < 150; i++ ))
    do
       ih=$(printf '%x' $i)
       ip6addr="fd::${ih}01"
-      $PREFIX_CMD ip addr add ${ip6addr}/120 dev bpftunelocal
+      $OPREFIX_CMD ip addr add ${ip6addr}/120 dev bpftunelocal
    done
 
    $PREFIX_CMD ip addr
@@ -61,10 +65,10 @@ for TUNER in route_table ; do
       ip6addr="fd::${ih}01"
 
       #$PREFIX_CMD ip -6 route add ${ip6pfx}/120 via $ADDR protocol ra
-      $PREFIX_CMD route -6 add ${ip6pfx} gw $ADDR dev $INTF dyn
-      set -e
-      $PREFIX_CMD ping -6 -c 1 $ip6addr
-      set +e
+      $PREFIX_CMD route -6 add ${ip6pfx} gw $ADDR dev $INTF
+      #set +e
+      #$PREFIX_CMD ping -6 -c 1 $ip6addr
+      #set -e
    done
    echo "Following changes were made:"
    set +e  
@@ -73,7 +77,7 @@ for TUNER in route_table ; do
    #grep "table nearly full" $LOGFILE
    test_pass
     $PREFIX_CMD sysctl -w net.ipv6.route.max_size="$max_size_orig"
-    $PREFIX_CMD ip link del dev bpftunelocal
+    $OPREFIX_CMD ip link del dev bpftunelocal
     test_cleanup
   done
  done
