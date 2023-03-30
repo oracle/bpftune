@@ -25,6 +25,7 @@ int BPF_KRETPROBE(bpftune_ip6_dst_alloc_return, struct rt6_info *dst)
 {
 	struct net *net;
 
+	__bpf_printk("dst_alloc: %ld\n", dst);
 	if (dst)
 		return 0;
 

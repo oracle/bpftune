@@ -241,6 +241,7 @@ test_cleanup_local()
 	ip --all netns del ${NETNS_PREFIX}\*
 	set +e
 	ip link del $VETH2 2>/dev/null
+	ip link del bpftunelocal 2>/dev/null
 	set -e
 
 	if [[ ! -f /usr/lib64/bpftune/tcp_buffer_tuner.so ]]; then
