@@ -9,7 +9,7 @@
 . ./test_lib.sh
 
 
-SLEEPTIME=5
+SLEEPTIME=10
 
 
 test_start "$0|sample legacy test: does sample tuner appear, trigger event and disappear?"
