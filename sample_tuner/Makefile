@@ -23,21 +23,13 @@ installprefix = $(DESTDIR)/$(prefix)
 
 INSTALLPATH = $(installprefix)
 
-KERNEL_REL := $(shell uname -r)
-
 CFLAGS = -fPIC -Wall -Wextra -march=native -g -I../include -std=c99
 
 CFLAGS += -DBPFTUNE_VERSION='"$(BPFTUNE_VERSION)"' $(INCLUDES)
 
-LDLIBS = -lbpf -ldl -lm -lnl-3 -lpthread -lnl-route-3
+LDLIBS = -lbpf -ldl -lm -lpthread
 
 LDFLAGS += -L. -L/usr/local/lib64
-
-# Try to detect best kernel BTF source
-KERNEL_REL := $(shell uname -r)
-VMLINUX_BTF_PATHS := /sys/kernel/btf/vmlinux /boot/vmlinux-$(KERNEL_REL)
-VMLINUX_BTF_PATH := $(or $(VMLINUX_BTF),$(firstword			       \
-					  $(wildcard $(VMLINUX_BTF_PATHS))))
 
 ifeq ($(V),1)
 Q =
