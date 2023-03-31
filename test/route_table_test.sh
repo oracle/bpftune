@@ -11,7 +11,7 @@
 
 LOGFILE=$TESTLOG_LAST
 
-SLEEPTIME=1
+SLEEPTIME=10
 
 for TUNER in route_table ; do
 
@@ -19,7 +19,7 @@ for TUNER in route_table ; do
  for NS in global $NETNS ; do
   for TBL in v6 ; do
  
-   test_start "$0|route table test ($NS netns): does filling $TBL make it grow?"
+   test_start "$0|route table test ($NS netns): does filling $TBL cache make it grow?"
 
    test_setup "true"
 
@@ -32,7 +32,7 @@ for TUNER in route_table ; do
    fi
 
    max_size_orig=($($PREFIX_CMD sysctl -n net.ipv6.route.max_size))
-   thresh_orig=$($(PREFIX_CMD sysctl -n net.ipv6.route.gc_thresh))
+   thresh_orig=($($PREFIX_CMD sysctl -n net.ipv6.route.gc_thresh))
    $PREFIX_CMD sysctl -w net.ipv6.route.gc_thresh=16
    $PREFIX_CMD sysctl -w net.ipv6.route.max_size=32
 
@@ -49,15 +49,22 @@ for TUNER in route_table ; do
    do
       $PREFIX_CMD ip link del bpftunelink${i}
    done
+   # wait for gc...
+   sleep $SLEEPTIME
+   sleep $SLEEPTIME
+   sleep $SLEEPTIME
    sleep $SLEEPTIME
    echo "Following changes were made:"
    set +e  
    grep bpftune $LOGFILE
    set -e
+   max_size_post=($($PREFIX_CMD sysctl -n net.ipv6.route.max_size))
    $PREFIX_CMD sysctl -w net.ipv6.route.max_size="$max_size_orig"
    $PREFIX_CMD sysctl -w net.ipv6.route.gc_thresh="$thresh_orig"
    grep "destination table nearly full" $LOGFILE
-   test_pass
+   if [[ "$max_size_post" -gt "$max_size_orig" ]]; then
+       test_pass
+   fi
    test_cleanup
   done
  done
