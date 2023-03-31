@@ -55,6 +55,10 @@ void event_handler(struct bpftuner *tuner, struct bpftune_event *event,
 
 			bpftune_log(LOG_DEBUG, "checking path %s against %s\n",
 				    path, event->str);
+			/* does name match last characters in path? want to
+			 * avoid gc_thresh in routing table tuner matching
+			 * gc_thresh3 in neigh table tuner for example.
+			 */
 			if (strstr(path, event->str)) {
 				bpftune_log(LOG_ALERT,
 					    "user modified sysctl '%s' that tuner '%s' uses; disabling '%s' for namespace cookie %ld\n",

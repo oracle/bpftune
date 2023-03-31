@@ -17,13 +17,14 @@ int BPF_KPROBE(bpftune_sysctl, struct ctl_table_header *head,
  	 */
 	struct ctl_table_set *dummy_ctl_table_set = NULL;
 	struct net *dummy_net = NULL;
-
 	struct bpftune_event event = {};
 	struct ctl_dir *root, *parent, *gparent, *ggparent;
 	struct ctl_dir *gggparent;
-	int current_pid = 0;
-	struct ctl_table *tbl;
+	struct ctl_table *tbl, *parent_table;
+	int len = sizeof(event.str);
 	const char *procname;
+	int current_pid = 0;	
+	char *str;
 	void *net;
 
 	if (!write)
@@ -58,10 +59,28 @@ int BPF_KPROBE(bpftune_sysctl, struct ctl_table_header *head,
 	event.netns_cookie = get_netns_cookie(net);
 	if (event.netns_cookie == (unsigned long)-1)
 		return 0;
+	parent_table = BPF_CORE_READ(parent, header.ctl_table);
+	str = event.str;
+	if (parent_table) {
+		procname = BPF_CORE_READ(parent_table, procname);
+		if (procname) {
+			if (!bpf_probe_read(event.str, sizeof(event.str), procname)) {
+				int i;
+
+				for (; len > 0 && *str; len--, str++) {}
+				if (len == 0)
+					return 0;
+				str[0] = '/';
+				str++;
+				len--;
+			}
+		}
+	}
+
 	procname = BPF_CORE_READ(table, procname);
 	if (!procname)
 		return 0;
-	if (bpf_probe_read(event.str, sizeof(event.str), procname) < 0)
+	if (bpf_probe_read(str, len, procname) < 0)
 		return 0;
 	bpf_ringbuf_output(&ring_buffer_map, &event, sizeof(event), 0);	
 	return 0;
