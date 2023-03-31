@@ -15,7 +15,7 @@ SLEEPTIME=1
 
 LOGFILE=/var/log/messages
 
-test_start "$0|service test: does enabling/disabling the service work?"
+test_start "$0|service test: does enabling the service work?"
 
 test_setup "true"
 
@@ -23,8 +23,24 @@ test_run_cmd_local "service bpftune start" true
 
 sleep $SETUPTIME
 grep "bpftune works" $LOGFILE
-pgrep bpftune
+oldpid=$(pgrep bpftune)
 
+test_pass
+
+test_start "$0|service test: does restarting the service work?"
+
+test_run_cmd_local "service bpftune restart"
+
+sleep $SETUPTIME
+newpid=$(pgrep bpftune)
+
+if [[ "$newpid" -ne "$oldpid" ]]; then
+	test_pass
+else
+	test_cleanup
+fi
+
+test_start "$0|service test: does stopping the service work?"
 test_run_cmd_local "service bpftune stop" true
 sleep $SETUPTIME
 test_pass
