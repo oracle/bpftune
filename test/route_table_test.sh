@@ -63,7 +63,6 @@ for TUNER in route_table ; do
    $PREFIX_CMD sysctl -w net.ipv6.route.gc_thresh="$thresh_orig"
    grep "change net.ipv6.route.max_size" $LOGFILE
    if [[ "$max_size_post" -gt "$max_size_orig" ]]; then
-       echo "
        test_pass
    fi
    test_cleanup
