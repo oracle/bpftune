@@ -14,6 +14,13 @@ fi
 
 . ./test_lib.sh
 
+set +e
+$QPERF -h >/dev/null 2>&1
+if [[ $? -ne 0 ]]; then
+	echo "$QPERF does not work, skipping qperf-based tests..."
+	exit 0
+fi
+set -e
 LOGFILE=$TESTLOG_LAST
 
 for FAMILY in ipv4 ipv6 ; do
