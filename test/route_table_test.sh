@@ -61,8 +61,9 @@ for TUNER in route_table ; do
    max_size_post=($($PREFIX_CMD sysctl -n net.ipv6.route.max_size))
    $PREFIX_CMD sysctl -w net.ipv6.route.max_size="$max_size_orig"
    $PREFIX_CMD sysctl -w net.ipv6.route.gc_thresh="$thresh_orig"
-   grep "destination table nearly full" $LOGFILE
+   grep "change net.ipv6.route.max_size" $LOGFILE
    if [[ "$max_size_post" -gt "$max_size_orig" ]]; then
+       echo "
        test_pass
    fi
    test_cleanup
