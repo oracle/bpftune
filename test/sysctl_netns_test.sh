@@ -36,7 +36,7 @@ for TUNER in neigh_table ; do
    rmem_orig_netns=($(ip netns exec $NETNS sysctl -n net.ipv4.tcp_rmem))
 
    for SYSCTL in kernel.core_pattern net.ipv4.tcp_rmem ; do
-	val=$(ip netns $NETNS sysctl -qn $SYSCTL)
+	val=$(ip netns exec $NETNS sysctl -qn $SYSCTL)
 	ip netns exec $NETNS sysctl -qw ${SYSCTL}="${val}"
    done
    sleep $SLEEPTIME
