@@ -25,6 +25,11 @@ netns cookie).
 
 Verify logging works with syslog, stdout/stderr.
 
+## Service test
+
+Verify enabling/disabling bpftune via service works and bpftune
+is running/logging.
+
 ## Inotify tests
 
 Verify that removing or adding a tuner is noticed and the tuner
