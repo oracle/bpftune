@@ -26,59 +26,39 @@ for TUNER in route_table ; do
    if [[ $NS != "global" ]]; then
 	PREFIX_CMD="ip netns exec $NETNS "
 	OPREFIX_CMD=""
-	$PREFIX_CMD ip link set lo up
-	ADDR=$VETH2_IPV6
-        INTF=$VETH1
-	OINTF=$VETH2
    else
 	PREFIX_CMD=""
 	OPREFIX_CMD="ip netns exec $NETNS"
-	ADDR=$VETH1_IPV6
-	INTF=$VETH2
-	OINTF=$VETH1
    fi
-   $OPREFIX_CMD ip link add bpftunelocal type dummy
-   $OPREFIX_CMD ip link set bpftunelocal up
-   sleep $SLEEPTIME
-   $OPREFIX_CMD sysctl -w net.ipv6.conf.bpftunelocal.forwarding=1
-   $OPREFIX_CMD sysctl -w net.ipv6.conf.${OINTF}.forwarding=1
 
-   for ((i=3; i < 150; i++ ))
-   do
-      ih=$(printf '%x' $i)
-      ip6addr="fd::${ih}01"
-      $OPREFIX_CMD ip addr add ${ip6addr}/120 dev bpftunelocal
-   done
-
-   $PREFIX_CMD ip addr
    max_size_orig=($($PREFIX_CMD sysctl -n net.ipv6.route.max_size))
+   thresh_orig=$($(PREFIX_CMD sysctl -n net.ipv6.route.gc_thresh))
+   $PREFIX_CMD sysctl -w net.ipv6.route.gc_thresh=16
    $PREFIX_CMD sysctl -w net.ipv6.route.max_size=32
 
    test_run_cmd_local "$BPFTUNE -ds &" true
 
    sleep $SETUPTIME
 
-   for ((i=3; i < 150; i++ ))
+   for ((i=1; i < 1024; i++ ))
    do
-      ih=$(printf '%x' $i)
-      ip6pfx="fd::${ih}00"
-      ip6addr="fd::${ih}01"
-
-      #$PREFIX_CMD ip -6 route add ${ip6pfx}/120 via $ADDR protocol ra
-      $PREFIX_CMD route -6 add ${ip6pfx} gw $ADDR dev $INTF
-      #set +e
-      #$PREFIX_CMD ping -6 -c 1 $ip6addr
-      #set -e
+      $PREFIX_CMD ip link add bpftunelink${i} type dummy
+      $PREFIX_CMD ip link set bpftunelink${i} up
    done
+   for ((i=1; i < 1024; i++ ))
+   do
+      $PREFIX_CMD ip link del bpftunelink${i}
+   done
+   sleep $SLEEPTIME
    echo "Following changes were made:"
    set +e  
    grep bpftune $LOGFILE
    set -e
-   #grep "table nearly full" $LOGFILE
+   $PREFIX_CMD sysctl -w net.ipv6.route.max_size="$max_size_orig"
+   $PREFIX_CMD sysctl -w net.ipv6.route.gc_thresh="$thresh_orig"
+   grep "destination table nearly full" $LOGFILE
    test_pass
-    $PREFIX_CMD sysctl -w net.ipv6.route.max_size="$max_size_orig"
-    $OPREFIX_CMD ip link del dev bpftunelocal
-    test_cleanup
+   test_cleanup
   done
  done
 done
