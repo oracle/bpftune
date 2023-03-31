@@ -43,6 +43,18 @@ fi
 test_start "$0|service test: does stopping the service work?"
 test_run_cmd_local "service bpftune stop" true
 sleep $SETUPTIME
+
+set +e
+gonepid=$(pgrep bpftune)
+set -e
+
+if [[ -n "$gonepid" ]]; then
+	echo "bpftune still running: $gonepid"
+	test_cleanup
+else
+	test_pass
+fi
+
 test_pass
 test_cleanup
 
