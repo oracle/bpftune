@@ -6,6 +6,8 @@ LIBBPFTUNE_0.1.1 {
 		bpftune_log;
 		bpftune_set_log;
 		bpftune_log_bpf_err;
+		bpftune_cap_set;
+		bpftune_cap_drop;
 		bpftune_set_learning_rate;
 		bpftune_learning_rate;
 		bpftune_cgroup_init;

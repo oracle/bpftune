@@ -15,13 +15,17 @@ SEC("kprobe/fib6_run_gc")
 int BPF_KPROBE(bpftune_fib6_run_gc_entry, unsigned long expires,
 					  struct net *net, bool force)
 {
-	struct dst_net dst_net = {};
+	struct dst_net *dst_netp, dst_net = {};
 
+	get_entry_struct(dst_net_map, dst_netp);
+	/* already in gc, skip */
+	if (dst_netp)
+		return 0;
 	save_entry_data(dst_net_map, dst_net, net, net);
 	return 0;
 }
 
-/* catch dst alloc failures and increase route table max size */
+/* catch dst alloc approaching limit and increase route table max size */
 SEC("kretprobe/fib6_run_gc")
 int BPF_KRETPROBE(bpftune_fib6_run_gc)
 {
@@ -48,11 +52,11 @@ int BPF_KRETPROBE(bpftune_fib6_run_gc)
 
 		old[0] = max_size;
 		new[0] = BPFTUNE_GROW_BY_DELTA(max_size);
-		if (send_net_sysctl_event(net, ROUTE_TABLE_FULL,
-					  ROUTE_TABLE_IPV6_MAX_SIZE,
-					  old, new, &event) < 0)
-			return 0;
+		(void) send_net_sysctl_event(net, ROUTE_TABLE_FULL,
+					     ROUTE_TABLE_IPV6_MAX_SIZE,
+					     old, new, &event);
 	}
+	del_entry_struct(dst_net_map);
 	return 0;
 }
 

@@ -51,6 +51,9 @@ void bpftune_set_log(int level,
 				   va_list args));
 void bpftune_log_bpf_err(int err, const char *fmt);
 
+int bpftune_cap_set(void);
+void bpftune_cap_drop(void);
+
 extern unsigned short bpftune_learning_rate;
 
 void bpftune_set_learning_rate(unsigned short rate);
@@ -114,8 +117,9 @@ void bpftuner_tunables_fini(struct bpftuner *tuner);
 	do {								     \
 		struct tuner_name##_tuner_bpf *__skel;                       \
 		struct tuner_name##_tuner_bpf_legacy *__lskel;		     \
-                int __err;                                                   \
+                int __err = bpftune_cap_set();				     \
                                                                              \
+		if (__err) return __err;				     \
                 tuner->name = #tuner_name;                                   \
 		tuner->bpf_legacy = bpftuner_bpf_legacy();		     \
                 if (!tuner->bpf_legacy) {				     \
@@ -137,6 +141,7 @@ void bpftuner_tunables_fini(struct bpftuner *tuner);
 			tuner->ring_buffer_map = __lskel->maps.ring_buffer_map;\
 			tuner->netns_map = __lskel->maps.netns_map;	     \
 		}							     \
+		bpftune_cap_drop();					     \
                 __err = libbpf_get_error(tuner->skel);                       \
                 if (__err) {                                                 \
                         bpftune_log_bpf_err(__err,                           \

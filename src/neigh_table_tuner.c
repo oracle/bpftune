@@ -75,7 +75,12 @@ static int set_gc_thresh3(struct bpftuner *tuner, struct tbl_stats *stats)
 		bpftune_log(LOG_ERR, "failed to alloc netlink socket\n");
 		return -ENOMEM;
 	}
-	nl_connect(sk, NETLINK_ROUTE);
+	ret = nl_connect(sk, NETLINK_ROUTE);
+	if (ret) {
+		bpftune_log(LOG_ERR, "nl_connect() failed: %d\n",
+			    strerror(-ret));
+		goto out;
+	}
 
 	/* it would be nice if we could simply call rtnl_neightbl_change()
 	 * here but it has a bug; it doesn't set gc_thresh3 (copy-and-paste
@@ -109,6 +114,9 @@ static int set_gc_thresh3(struct bpftuner *tuner, struct tbl_stats *stats)
 		goto out;
 
 	ret = nl_send_auto_complete(sk, m);
+	if (ret < 0)
+		bpftune_log(LOG_ERR, "nl_send_auto_complete() failed: %s\n",
+			    strerror(-ret));
 
 nla_put_failure:
 out:
@@ -140,7 +148,10 @@ void event_handler(struct bpftuner *tuner,
 
 	switch (event->scenario_id) {
 	case NEIGH_TABLE_FULL:
+		if (bpftune_cap_set())
+			return;
 		set_gc_thresh3(tuner, stats);
+		bpftune_cap_drop();
 		break;
 	case DST_TABLE_FULL:
 		id = event->update[0].id;

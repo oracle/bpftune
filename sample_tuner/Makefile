@@ -13,7 +13,7 @@ LLVM_STRIP ?= llvm-strip
 BPFTOOL ?= bpftool
 BPF_INCLUDE := /usr/include
 NL_INCLUDE := /usr/include/libnl3
-INCLUDES := -I/usr/include/bpftune -I$(BPF_INCLUDE) -I$(NL_INCLUDE) -I/usr/include/uapi
+INCLUDES := -I$(BPF_INCLUDE) -I$(NL_INCLUDE) -I/usr/include/uapi
 
 INSTALL ?= install
 
@@ -27,7 +27,7 @@ CFLAGS = -fPIC -Wall -Wextra -march=native -g -I../include -std=c99
 
 CFLAGS += -DBPFTUNE_VERSION='"$(BPFTUNE_VERSION)"' $(INCLUDES)
 
-LDLIBS = -lbpf -ldl -lm -lpthread
+LDLIBS = -lbpf -ldl -lm -lcap -lpthread
 
 LDFLAGS += -L. -L/usr/local/lib64
 

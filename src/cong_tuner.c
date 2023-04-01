@@ -93,8 +93,11 @@ void event_handler(struct bpftuner *tuner, struct bpftune_event *event,
 				buf, "bbr");
 
 	if (!tuner->bpf_legacy) {
-		/* kick existing connections by running iterator over them... */
-		while (read(tcp_iter_fd, &iterbuf, sizeof(iterbuf)) == -1 && errno == EAGAIN)
-		;
+		if (!bpftune_cap_set()) {
+			/* kick existing connections by running iter over them... */
+			while (read(tcp_iter_fd, &iterbuf, sizeof(iterbuf)) == -1 && errno == EAGAIN) {}
+			
+			bpftune_cap_drop();
+		}
 	}
 }

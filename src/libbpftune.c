@@ -26,6 +26,8 @@
 #include <sys/utsname.h>
 #include <sched.h>
 #include <mntent.h>
+#include <sys/capability.h>
+#include <pthread.h>
 
 unsigned short bpftune_learning_rate;
 
@@ -140,13 +142,80 @@ void bpftune_log_bpf_err(int err, const char *fmt)
 	bpftune_log(LOG_ERR, fmt, errbuf);
 }
 
+static const cap_value_t cap_vector[] = {
+						CAP_SYS_ADMIN,
+						CAP_NET_ADMIN,
+						CAP_SYS_CHROOT
+};
+
+static cap_t cap_dropped, cap_off, cap_on;
+static int caps_set, cap_inited;
+static pthread_mutex_t cap_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+static void bpftune_cap_init(void)
+{
+	cap_dropped = cap_init();
+	cap_off = cap_dup(cap_dropped);
+	cap_set_flag(cap_off, CAP_PERMITTED, 1, cap_vector, CAP_SET);
+	cap_on = cap_dup(cap_off);
+	cap_set_flag(cap_on, CAP_EFFECTIVE, 1, cap_vector, CAP_SET);
+	cap_inited = 1;
+}
+
+
+int bpftune_cap_set(void)
+{
+	int ret = 0;
+
+	pthread_mutex_lock(&cap_mutex);
+	
+	if (!cap_inited)
+		bpftune_cap_init();
+
+	/* caps already set? */
+	if (++caps_set == 1) {
+		if (cap_set_proc(cap_on) != 0) {
+			ret = -errno;
+			bpftune_log(LOG_ERR, "could not set caps: %s\n",
+				    strerror(errno));
+		} else {
+			bpftune_log(LOG_DEBUG, "set caps\n");
+		}
+	}
+	pthread_mutex_unlock(&cap_mutex);
+
+	return ret;
+}
+
+
+void bpftune_cap_drop(void)
+{
+	pthread_mutex_lock(&cap_mutex);
+
+	if (!cap_inited)
+		bpftune_cap_init();
+
+	if (--caps_set <= 0) {
+		if (cap_set_proc(cap_off) != 0)
+			bpftune_log(LOG_ERR, "could not drop caps: %s\n",
+				    strerror(errno));
+		else
+			bpftune_log(LOG_DEBUG, "dropped caps\n");
+		caps_set = 0;
+	}
+	pthread_mutex_unlock(&cap_mutex);
+}
+
 static char bpftune_cgroup_path[PATH_MAX];
 static int __bpftune_cgroup_fd;
 
 int bpftune_cgroup_init(const char *cgroup_path)
 {
-	int err;
+	int err = 0;
 
+	err = bpftune_cap_set();
+	if (err)
+		return err;
 	strncpy(bpftune_cgroup_path, cgroup_path, sizeof(bpftune_cgroup_path));
 	__bpftune_cgroup_fd = open(cgroup_path, O_RDONLY);
 	if (__bpftune_cgroup_fd < 0) {
@@ -154,7 +223,7 @@ int bpftune_cgroup_init(const char *cgroup_path)
 			err = -errno;
 			bpftune_log(LOG_ERR, "couldnt create cgroup dir '%s': %s\n",
 				    cgroup_path, strerror(-err));
-                        return err;
+			goto out;
 		}
 		close(__bpftune_cgroup_fd);
 	}
@@ -165,7 +234,7 @@ int bpftune_cgroup_init(const char *cgroup_path)
 				    strerror(-err));
 			if (__bpftune_cgroup_fd > 0)
 				close(__bpftune_cgroup_fd);
-			return err;
+			goto out;
 		}
 	}
 	if (__bpftune_cgroup_fd < 0)
@@ -174,9 +243,10 @@ int bpftune_cgroup_init(const char *cgroup_path)
 		err = -errno;
 		bpftune_log(LOG_ERR, "cannot open cgroup dir '%s': %s\n",
 			    cgroup_path, strerror(-err));
-		return err;
 	}
-	return 0;
+out:
+	bpftune_cap_drop();
+	return err;
 }
 
 const char *bpftune_cgroup_name(void)
@@ -198,22 +268,28 @@ void bpftune_cgroup_fini(void)
 int bpftuner_cgroup_attach(struct bpftuner *tuner, const char *prog_name,
 			   enum bpf_attach_type attach_type)
 {
-	int prog_fd, cgroup_fd, err;
+	int prog_fd, cgroup_fd, err = 0;
 	struct bpf_program *prog;
 	const char *cgroup_dir;
 
+	err = bpftune_cap_set();
+	if (err)
+		return err;
+	
 	/* attach to root cgroup */
 	cgroup_dir = bpftune_cgroup_name();
 
 	if (!cgroup_dir) {
 		bpftune_log(LOG_ERR, "cannot get cgroup_dir\n");
-		return 1;
+		err = 1;
+		goto out;
 	}
 	cgroup_fd = bpftune_cgroup_fd();
 	prog = bpf_object__find_program_by_name(tuner->obj, prog_name);
 	if (!prog) {
 		bpftune_log(LOG_ERR, "no prog '%s'\n", prog_name);
-		return -EINVAL;
+		err = -EINVAL;
+		goto out;
 	}
 	prog_fd = bpf_program__fd(prog);
 
@@ -222,17 +298,22 @@ int bpftuner_cgroup_attach(struct bpftuner *tuner, const char *prog_name,
 		err = -errno;
 		bpftune_log(LOG_ERR, "cannot attach '%s' to cgroup '%s': %s\n",
 			    prog_name, cgroup_dir, strerror(-err));
-		return 1;
 	}
-	return 0;
+out:
+	bpftune_cap_drop();
+
+	return err;
 }
 
 void bpftuner_cgroup_detach(struct bpftuner *tuner, const char *prog_name,
 			   enum bpf_attach_type attach_type)
 {
-	int prog_fd, cgroup_fd, err;
+	int prog_fd, cgroup_fd, err = 0;
 	struct bpf_program *prog;
 
+	err = bpftune_cap_set();
+	if (err)
+		return;
 	prog = bpf_object__find_program_by_name(tuner->obj, prog_name);
 	if (prog) {
 		prog_fd = bpf_program__fd(prog);
@@ -244,6 +325,7 @@ void bpftuner_cgroup_detach(struct bpftuner *tuner, const char *prog_name,
                                 prog_fd, cgroup_fd, strerror(-err));
                 }
         }
+	bpftune_cap_drop();
 }
 
 static bool force_bpf_legacy;
@@ -287,6 +369,9 @@ enum bpftune_support_level bpftune_bpf_support(void)
 	struct probe_bpf *probe_bpf = probe_bpf__open_and_load();
 	struct probe_bpf_legacy *probe_bpf_legacy;
 
+	err = bpftune_cap_set();
+	if (err)
+		return BPFTUNE_NONE;
 	support_level = BPFTUNE_LEGACY;
 	err = libbpf_get_error(probe_bpf);
 	if (!err) {
@@ -316,6 +401,7 @@ enum bpftune_support_level bpftune_bpf_support(void)
 	ret = bpftune_netns_cookie_supported();
 	if (!ret)
 		bpftune_log(LOG_DEBUG, "netns cookie not supported\n");
+	bpftune_cap_drop();
 	return support_level;
 }
 
@@ -332,27 +418,35 @@ bool bpftuner_bpf_legacy(void)
 static int bpftuner_map_reuse(const char *name, struct bpf_map *map,
 			      int fd, int *tuner_fdp)
 {
-	int err;
+	int err = 0;
 
 	if (fd > 0) {
+		err = bpftune_cap_set();
+		if (err)
+			return err;
 		bpftune_log(LOG_DEBUG, "reusing %s fd %d\n", name, fd);
 		err = bpf_map__reuse_fd(map, fd);
 		if (err < 0) {
 			bpftune_log_bpf_err(err, "could not reuse fd: %s\n");
-			return err;
+		} else {
+			*tuner_fdp = fd;
 		}
-		*tuner_fdp = fd;
+		bpftune_cap_drop();
 	}
-	return 0;
+	return err;
 }
 
 static void bpftuner_map_init(struct bpftuner *tuner, const char *name,
 			      void **mapp, int *fdp, int *tuner_fdp)
 {
 	struct bpf_map *m;
-	int err;
+	int err = 0;
 
 	if (*fdp > 0)
+		return;
+
+	err = bpftune_cap_set();
+	if (err)
 		return;
 
 	m = bpf_object__find_map_by_name(*tuner->skeleton->obj, name);
@@ -380,17 +474,25 @@ static void bpftuner_map_init(struct bpftuner *tuner, const char *name,
 			}
 		}
 	}
+	bpftune_cap_drop();
 }
 
 int __bpftuner_bpf_load(struct bpftuner *tuner, const char **optionals)
 {
-	int err;	
+	int err = 0;
+
+	err = bpftune_cap_set();
+
+	if (err)
+		return err;
 
 	if (bpftuner_map_reuse("ring_buffer", tuner->ring_buffer_map,
 			       ring_buffer_map_fd, &tuner->ring_buffer_map_fd) ||
 	    bpftuner_map_reuse("netns_map", tuner->netns_map,
-			       netns_map_fd, &tuner->netns_map_fd))
-		return -1;
+			       netns_map_fd, &tuner->netns_map_fd)) {
+		err = -1;
+		goto out;
+	}
 
 	if (optionals) {
 		int i;
@@ -410,32 +512,41 @@ int __bpftuner_bpf_load(struct bpftuner *tuner, const char **optionals)
 	err = bpf_object__load_skeleton(tuner->skeleton);
 	if (err) {
 		bpftune_log_bpf_err(err, "could not load skeleton: %s\n");
-		return err;
+		goto out;
 	}
 
 	bpftuner_map_init(tuner, "ring_buffer_map", &tuner->ring_buffer_map,
 			  &ring_buffer_map_fd, &tuner->ring_buffer_map_fd);
 	bpftuner_map_init(tuner, "netns_map", &tuner->netns_map,
 			  &netns_map_fd, &tuner->netns_map_fd);
-	return 0;
+out:
+	bpftune_cap_drop();
+	return err;
 }
 
 int __bpftuner_bpf_attach(struct bpftuner *tuner)
 {
-	int err = bpf_object__attach_skeleton(tuner->skeleton);
+	int err = 0;
+
+	err = bpftune_cap_set();
+	if (err)
+		return err;
+	err = bpf_object__attach_skeleton(tuner->skeleton);
 	if (err) {
 		bpftune_log_bpf_err(err, "could not attach skeleton: %s\n");
-		return err;
+	} else {
+		tuner->ring_buffer_map_fd = bpf_map__fd(tuner->ring_buffer_map);
 	}
-	tuner->ring_buffer_map_fd = bpf_map__fd(tuner->ring_buffer_map);
-
-	return 0;
+	bpftune_cap_drop();
+	return err;
 }
 
 static unsigned int bpftune_num_tuners;
 
 void bpftuner_bpf_fini(struct bpftuner *tuner)
 {
+	if (bpftune_cap_set())
+		return;
 	bpf_object__destroy_skeleton(tuner->skeleton);
 	free(tuner->skel);
 	if (bpftune_num_tuners == 0) {
@@ -445,6 +556,7 @@ void bpftuner_bpf_fini(struct bpftuner *tuner)
 			close(netns_map_fd);
 		ring_buffer_map_fd = netns_map_fd = 0;
 	}
+	bpftune_cap_drop();
 }
 
 static struct bpftuner *bpftune_tuners[BPFTUNE_MAX_TUNERS];
@@ -489,7 +601,10 @@ struct bpftuner *bpftuner_init(const char *path)
 	tuner->event_handler = dlsym(tuner->handle, "event_handler");
 	
 	bpftune_log(LOG_DEBUG, "calling init for '%s\n", path);
-	err = tuner->init(tuner);
+	err = bpftune_cap_set();
+	if (!err)
+		err = tuner->init(tuner);
+	bpftune_cap_drop();
 	if (err) {
 		dlclose(tuner->handle);
 		bpftune_log(LOG_ERR, "error initializing '%s: %s\n",
@@ -531,9 +646,12 @@ void bpftuner_fini(struct bpftuner *tuner, enum bpftune_state state)
 			bpftuner_scenario_log(tuner, i, j, 1, true, NULL, args);
 		}
 	}
-	if (tuner->fini)
-		tuner->fini(tuner);
-
+	if (tuner->fini) {
+		if (!bpftune_cap_set()) {
+			tuner->fini(tuner);
+			bpftune_cap_drop();
+		}
+	}
 	tuner->state = state;
 }
 
@@ -595,12 +713,16 @@ void *bpftune_ring_buffer_init(int ring_buffer_map_fd, void *ctx)
 
 	bpftune_log(LOG_DEBUG, "calling ring_buffer__new, ringbuf_map_fd %d\n",
 		    ring_buffer_map_fd);
+	err = bpftune_cap_set();
+	if (err)
+		return NULL;
 	rb = ring_buffer__new(ring_buffer_map_fd, bpftune_ringbuf_event_read, ctx, NULL);
 	err = libbpf_get_error(rb);
 	if (err) {
 		bpftune_log_bpf_err(err, "couldnt create ring buffer: %s\n");
-		return NULL;
+		rb = NULL;
 	}
+	bpftune_cap_drop();
 	return rb;
 }
 
@@ -646,11 +768,15 @@ int bpftune_sysctl_read(int netns_fd, const char *name, long *values)
 	int err = 0;	
 	FILE *fp;
 
+	err = bpftune_cap_set();
+	if (err)
+		return err;
+
 	bpftune_sysctl_name_to_path(name, path, sizeof(path));
 
 	err = bpftune_netns_set(netns_fd, &orig_netns_fd);
 	if (err < 0)
-		return err;
+		goto out_unset;
 
 	fp = fopen(path, "r");
 	if (!fp) {
@@ -680,7 +806,9 @@ int bpftune_sysctl_read(int netns_fd, const char *name, long *values)
 
 out:
 	bpftune_netns_set(orig_netns_fd, NULL);
-	return num_values;
+out_unset:
+	bpftune_cap_drop();
+	return err ? err : num_values;
 }
 
 int bpftune_sysctl_write(int netns_fd, const char *name, __u8 num_values, long *values)
@@ -696,9 +824,12 @@ int bpftune_sysctl_write(int netns_fd, const char *name, __u8 num_values, long *
 	bpftune_log(LOG_DEBUG, "writing sysctl '%s' for netns_fd %d\n",
 		    path, netns_fd);
 
+	err = bpftune_cap_set();
+	if (err)
+		return err;
 	err = bpftune_netns_set(netns_fd, &orig_netns_fd);
 	if (err < 0)
-		return err;
+		goto out;
 
 	/* If value is already set to val, do nothing. */
 	old_num_values = bpftune_sysctl_read(0, name, old_values);
@@ -712,7 +843,7 @@ int bpftune_sysctl_write(int netns_fd, const char *name, __u8 num_values, long *
 				break;
 		}
 		if (i == num_values)
-			return 0;
+			goto out;
 	}
         fp = fopen(path, "w");
         if (!fp) {
@@ -732,6 +863,7 @@ int bpftune_sysctl_write(int netns_fd, const char *name, __u8 num_values, long *
 	}
 out:
 	bpftune_netns_set(orig_netns_fd, NULL);
+	bpftune_cap_drop();
         return 0;
 }
 
@@ -937,13 +1069,18 @@ static int bpftune_netns_fd(int netns_pid)
 {
 	char netns_path[256];
 	int netns_fd;
+	int err;
 
 	if (netns_pid == 0)
 		return 0;
 	snprintf(netns_path, sizeof(netns_path), "/proc/%d/ns/net", netns_pid);
+	err = bpftune_cap_set();
+	if (err)
+		return err;
 	netns_fd = open(netns_path, O_RDONLY);
 	if (netns_fd < 0)
 		netns_fd = -errno;
+	bpftune_cap_drop();
 	return netns_fd;
 }
 
@@ -957,6 +1094,11 @@ int bpftune_netns_set(int new_fd, int *orig_fd)
 
 	if (!new_fd)
 		return 0;
+
+	err = bpftune_cap_set();
+	if (err)
+		return err;
+
 	fd = open("/proc/self/ns/net", O_RDONLY | O_CLOEXEC);
 	if (fd < 0) {
 		err = -errno;
@@ -976,6 +1118,8 @@ int bpftune_netns_set(int new_fd, int *orig_fd)
 		*orig_fd = fd;
 	else
 		close(fd);
+
+	bpftune_cap_drop();
 	return err;
 }
 
@@ -1054,12 +1198,16 @@ static int bpftune_netns_find(unsigned long cookie)
 	if (!netns_cookie_supported || cookie == 0 || (global_netns_cookie && cookie == global_netns_cookie))
 		return 0;
 
+	ret = bpftune_cap_set();
+	if (ret)
+		return ret;
+
 	mounts = setmntent("/proc/mounts", "r");
 	if (mounts == NULL) {
 		ret = -errno;
 		bpftune_log(LOG_ERR, "cannot setmntent() for /proc/mounts\n",
 			    strerror(-ret));
-		return ret;
+		goto out;
 	}
 	while ((ent = getmntent(mounts)) != NULL) {
 		int mntfd;
@@ -1086,7 +1234,7 @@ static int bpftune_netns_find(unsigned long cookie)
 		}
 		ret = mntfd;
 		endmntent(mounts);
-		return ret;
+		goto out;
 	}
 	endmntent(mounts);
 
@@ -1095,7 +1243,7 @@ static int bpftune_netns_find(unsigned long cookie)
 	if (!dir) { 
 		ret = -errno;   
 		bpftune_log(LOG_ERR, "could not open /proc: %s\n", strerror(-ret));
-		return ret;
+		goto out;
 	}
 	while ((dirent = readdir(dir)) != NULL) {
 		char *endptr;
@@ -1125,6 +1273,8 @@ static int bpftune_netns_find(unsigned long cookie)
 	}
 	closedir(dir);
 
+out:
+	bpftune_cap_drop();
 	return ret;
 }
 
@@ -1258,14 +1408,18 @@ int bpftune_module_load(const char *name)
 	char modpath[PATH_MAX];
 	int ret, fd;
 
-	ret = bpftune_module_path(name, modpath);
+	ret = bpftune_cap_set();
 	if (ret)
 		return ret;
+	ret = bpftune_module_path(name, modpath);
+	if (ret)
+		goto out;
 
 	fd = open(modpath, O_RDONLY);
 	if (fd < 0) {
 		bpftune_log(LOG_DEBUG, "no module '%s' found.\n", modpath);
-		return -errno;
+		ret = -errno;
+		goto out;
 	}
 	ret = syscall(__NR_finit_module, fd, "", 0);
 	if (ret) {
@@ -1274,6 +1428,8 @@ int bpftune_module_load(const char *name)
 		ret = -errno;
 	}
 	close(fd);
+out:
+	bpftune_cap_drop();
 	return ret;
 }
 
@@ -1281,11 +1437,15 @@ int bpftune_module_delete(const char *name)
 {
 	int ret;
 
+	ret = bpftune_cap_set();
+	if (ret)
+		return ret;
 	ret = syscall(__NR_delete_module, name, 0);
 	if (ret) {
 		bpftune_log(LOG_DEBUG, "could not delete module '%s'\n",
 			    name);
 		ret = -errno;
 	}
+	bpftune_cap_drop();
 	return ret;
 }

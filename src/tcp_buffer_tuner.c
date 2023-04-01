@@ -85,14 +85,20 @@ int get_from_file(FILE *fp, const char *fmt, ...)
 
 long nr_free_buffer_pages(bool initial)
 {
-	FILE *fp = fopen("/proc/zoneinfo", "r");
 	unsigned long nr_pages = 0;
+	FILE *fp;
+	int err;
+
+	err = bpftune_cap_set();
+	if (err)
+		return err;
+
+	fp = fopen("/proc/zoneinfo", "r");
 
 	if (!fp) {
 		bpftune_log(LOG_DEBUG, "could not open /proc/zoneinfo: %s\n", strerror(errno));
-		return 0;
 	}	
-	while (!feof(fp)) {
+	while (fp && !feof(fp)) {
 		long managed = 0, high = 0, free = 0, node;
 		char zone[128] = {};
 
@@ -112,8 +118,10 @@ long nr_free_buffer_pages(bool initial)
 				nr_pages += free;
 		}
 	}
-	fclose(fp);
+	if (fp)
+		fclose(fp);
 
+	bpftune_cap_drop();
 	return nr_pages;
 }
 

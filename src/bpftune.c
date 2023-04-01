@@ -78,6 +78,8 @@ void *inotify_thread(void *arg)
 	char buf[sizeof(struct inotify_event) * 32];
 	struct bpftuner *tuner;
 
+	if (bpftune_cap_set())
+		return NULL;
 	inotify_fd = inotify_init();
 	if (inotify_fd < 0) {
 		bpftune_log(LOG_ALERT, "cannot monitor '%s' for changes: %s\n",
@@ -85,6 +87,8 @@ void *inotify_thread(void *arg)
 		return NULL;
 	}
 	wd = inotify_add_watch(inotify_fd, library_dir, IN_CREATE | IN_DELETE);
+
+	bpftune_cap_drop();
 
 	while (!exiting) {
 		len = read(inotify_fd, buf, sizeof(buf));
@@ -116,7 +120,9 @@ void *inotify_thread(void *arg)
 			}
 		}
 	}
-	inotify_rm_watch(inotify_fd, wd);
+	if (!bpftune_cap_set())
+		inotify_rm_watch(inotify_fd, wd);
+	bpftune_cap_drop();
 	close(inotify_fd);
 
 	return NULL;
@@ -189,6 +195,7 @@ int init(const char *library_dir)
 	}
 	bpftune_netns_init_all();
 
+	bpftune_cap_drop();
 	return 0;
 }
 
@@ -341,7 +348,10 @@ int main(int argc, char *argv[])
 		return 0;
 
 	/* ensure no existing pin in place... */
+	if (bpftune_cap_set())
+		exit(EXIT_FAILURE);
 	ftw(BPFTUNE_PIN, unlink_cb, FTW_F | FTW_D);
+	bpftune_cap_drop();
 
 	err = bpftune_cgroup_init(cgroup_dir);
 	if (err)
