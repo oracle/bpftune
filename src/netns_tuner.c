@@ -23,6 +23,7 @@ static struct bpftunable_scenario scenarios[] = {
 int init(struct bpftuner *tuner)
 {
 	const char *optionals[] = { "entry__net_free", NULL };
+
 	if (!bpftune_netns_cookie_supported())
 		return -ENOTSUP;
 

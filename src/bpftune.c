@@ -144,6 +144,9 @@ int init(const char *library_dir)
 			    library_dir, strerror(-err));
 		return err;
 	}
+
+	bpftune_cap_drop();
+
 	bpftune_log(LOG_DEBUG, "searching %s for plugins...\n", library_dir);
 	while ((dirent = readdir(dir)) != NULL) {
 		struct bpftuner *tuner;
@@ -195,7 +198,6 @@ int init(const char *library_dir)
 	}
 	bpftune_netns_init_all();
 
-	bpftune_cap_drop();
 	return 0;
 }
 

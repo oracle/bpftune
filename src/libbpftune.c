@@ -144,45 +144,58 @@ void bpftune_log_bpf_err(int err, const char *fmt)
 
 static const cap_value_t cap_vector[] = {
 						CAP_SYS_ADMIN,
-						CAP_NET_ADMIN,
+						CAP_NET_RAW,
 						CAP_SYS_CHROOT
 };
 
 static cap_t cap_dropped, cap_off, cap_on;
-static int caps_set, cap_inited;
-static pthread_mutex_t cap_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_key_t cap_key;
+static pthread_once_t cap_once = PTHREAD_ONCE_INIT;
+
+/* capabilities are thread-specific, maintain a count for nested calls
+ * so we only drop caps when it reaches zero.
+ */
+static int *cap_count(void)
+{
+	int *count = pthread_getspecific(cap_key);
+	if (count)
+		return count;
+	count = calloc(1, sizeof(int));
+	pthread_setspecific(cap_key, count);
+	return count;
+}
 
 static void bpftune_cap_init(void)
 {
+	int err = pthread_key_create(&cap_key, NULL);
+
+	if (err)
+		bpftune_log(LOG_ERR, "could not create cap key: %s\n",
+			    strerror(err));
 	cap_dropped = cap_init();
 	cap_off = cap_dup(cap_dropped);
 	cap_set_flag(cap_off, CAP_PERMITTED, 1, cap_vector, CAP_SET);
 	cap_on = cap_dup(cap_off);
 	cap_set_flag(cap_on, CAP_EFFECTIVE, 1, cap_vector, CAP_SET);
-	cap_inited = 1;
 }
-
 
 int bpftune_cap_set(void)
 {
 	int ret = 0;
+	int *count;
 
-	pthread_mutex_lock(&cap_mutex);
-	
-	if (!cap_inited)
-		bpftune_cap_init();
+	(void) pthread_once(&cap_once, bpftune_cap_init);
 
-	/* caps already set? */
-	if (++caps_set == 1) {
+	count = cap_count();
+	(*count)++;
+	bpftune_log(LOG_DEBUG, "set caps (count %d)\n", *count);
+	if (*count == 1) {
 		if (cap_set_proc(cap_on) != 0) {
 			ret = -errno;
 			bpftune_log(LOG_ERR, "could not set caps: %s\n",
 				    strerror(errno));
-		} else {
-			bpftune_log(LOG_DEBUG, "set caps\n");
 		}
 	}
-	pthread_mutex_unlock(&cap_mutex);
 
 	return ret;
 }
@@ -190,20 +203,19 @@ int bpftune_cap_set(void)
 
 void bpftune_cap_drop(void)
 {
-	pthread_mutex_lock(&cap_mutex);
+	int *count;
 
-	if (!cap_inited)
-		bpftune_cap_init();
+	(void) pthread_once(&cap_once, bpftune_cap_init);
 
-	if (--caps_set <= 0) {
+	count = cap_count();
+	if (*count > 0)
+		(*count)--;
+	bpftune_log(LOG_DEBUG, "drop caps (count %d)\n", *count);
+	if (*count == 0) {
 		if (cap_set_proc(cap_off) != 0)
 			bpftune_log(LOG_ERR, "could not drop caps: %s\n",
 				    strerror(errno));
-		else
-			bpftune_log(LOG_DEBUG, "dropped caps\n");
-		caps_set = 0;
 	}
-	pthread_mutex_unlock(&cap_mutex);
 }
 
 static char bpftune_cgroup_path[PATH_MAX];
@@ -415,15 +427,13 @@ bool bpftuner_bpf_legacy(void)
 	return support_level < BPFTUNE_NORMAL;
 }
 
+/* called with caps set */
 static int bpftuner_map_reuse(const char *name, struct bpf_map *map,
 			      int fd, int *tuner_fdp)
 {
 	int err = 0;
 
 	if (fd > 0) {
-		err = bpftune_cap_set();
-		if (err)
-			return err;
 		bpftune_log(LOG_DEBUG, "reusing %s fd %d\n", name, fd);
 		err = bpf_map__reuse_fd(map, fd);
 		if (err < 0) {
@@ -431,11 +441,11 @@ static int bpftuner_map_reuse(const char *name, struct bpf_map *map,
 		} else {
 			*tuner_fdp = fd;
 		}
-		bpftune_cap_drop();
 	}
 	return err;
 }
 
+/* called with caps set */
 static void bpftuner_map_init(struct bpftuner *tuner, const char *name,
 			      void **mapp, int *fdp, int *tuner_fdp)
 {
@@ -443,10 +453,6 @@ static void bpftuner_map_init(struct bpftuner *tuner, const char *name,
 	int err = 0;
 
 	if (*fdp > 0)
-		return;
-
-	err = bpftune_cap_set();
-	if (err)
 		return;
 
 	m = bpf_object__find_map_by_name(*tuner->skeleton->obj, name);
@@ -474,7 +480,6 @@ static void bpftuner_map_init(struct bpftuner *tuner, const char *name,
 			}
 		}
 	}
-	bpftune_cap_drop();
 }
 
 int __bpftuner_bpf_load(struct bpftuner *tuner, const char **optionals)
@@ -575,6 +580,7 @@ struct bpftuner *bpftuner_init(const char *path)
 		return NULL;
 	}
 
+	bpftune_cap_set();
 	/* if file appears via inotify we may get "file too short" errors;
 	 * retry a few times to avoid this.
 	 */
@@ -584,6 +590,7 @@ struct bpftuner *bpftuner_init(const char *path)
 			break;
 		usleep(100);
 	}
+	bpftune_cap_drop();
 	if (!tuner->handle) {
 		bpftune_log(LOG_ERR,
 			    "could not dlopen '%s' after %d retries: %s\n",
@@ -601,10 +608,7 @@ struct bpftuner *bpftuner_init(const char *path)
 	tuner->event_handler = dlsym(tuner->handle, "event_handler");
 	
 	bpftune_log(LOG_DEBUG, "calling init for '%s\n", path);
-	err = bpftune_cap_set();
-	if (!err)
-		err = tuner->init(tuner);
-	bpftune_cap_drop();
+	err = tuner->init(tuner);
 	if (err) {
 		dlclose(tuner->handle);
 		bpftune_log(LOG_ERR, "error initializing '%s: %s\n",
@@ -646,12 +650,9 @@ void bpftuner_fini(struct bpftuner *tuner, enum bpftune_state state)
 			bpftuner_scenario_log(tuner, i, j, 1, true, NULL, args);
 		}
 	}
-	if (tuner->fini) {
-		if (!bpftune_cap_set()) {
-			tuner->fini(tuner);
-			bpftune_cap_drop();
-		}
-	}
+	if (tuner->fini)
+		tuner->fini(tuner);
+
 	tuner->state = state;
 }
 
