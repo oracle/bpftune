@@ -1225,7 +1225,7 @@ static int bpftune_netns_find(unsigned long cookie)
 			continue;
 		}
 		bpftune_log(LOG_DEBUG, "found netns fd %d for cookie %ld via mnt %s\n",
-			    netns_cookie, ent->mnt_dir);
+			    mntfd, netns_cookie, ent->mnt_dir);
 		if (cookie == 0) {
 			close(mntfd);
 			bpftune_for_each_tuner(t)
