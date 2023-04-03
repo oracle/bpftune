@@ -144,7 +144,7 @@ void bpftune_log_bpf_err(int err, const char *fmt)
 
 static const cap_value_t cap_vector[] = {
 						CAP_SYS_ADMIN,
-						CAP_NET_RAW,
+						CAP_NET_ADMIN,
 						CAP_SYS_CHROOT
 };
 
@@ -174,9 +174,9 @@ static void bpftune_cap_init(void)
 			    strerror(err));
 	cap_dropped = cap_init();
 	cap_off = cap_dup(cap_dropped);
-	cap_set_flag(cap_off, CAP_PERMITTED, 1, cap_vector, CAP_SET);
+	cap_set_flag(cap_off, CAP_PERMITTED, 3, cap_vector, CAP_SET);
 	cap_on = cap_dup(cap_off);
-	cap_set_flag(cap_on, CAP_EFFECTIVE, 1, cap_vector, CAP_SET);
+	cap_set_flag(cap_on, CAP_EFFECTIVE, 3, cap_vector, CAP_SET);
 }
 
 int bpftune_cap_set(void)
