@@ -23,11 +23,12 @@ test_run_cmd_local "$BPFTUNE $OPTIONS &" true
 
 sleep $SETUPTIME
 
-caps=$(getpcaps $(pgrep bpftune) 2>&1 )
+caps=$(getpcaps $(pgrep bpftune) 2>&1 | \
+       awk '/cap_net_admin,cap_sys_chroot,cap_sys_admin[+=]p/ { print $0 }')
 
 echo "caps: $caps"
 
-if [[ "$caps" =~ "cap_sys_admin+p" ]]; then
+if [[ -n "$caps" ]]; then
 	test_pass
 fi
 test_cleanup
