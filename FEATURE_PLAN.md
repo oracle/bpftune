@@ -33,6 +33,8 @@
  - we notice new tuners appearing/disappearing from /usr/lib64/bpftune
    via inotify.  We watch the above directory for tuner addition or
    removal to allow packages to separately deliver their own tuners.
+ - make (lib)bpftune assume capabilities as needed; this reduces the
+   threat surface of a service that requires CAP_SYS_ADMIN.
  - We deliver a bpftune-devel package to support separate tuner
    development.
  - And also show a sample standalone tuner in sample_tuner/ ; it
