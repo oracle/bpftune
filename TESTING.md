@@ -30,6 +30,11 @@ Verify logging works with syslog, stdout/stderr.
 Verify enabling/disabling bpftune via service works and bpftune
 is running/logging.
 
+## Capabilities test
+
+Ensure capabilities are dropped after initialization using
+getpcaps(8).
+
 ## Inotify tests
 
 Verify that removing or adding a tuner is noticed and the tuner
