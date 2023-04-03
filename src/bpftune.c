@@ -84,6 +84,7 @@ void *inotify_thread(void *arg)
 	if (inotify_fd < 0) {
 		bpftune_log(LOG_ALERT, "cannot monitor '%s' for changes: %s\n",
 			    library_path, strerror(errno));
+		bpftune_cap_drop();
 		return NULL;
 	}
 	wd = inotify_add_watch(inotify_fd, library_dir, IN_CREATE | IN_DELETE);
@@ -144,8 +145,6 @@ int init(const char *library_dir)
 			    library_dir, strerror(-err));
 		return err;
 	}
-
-	bpftune_cap_drop();
 
 	bpftune_log(LOG_DEBUG, "searching %s for plugins...\n", library_dir);
 	while ((dirent = readdir(dir)) != NULL) {
@@ -358,6 +357,8 @@ int main(int argc, char *argv[])
 	err = bpftune_cgroup_init(cgroup_dir);
 	if (err)
 		exit(EXIT_FAILURE);
+
+	bpftune_cap_drop();
 
 	if (init(BPFTUNER_LIB_DIR)) {
 		bpftune_log(LOG_ERR, "could not initialize tuners in '%s'\n",
