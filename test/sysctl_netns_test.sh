@@ -21,7 +21,7 @@ for TUNER in neigh_table ; do
 
    sysctl -qw net.ipv4.tcp_rmem="${rmem_orig[0]} ${rmem_orig[1]} ${rmem_orig[1]}"
 
-   test_run_cmd_local "$BPFTUNE -s &" true
+   test_run_cmd_local "$BPFTUNE -ds &" true
 
    sleep $SETUPTIME
 
