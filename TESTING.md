@@ -13,6 +13,23 @@ Network namespace awareness requires support for netns cookies,
 which is not available in 5.4 kernels.  In such cases, tests
 requiring netns cookie support are skipped automatically.
 
+# Configuration
+
+Install packages used to facilitate testing:
+
+```
+$ sudo dnf install iperf3 qperf kernel-uek-modules-extra clang llvm bpftool libbpf-devel libcap-devel 
+$ sudo dnf module install container-tools:ol8
+```
+
+iperf3, qperf are needed for perf testing; kernel-uek-modules-extra is
+needed for sch-netem; the latter 5 packages are needed to build the sample
+tuner.
+
+podman is optional and is used to verify container support in bpftune.
+
+Package names may differ for different distros.
+
 # General tests
 
 ## Support test

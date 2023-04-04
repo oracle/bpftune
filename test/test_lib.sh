@@ -97,6 +97,23 @@ export MTU=1500
 export DROP=${DROP:-""}
 export LATENCY=${LATENCY:-""}
 
+export NETNS_CMD="ip netns exec $NETNS"
+export PODMAN=$(which podman 2>/dev/null)
+export PODMAN_SEARCH=$($PODMAN search oraclelinux 2> /dev/null)
+
+# only use podman if it can access images
+if [[ -n $PODMAN ]]; then
+	set +e
+	$PODMAN_SEARCH oraclelinux
+	if [[ $? -ne 0 ]]; then
+		PODMAN=""
+	fi
+	set -e
+fi
+
+export PODMAN_CONTAINER=${PODMAN_CONTAINER:-"container-registry.oracle.com/os/oraclelinux:8-slim"}
+export PODMAN_CMD="${PODMAN} run --rm $PODMAN_CONTAINER"
+
 export BPFTUNE_FLAGS=${BPFTUNE_FLAGS:-""}
 if [[ "$DEBUG" != 0 ]]; then
 	export BPFTUNE_FLAGS="${BPFTUNE_FLAGS} -d"
