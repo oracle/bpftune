@@ -100,11 +100,12 @@ export LATENCY=${LATENCY:-""}
 export NETNS_CMD="ip netns exec $NETNS"
 export PODMAN=$(which podman 2>/dev/null)
 export PODMAN_SEARCH="$PODMAN search oraclelinux"
+export PROXYT_SERVICE=${PROXYT_SERVICE:-proxyt"
 
 # only use podman if it can access images
 if [[ -n $PODMAN ]]; then
 	set +e
-	timeout 10 $PODMAN_SEARCH > /dev/null 2>&1
+	timeout 5 $PODMAN_SEARCH > /dev/null 2>&1
 	if [[ $? -ne 0 ]]; then
 		PODMAN=""
 	fi
@@ -227,6 +228,10 @@ test_setup_local()
 	fi
 	set +e
 	service bpftune stop 2>/dev/null
+	# proxyt causes problems for tcp tests
+	if [[ -n "$PROXYT_SERVICE" ]]; then
+		service proxyt stop 2>/dev/null
+	fi
 	set -e
 	if [[ -f "$FIREWALL_CMD" ]]; then
 		set +e
