@@ -100,7 +100,7 @@ export LATENCY=${LATENCY:-""}
 export NETNS_CMD="ip netns exec $NETNS"
 export PODMAN=$(which podman 2>/dev/null)
 export PODMAN_SEARCH="$PODMAN search oraclelinux"
-export PROXYT_SERVICE=${PROXYT_SERVICE:-proxyt"
+export PROXYT_SERVICE=${PROXYT_SERVICE:-"proxyt"}
 
 # only use podman if it can access images
 if [[ -n $PODMAN ]]; then
