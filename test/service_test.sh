@@ -55,7 +55,6 @@ else
 	test_pass
 fi
 
-test_pass
 test_cleanup
 
 test_exit
