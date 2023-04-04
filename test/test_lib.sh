@@ -104,7 +104,7 @@ export PODMAN_SEARCH=$($PODMAN search oraclelinux 2> /dev/null)
 # only use podman if it can access images
 if [[ -n $PODMAN ]]; then
 	set +e
-	$PODMAN_SEARCH oraclelinux
+	$PODMAN_SEARCH
 	if [[ $? -ne 0 ]]; then
 		PODMAN=""
 	fi
