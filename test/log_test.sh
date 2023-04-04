@@ -12,25 +12,34 @@
 
 SLEEPTIME=1
 
-for TUNER in neigh_table ; do
-
- for MODE in debug info syslog; do
+for MODE in debug info syslog service; do
 
    LOGFILE=$TESTLOG_LAST
-   if [[ $MODE == "debug" ]]; then
+   case $MODE in
+   debug)
 	OPTIONS="-ds"
-   elif [[ $MODE == "syslog" ]]; then
+	BPFTUNECMD="$BPFTUNE $OPTIONS &"
+	;;
+   syslog)
 	OPTIONS="-d"
+	BPFTUNECMD="$BPFTUNE $OPTIONS &"
 	LOGFILE=/var/log/messages
-   else
+	;;
+   service)
+	BPFTUNECMD="service bpftue start"
+	LOGFILE=/var/log/messages
+	;;
+   *)
 	OPTIONS="-s"
-   fi
+	BPFTUNECMD="$BPFTUNE $OPTIONS &"
+	;;
+   esac
 
-   test_start "$0|log test: does setting $MODE logging generate messages?"
+   test_start "$0|log test: does setting $MODE logging generate messages for $BPFTUNECMD?"
 
    test_setup "true"
 
-   test_run_cmd_local "$BPFTUNE $OPTIONS &" true
+   test_run_cmd_local "$BPFTUNECMD &" true
 
    sleep $SETUPTIME
    grep "bpftune works" $LOGFILE
@@ -45,7 +54,6 @@ for TUNER in neigh_table ; do
    fi
 
    test_cleanup
- done
 done
 
 test_exit

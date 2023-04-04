@@ -104,6 +104,7 @@ fi
 export CGROUPDIR=${CGROUPDIR:-"/tmp/cgroupv2"}
 export BPFTUNE_PROG=${BPFTUNE_PROG:-"/usr/sbin/bpftune"}
 export BPFTUNE="${BPFTUNE_PROG} -c $CGROUPDIR $BPFTUNE_FLAGS"
+export BPFTUNE_CMD=${BPFTUNE_CMD:-"$BPFTUNE"}
 
 # Don't want __pycache__ files hanging around.
 export PYTHONCMD="python3 -B"
@@ -237,6 +238,10 @@ test_cleanup_local()
 		done
 		rm -f $CMD_PIDFILE
 	fi
+
+	set +e
+	service bpftune stop 2>/dev/null
+	set -e
 
 	ip --all netns del ${NETNS_PREFIX}\*
 	set +e
