@@ -11,7 +11,9 @@ Summary:        BPF/tracing tools for auto-tuning Linux
 Group:          Development/Tools
 Requires:       libbpf >= 0.6
 Requires:       libnl3
+Requires:       libcap
 BuildRequires:  libbpf-devel >= 0.6
+BuildRequires:  libcap-devel
 BuildRequires:	bpftool >= 4.18
 BuildRequires:  libnl3-devel
 BuildRequires:  clang >= 11
