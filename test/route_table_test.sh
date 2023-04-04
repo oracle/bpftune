@@ -36,7 +36,7 @@ for TUNER in route_table ; do
    $PREFIX_CMD sysctl -w net.ipv6.route.gc_thresh=16
    $PREFIX_CMD sysctl -w net.ipv6.route.max_size=32
 
-   test_run_cmd_local "$BPFTUNE -ds &" true
+   test_run_cmd_local "$BPFTUNE -s &" true
 
    sleep $SETUPTIME
 
@@ -54,10 +54,6 @@ for TUNER in route_table ; do
    sleep $SLEEPTIME
    sleep $SLEEPTIME
    sleep $SLEEPTIME
-   echo "Following changes were made:"
-   set +e  
-   grep bpftune $LOGFILE
-   set -e
    max_size_post=($($PREFIX_CMD sysctl -n net.ipv6.route.max_size))
    $PREFIX_CMD sysctl -w net.ipv6.route.max_size="$max_size_orig"
    $PREFIX_CMD sysctl -w net.ipv6.route.gc_thresh="$thresh_orig"

@@ -24,7 +24,7 @@ for TUNER in neigh_table ; do
 
    test_setup "true"
 
-   test_run_cmd_local "$BPFTUNE -dsL &" true
+   test_run_cmd_local "$BPFTUNE -sL &" true
 
    sleep $SETUPTIME
 
@@ -49,10 +49,6 @@ for TUNER in neigh_table ; do
 	$PREFIX_CMD ip neigh replace $ip6addr lladdr $macaddr dev $INTF
       fi
    done
-   echo "Following changes were made:"
-   set +e  
-   grep bpftune $LOGFILE
-   set -e
    grep "table nearly full" $LOGFILE
    test_pass
   done

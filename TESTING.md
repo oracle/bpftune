@@ -18,13 +18,17 @@ requiring netns cookie support are skipped automatically.
 Install packages used to facilitate testing:
 
 ```
-$ sudo dnf install iperf3 qperf kernel-uek-modules-extra clang llvm bpftool libbpf-devel libcap-devel 
+$ sudo dnf install iperf3 qperf proxyt kernel-uek-modules-extra clang llvm bpftool libbpf-devel libcap-devel 
 $ sudo dnf module install container-tools:ol8
 ```
 
 iperf3, qperf are needed for perf testing; kernel-uek-modules-extra is
-needed for sch-netem; the latter 5 packages are needed to build the sample
-tuner.
+needed for sch-netem; proxyt is used by podman to connect to the container
+registry; may not be needed depending on the network connectivity/podman
+config used.  If podman is not installed or registry reachable, tests
+will be skipped.
+
+The latter 5 packages are needed to build the sample tuner.
 
 podman is optional and is used to verify container support in bpftune.
 
