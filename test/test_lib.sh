@@ -263,10 +263,7 @@ test_cleanup_local()
 
 	set +e
 	service bpftune stop 2>/dev/null
-	set -e
-
 	ip --all netns del ${NETNS_PREFIX}\*
-	set +e
 	ip link del $VETH2 2>/dev/null
 	ip link del bpftunelocal 2>/dev/null
 	set -e
