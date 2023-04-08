@@ -49,7 +49,7 @@ for TUNER in neigh_table ; do
 	$PREFIX_CMD ip neigh replace $ip6addr lladdr $macaddr dev $INTF
       fi
    done
-   grep "table nearly full" $LOGFILE
+   grep "updated gc_thresh3 for $TBL table" $LOGFILE
    test_pass
   done
  done

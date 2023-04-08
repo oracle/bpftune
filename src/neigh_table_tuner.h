@@ -18,13 +18,11 @@ enum neigh_table_tunables {
 	NEIGH_TABLE_IPV6_GC_THRESH1,
 	NEIGH_TABLE_IPV6_GC_THRESH2,
 	NEIGH_TABLE_IPV6_GC_THRESH3,
-	NEIGH_TABLE_IPV6_MAX_SIZE,
 	NEIGH_TABLE_NUM_TUNABLES
 };
 
 enum neigh_table_scenarios {
 	NEIGH_TABLE_FULL,
-	DST_TABLE_FULL,
 };
 
 struct tbl_stats {

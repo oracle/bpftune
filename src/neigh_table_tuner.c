@@ -32,15 +32,11 @@ static struct bpftunable_desc descs[] = {
 		"net.ipv6.neigh.default.gc_thresh2",    false, 1, },
 { NEIGH_TABLE_IPV6_GC_THRESH3,		BPFTUNABLE_SYSCTL,
 		"net.ipv6.neigh.default.gc_thresh3",    false, 1, },
-{ NEIGH_TABLE_IPV6_MAX_SIZE,		BPFTUNABLE_SYSCTL,
-		"net.ipv6.route.max_size",		false, 1 },
 };
 
 static struct bpftunable_scenario scenarios[] = {
 { NEIGH_TABLE_FULL,	"neighbour table nearly full",
 		"neighbour table is nearly full, preventing new entries from being added." },
-{ DST_TABLE_FULL,	"destination table nearly full",
-		"destination table is nearly full, preventing new entries from being added." },
 };
 
 int init(struct bpftuner *tuner)
@@ -143,8 +139,6 @@ void event_handler(struct bpftuner *tuner,
 		   __attribute__((unused))void *ctx)
 {
 	struct tbl_stats *stats = (struct tbl_stats *)&event->raw_data;
-	long new[3], old[3];
-	int id;
 
 	switch (event->scenario_id) {
 	case NEIGH_TABLE_FULL:
@@ -152,16 +146,6 @@ void event_handler(struct bpftuner *tuner,
 			return;
 		set_gc_thresh3(tuner, stats);
 		bpftune_cap_drop();
-		break;
-	case DST_TABLE_FULL:
-		id = event->update[0].id;
-		memcpy(new, event->update[0].new, sizeof(new));
-		memcpy(old, event->update[0].old, sizeof(old));
-		
-		bpftuner_tunable_sysctl_write(tuner, id, DST_TABLE_FULL,
-					      event->netns_cookie, 1, new,
-"Due to dst table filling up, change net.ipv6.route.max_size from %d -> %d\n",
-					      old[0], new[0]);
 		break;
 	default:
 		return;
