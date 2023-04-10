@@ -5,7 +5,7 @@
 %define version     0.1
 %global _unitdir    /usr/lib/systemd/system/	
 
-License:        LGPL/BSD Dual License
+License:        GPLv2 WITH Linux-syscall-note
 Name:           %{name}
 Summary:        BPF/tracing tools for auto-tuning Linux
 Group:          Development/Tools

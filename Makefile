@@ -1,4 +1,7 @@
-# SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause)
+# SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note
+#
+# Copyright (c) 2023, Oracle and/or its affiliates. All rights reserved.
+#
 
 PKG_NAME = `rpmspec -q --queryformat="%{NAME}-%{VERSION}-%{RELEASE}\n" buildrpm/bpftune.spec | head -1`.`uname -m`
 PKG_ARCHIVE = `rpmspec -q --queryformat="%{NAME}-%{VERSION}\n" buildrpm/bpftune.spec | head -1`

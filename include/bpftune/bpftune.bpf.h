@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: (LGPL-2.1 OR BSD-2-Clause) */
+/* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
 /* Copyright (c) 2023, Oracle and/or its affiliates. */
 
 #define __KERNEL__
@@ -332,4 +332,4 @@ static inline void corr_update_bpf(void *map, __u64 id,
 	corr_update(corrp, x, y);
 }
 
-char _license[] SEC("license") = "Dual BSD/GPL";
+char _license[] SEC("license") = "GPL v2";
