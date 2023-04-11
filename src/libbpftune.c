@@ -814,7 +814,7 @@ out_unset:
 
 int bpftune_sysctl_write(int netns_fd, const char *name, __u8 num_values, long *values)
 {
-	long old_values[BPFTUNE_MAX_VALUES];	
+	long old_values[BPFTUNE_MAX_VALUES] = {};
 	int i, err = 0, orig_netns_fd;
 	int old_num_values;
 	char path[512];
@@ -865,7 +865,7 @@ int bpftune_sysctl_write(int netns_fd, const char *name, __u8 num_values, long *
 out:
 	bpftune_netns_set(orig_netns_fd, NULL);
 	bpftune_cap_drop();
-        return 0;
+        return err;
 }
 
 int bpftuner_tunables_init(struct bpftuner *tuner, unsigned int num_descs,
@@ -1129,8 +1129,8 @@ int bpftune_netns_set(int new_fd, int *orig_fd)
  */
 int bpftune_netns_info(int pid, int *fd, unsigned long *cookie)
 {
+	unsigned long netns_cookie = 0;
 	int netns_fd, orig_netns_fd;
-	unsigned long netns_cookie;
 	bool fdnew = true;
 	int ret, err;
 
@@ -1294,7 +1294,7 @@ int bpftuner_netns_fd_from_cookie(struct bpftuner *tuner, unsigned long cookie)
 
 int bpftune_netns_init_all(void)
 {
-	unsigned long cookie;
+	unsigned long cookie = 0;
 
 	netns_cookie_supported = bpftune_netns_cookie_supported();
 	if (!netns_cookie_supported)

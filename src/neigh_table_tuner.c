@@ -64,7 +64,7 @@ static int set_gc_thresh3(struct bpftuner *tuner, struct tbl_stats *stats)
                 .ndtm_family = stats->family,
         };
 	struct nl_msg *m = NULL, *parms = NULL;
-	int new_gc_thresh3;
+	int new_gc_thresh3 = 0;
 	int ret;
 
 	if (!sk) {

@@ -58,6 +58,7 @@ TUNERS = tcp_buffer_tuner route_table_tuner neigh_table_tuner sysctl_tuner \
 	 cong_tuner netns_tuner
 
 TUNER_OBJS = $(patsubst %,%.o,$(TUNERS))
+TUNER_SRCS = $(patsubst %,%.c,$(TUNERS))
 TUNER_LIBS = $(patsubst %,%.so,$(TUNERS))
 
 BPF_TUNERS = $(patsubst %,%.bpf.o,$(TUNERS))
@@ -72,6 +73,8 @@ BPF_SKELS = $(patsubst %,%.skel.h,$(TUNERS)) probe.skel.h
 
 all: bpftune $(TUNER_LIBS)
 	
+analyze:
+	$(CLANG) --analyze $(INCLUDES) libbpftune.c bpftune.c $(TUNER_SRCS)
 clean:
 	$(call QUIET_CLEAN, bpftune)
 	$(Q)$(RM) *.o *.d *.so*

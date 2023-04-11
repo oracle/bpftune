@@ -68,8 +68,8 @@ static struct bpftunable_scenario scenarios[] = {
 int get_from_file(FILE *fp, const char *fmt, ...)
 {
 	char line[256];
+	int ret = 0;
 	va_list ap;
-	int ret;
 
 	va_start(ap, fmt);
 	while (fgets(line, sizeof(line), fp)) {
