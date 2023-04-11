@@ -46,6 +46,12 @@ VMLINUX_BTF_PATHS := /sys/kernel/btf/vmlinux /boot/vmlinux-$(KERNEL_REL)
 VMLINUX_BTF_PATH := $(or $(VMLINUX_BTF),$(firstword			       \
 					  $(wildcard $(VMLINUX_BTF_PATHS))))
 
+OPATH :=
+ifeq ($(SANITIZE),1)
+CFLAGS += -fsanitize=address 
+OPATH := .sanitize/
+endif
+
 ifeq ($(V),1)
 Q =
 else
@@ -59,7 +65,7 @@ TUNERS = tcp_buffer_tuner route_table_tuner neigh_table_tuner sysctl_tuner \
 
 TUNER_OBJS = $(patsubst %,%.o,$(TUNERS))
 TUNER_SRCS = $(patsubst %,%.c,$(TUNERS))
-TUNER_LIBS = $(patsubst %,%.so,$(TUNERS))
+TUNER_LIBS = $(patsubst %,$(OPATH)%.so,$(TUNERS))
 
 BPF_TUNERS = $(patsubst %,%.bpf.o,$(TUNERS))
 
@@ -71,47 +77,52 @@ BPF_SKELS = $(patsubst %,%.skel.h,$(TUNERS)) probe.skel.h
 
 .PHONY: clean
 
-all: bpftune $(TUNER_LIBS)
+all: $(OPATH) $(OPATH)bpftune $(TUNER_LIBS)
+
+$(OPATH):
+	mkdir $(OPATH)
 	
 analyze:
 	$(CLANG) --analyze $(INCLUDES) libbpftune.c bpftune.c $(TUNER_SRCS)
 clean:
 	$(call QUIET_CLEAN, bpftune)
-	$(Q)$(RM) *.o *.d *.so*
+	$(Q)$(RM) $(OPATH)*.o *.d $(OPATH)*.so*
+	$(Q)$(RM) *.o *.so*
 	$(Q)$(RM) *.skel.h
 	$(Q)$(RM) bpftune
 	$(Q)$(RM) -r .output
 
-install: libbpftune.so bpftune bpftune.service
+install: $(OPATH)libbpftune.so $(OPATH)bpftune bpftune.service
 	$(INSTALL) -m 0755 -d $(INSTALLPATH)/sbin
-	$(INSTALL) bpftune $(INSTALLPATH)/sbin/bpftune
+	$(INSTALL) $(OPATH)bpftune $(INSTALLPATH)/sbin/bpftune
 	$(INSTALL) -m 0755 -d $(INSTALLPATH)/lib64
-	$(INSTALL) libbpftune.so* $(INSTALLPATH)/lib64
+	$(INSTALL) $(OPATH)libbpftune.so* $(INSTALLPATH)/lib64
 	$(INSTALL) -m 0755 -d $(installprefix)/lib/systemd/system
 	$(INSTALL) -m 644 bpftune.service $(installprefix)/lib/systemd/system
 	$(INSTALL) -m 0755 -d $(INSTALLPATH)/lib64/bpftune
 	$(INSTALL) $(TUNER_LIBS) $(INSTALLPATH)/lib64/bpftune
 
-bpftune: bpftune.c bpftune.o libbpftune.so
-	$(QUIET_LINK)$(CC) $(CFLAGS) bpftune.o -o $@ \
+$(OPATH)bpftune: bpftune.c $(OPATH)bpftune.o $(OPATH)libbpftune.so
+	$(QUIET_LINK)$(CC) $(CFLAGS) $(OPATH)bpftune.o -o $@ \
 	$(LDFLAGS) $(LDLIBS) -lbpftune
 
-libbpftune.so: libbpftune.c ../include/bpftune/libbpftune.h libbpftune.o
+$(OPATH)libbpftune.so: libbpftune.c ../include/bpftune/libbpftune.h $(OPATH)libbpftune.o
 	$(CC) $(CFLAGS) -Wl,--version-script=$(VERSION_SCRIPT) \
 			-Wl,--soname,libbpftune.so.$(VERSION) \
-			-shared -o $(@).$(VERSION) $(patsubst %.so,%.o,$(@)) \
+			-shared -o $(@).$(VERSION) \
+			$(patsubst %.so,%.o,$(@)) \
 			$(LDLIBS) $(LDFLAGS) ; \
-	rm -f libbpftune.so ; \
-	ln -s libbpftune.so.$(VERSION) libbpftune.so
+	rm -f $(OPATH)libbpftune.so ; \
+	ln -sr $(OPATH)libbpftune.so.$(VERSION) $(OPATH)libbpftune.so
 
-$(TUNER_LIBS): libbpftune.so $(BPF_SKELS) $(TUNER_OBJS)
-	$(CC) $(CFLAGS) -shared -o $(@) $(patsubst %.so,%.c,$(@)) \
+$(TUNER_LIBS): $(OPATH)libbpftune.so $(BPF_SKELS) $(TUNER_OBJS)
+	$(CC) $(CFLAGS) -shared -o $(@) $(patsubst $(OPATH)%.so,%.c,$(@)) \
 		$(LDLIBS) -lbpftune $(LDFLAGS)
 
-libbpftune.o: probe.skel.h probe.skel.legacy.h
+$(OPATH)libbpftune.o: probe.skel.h probe.skel.legacy.h
 	$(QUIET_CC)$(CC) $(CFLAGS) -c libbpftune.c -o $@
 
-bpftune.o: libbpftune.so
+$(OPATH)bpftune.o: $(OPATH)libbpftune.so
 	$(QUIET_CC)$(CC) $(CFLAGS) -c bpftune.c -o $@
 
 %.skel.h: %.bpf.o
