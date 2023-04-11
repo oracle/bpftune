@@ -7,11 +7,6 @@ SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note
 Being under the terms of the GNU General Public License version 2.
 
 SPDX-URL: https://spdx.org/licenses/GPL-2.0.html
-Usage-Guide:
-  To use this license in source code, put the following SPDX
-  tag/value pairs into a comment according to the placement
-  guidelines in the licensing rules documentation.
-    SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note
 
 License-Text:
 
@@ -360,7 +355,7 @@ With an explicit syscall exception, as stated:
 
 SPDX-Exception-Identifier: Linux-syscall-note
 SPDX-URL: https://spdx.org/licenses/Linux-syscall-note.html
-SPDX-Licenses: GPL-2.0, GPL-2.0+, GPL-1.0+, LGPL-2.0, LGPL-2.0+, LGPL-2.1, LGPL-2.1+, GPL-2.0-only, GPL-2.0-or-later
+SPDX-Licenses: GPL-2.0
 Usage-Guide:
   This exception is used together with one of the above SPDX-Licenses
   to mark user space API (uapi) header files so they can be included
