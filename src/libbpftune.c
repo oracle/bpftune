@@ -1474,7 +1474,7 @@ int bpftune_symbol_lookup(const char *name, unsigned long *addr)
 			continue;
 		if (strcmp(sym_name, name) == 0) {
 			*addr = sym_addr;
-			bpftune_log(LOG_DEBUG, "looked up '%s': 0xlx\n", name,
+			bpftune_log(LOG_DEBUG, "looked up '%s': 0x%lx\n", name,
 				    *addr);
 			err = 0;
 			break;
