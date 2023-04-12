@@ -1450,3 +1450,33 @@ int bpftune_module_delete(const char *name)
 	bpftune_cap_drop();
 	return ret;
 }
+
+int bpftune_symbol_lookup(const char *name, unsigned long *addr)
+{
+	char sym_type, sym_name[512];
+	unsigned long sym_addr;
+	int err = -ENOENT;
+	FILE *f;
+
+	f = fopen("/proc/kallsyms", "r");
+	if (!f) {
+		err = -errno;
+		bpftune_log(LOG_DEBUG, "could not open kallsyms: %s\n",
+			    strerror(-err));
+		return err;
+	}
+	while (true) {
+		int ret = fscanf(f, "%lx %c %499s%*[^\n]\n",
+			     &sym_addr, &sym_type, sym_name);
+		if (ret == EOF && feof(f))
+			break;
+		if (ret != 3)
+			continue;
+		if (strcmp(sym_name, name) == 0) {
+			*addr = sym_addr;
+			break;
+		}
+	}	
+	fclose(f);	
+	return err;
+}

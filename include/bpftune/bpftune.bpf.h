@@ -155,6 +155,8 @@ BPF_MAP_DEF(netns_map, BPF_MAP_TYPE_HASH, __u64, __u64, 65536);
 
 unsigned int tuner_id;
 unsigned int bpftune_pid;
+/* init_net value used for older kernels since __ksym does not work */
+unsigned long bpftune_init_net;
 
 /* TCP buffer tuning */
 #ifndef SO_SNDBUF
@@ -242,7 +244,7 @@ static __always_inline long get_netns_cookie(struct net *net)
 {
 	if (bpf_core_field_exists(net->net_cookie))
 		return BPF_CORE_READ(net, net_cookie);
-	if (net == &init_net)
+	if (net == &init_net || net == (void *)bpftune_init_net)
 		return 0;
 	/* not global ns, no cookie support. */
 	return -1;

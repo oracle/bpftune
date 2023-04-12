@@ -49,6 +49,7 @@ LIBBPFTUNE_0.1.1 {
 		bpftune_netns_info;
 		bpftune_module_load;
 		bpftune_module_delete;
+		bpftune_symbol_lookup;
 	local:
 		*;
 };
