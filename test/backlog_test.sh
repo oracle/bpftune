@@ -47,7 +47,7 @@ for FAMILY in ipv4 ipv6 ; do
 
    test_setup true
 
-   sysctl -w net.core.netdev_max_backlog="8"
+   sysctl -w net.core.netdev_max_backlog=4
    backlog_pre=($(sysctl -n net.core.netdev_max_backlog))
    declare -A results
    for MODE in baseline test ; do

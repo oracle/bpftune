@@ -14,8 +14,8 @@ DESCRIPTION
         length is controlled by net.core.netdev_max_backlog.  On
         fast connections (10Gb/s or higher) the default backlog length
         of 1024 can be insufficient; here the backlog length is increased
-        if 1/8 of traffic in the last minute is dropped (drops occur when
-        the backlog limit is reached).
+        if 1/16 of current backlog size in the last minute is dropped
+        (drops occur when the backlog limit is reached).
 
         Tunables:
 

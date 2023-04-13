@@ -56,7 +56,7 @@ int BPF_PROG(bpftune_enqueue_to_backlog, struct sk_buff *skb, int cpu,
 				  max_backlogp))
 		return 0;
 
-	/* if we drop more than 1/8 of the backlog queue size/min,
+	/* if we drop more than 1/16 of the backlog queue size/min,
 	 * increase backlog queue size.  This means as the queue size
 	 * increases, the likliehood of hitting that limit decreases.
 	 */
