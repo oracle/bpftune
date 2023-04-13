@@ -137,8 +137,6 @@ void bpftuner_tunables_fini(struct bpftuner *tuner);
 			__lskel->bss->debug = bpftune_log_level() >= LOG_DEBUG;\
 			__lskel->bss->bpftune_learning_rate = bpftune_learning_rate;\
 			__lskel->bss->bpftune_pid = getpid();		     \
-			bpftune_symbol_lookup("init_net",		     \
-				&__lskel->bss->bpftune_init_net);	     \
 			tuner->obj = __lskel->obj;			     \
 			tuner->ring_buffer_map = __lskel->maps.ring_buffer_map;\
 			tuner->netns_map = __lskel->maps.netns_map;	     \
@@ -252,7 +250,5 @@ int bpftuner_netns_fd_from_cookie(struct bpftuner *tuner, unsigned long cookie);
 
 int bpftune_module_load(const char *name);
 int bpftune_module_delete(const char *name);
-
-int bpftune_symbol_lookup(const char *name, unsigned long *addr);
 
 #endif /* __LIBBPFTUNE_H */

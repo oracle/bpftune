@@ -145,7 +145,8 @@ void bpftune_log_bpf_err(int err, const char *fmt)
 static const cap_value_t cap_vector[] = {
 						CAP_SYS_ADMIN,
 						CAP_NET_ADMIN,
-						CAP_SYS_CHROOT
+						CAP_SYS_CHROOT,
+						CAP_SYSLOG
 };
 
 static cap_t cap_dropped, cap_off, cap_on;
@@ -174,9 +175,13 @@ static void bpftune_cap_init(void)
 			    strerror(err));
 	cap_dropped = cap_init();
 	cap_off = cap_dup(cap_dropped);
-	cap_set_flag(cap_off, CAP_PERMITTED, 3, cap_vector, CAP_SET);
+	cap_set_flag(cap_off, CAP_PERMITTED, ARRAY_SIZE(cap_vector),cap_vector,
+		     CAP_SET);
+
+			
 	cap_on = cap_dup(cap_off);
-	cap_set_flag(cap_on, CAP_EFFECTIVE, 3, cap_vector, CAP_SET);
+	cap_set_flag(cap_on, CAP_EFFECTIVE, ARRAY_SIZE(cap_vector), cap_vector,
+		     CAP_SET);
 }
 
 int bpftune_cap_set(void)
@@ -1449,37 +1454,4 @@ int bpftune_module_delete(const char *name)
 	}
 	bpftune_cap_drop();
 	return ret;
-}
-
-int bpftune_symbol_lookup(const char *name, unsigned long *addr)
-{
-	char sym_type, sym_name[512];
-	unsigned long sym_addr;
-	int err = -ENOENT;
-	FILE *f;
-
-	f = fopen("/proc/kallsyms", "r");
-	if (!f) {
-		err = -errno;
-		bpftune_log(LOG_DEBUG, "could not open kallsyms: %s\n",
-			    strerror(-err));
-		return err;
-	}
-	while (true) {
-		int ret = fscanf(f, "%lx %c %499s%*[^\n]\n",
-			     &sym_addr, &sym_type, sym_name);
-		if (ret == EOF && feof(f))
-			break;
-		if (ret != 3)
-			continue;
-		if (strcmp(sym_name, name) == 0) {
-			*addr = sym_addr;
-			bpftune_log(LOG_DEBUG, "looked up '%s': 0x%lx\n", name,
-				    *addr);
-			err = 0;
-			break;
-		}
-	}
-	fclose(f);	
-	return err;
 }

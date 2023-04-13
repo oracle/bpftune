@@ -14,8 +14,6 @@ BPFTUNE_FLAGS="-s"
 
 SLEEPTIME=1
 
-test_start "$0|cap test: are caps dropped by bpftune after init?"
-
 test_setup "true"
 
 for BPFTUNECMD in "$BPFTUNE &" "service bpftune start" ; do
@@ -25,7 +23,7 @@ for BPFTUNECMD in "$BPFTUNE &" "service bpftune start" ; do
   sleep $SETUPTIME
 
   caps=$(getpcaps $(pgrep bpftune) 2>&1 | \
-         awk '/cap_net_admin,cap_sys_chroot,cap_sys_admin[+=]p/ { print $0 }')
+         awk '/cap_net_admin,cap_sys_chroot,cap_sys_admin,cap_syslog[+=]p/ { print $0 }')
 
   echo "caps: $caps"
 
