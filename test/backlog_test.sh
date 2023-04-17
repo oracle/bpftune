@@ -31,29 +31,33 @@ MAX_CONN=50
 
 for FAMILY in ipv4 ipv6 ; do
 
- for CLIENT_OPTS in "-R -P $MAX_CONN" ; do
+ for CLIENT_OPTS in "" ; do
+   # use localhost to maximize bandwidth -> hit backlog limits
    case $FAMILY in
    ipv4)
-   	ADDR=$VETH1_IPV4
+   	ADDR=127.0.0.1
 	;;
    ipv6)
-	ADDR=$VETH1_IPV6
+	ADDR=::1
 	;;
    esac
 
    test_start "$0|backlog test to $ADDR:$PORT $FAMILY opts $CLIENT_OPTS $LATENCY"
 
    backlog_orig=($(sysctl -n net.core.netdev_max_backlog))
+   mask_orig=($(sysctl -n net.core.flow_limit_cpu_bitmap))
 
    test_setup true
 
    sysctl -w net.core.netdev_max_backlog=4
+   sysctl -w net.core.flow_limit_cpu_bitmap=0
    backlog_pre=($(sysctl -n net.core.netdev_max_backlog))
+   mask_pre=($(sysctl -n net.core.flow_limit_cpu_bitmap))
    declare -A results
    for MODE in baseline test ; do
 
 	echo "Running ${MODE}..."
-	test_run_cmd_local "ip netns exec $NETNS $IPERF3 -s -p $PORT -1 &"
+	test_run_cmd_local "$IPERF3 -s -p $PORT -1 &"
 	if [[ $MODE != "baseline" ]]; then
 		test_run_cmd_local "$BPFTUNE &"
 		sleep $SETUPTIME
@@ -61,7 +65,7 @@ for FAMILY in ipv4 ipv6 ; do
 		LOGSZ=$(wc -l $LOGFILE | awk '{print $1}')
 		LOGSZ=$(expr $LOGSZ + 1)
 	fi
-	test_run_cmd_local "$IPERF3 -fm $CLIENT_OPTS -c $PORT -c $ADDR" true
+	test_run_cmd_local "$IPERF3 -fm  $CLIENT_OPTS -c $PORT -c $ADDR" true
 	sleep $SLEEPTIME
 
 	sresults=$(grep -E "sender" ${CMDLOG} | awk '{print $7}')
@@ -81,17 +85,18 @@ for FAMILY in ipv4 ipv6 ; do
    done
 
    backlog_post=($(sysctl -n net.core.netdev_max_backlog))
+   mask_post=($(sysctl -n net.core.flow_limit_cpu_bitmap))
    sysctl -w net.core.netdev_max_backlog="$backlog_orig"
+   sysctl -w net.core.flow_limit_cpu_bitmap="$mask_orig"
    if [[ $MODE == "test" ]]; then
+	echo "backlog	${backlog_pre}	->	${backlog_post}"
+	echo "mask	${mask_pre}	->	${mask_post}"
 	if [[ "${backlog_post}" -gt ${backlog_pre} ]]; then
-		echo "backlog before ${backlog_pre} ; after ${backlog_post}"
-	else
-		test_cleanup
+		if [[ "${mask_post}" != "${mask_pre}" ]]; then
+			test_pass
+		fi
 	fi
    fi
-
-   test_pass
-
    test_cleanup
  done
 done
