@@ -52,7 +52,7 @@ int BPF_PROG(bpftune_enqueue_to_backlog, struct sk_buff *skb, int cpu,
 	drop_count++;
 
 	/* only sample subset of drops to reduce overhead. */
-	if ((drop_count % 16) != 0)
+	if ((drop_count % 4) != 0)
 		return 0;
 	if (bpf_probe_read_kernel(&max_backlog, sizeof(max_backlog),
 				  max_backlogp))
