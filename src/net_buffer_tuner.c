@@ -18,6 +18,8 @@ static struct bpftunable_desc descs[] = {
 static struct bpftunable_scenario scenarios[] = {
 { NETDEV_MAX_BACKLOG_INCREASE,	"need to increase max backlog size",
 	"Need to increase backlog size to prevent drops for faster connection" },
+{ FLOW_LIMIT_CPU_SET,		"need to set per-cpu bitmap value",
+	"Need to set flow limit per-cpu to prioritize small flows" }
 };
 
 int init(struct bpftuner *tuner)
@@ -61,5 +63,14 @@ void event_handler(struct bpftuner *tuner,
 					     event->update[0].old[0],
 					     event->update[0].new[0]);
 		break;
+	case FLOW_LIMIT_CPU_BITMAP:
+		bpftuner_tunable_sysctl_write(tuner, id, scenario, 
+					      event->netns_cookie, 1,
+					      (long int *)event->update[0].new,
+"To prioritize small flows, change %s from (%d) -> (%d)\n",
+					      tunable,
+					      event->update[0].old[0],
+					      event->update[0].new[0]);
+
 	}
 }

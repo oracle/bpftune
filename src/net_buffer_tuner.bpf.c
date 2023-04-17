@@ -29,6 +29,8 @@ extern const void netdev_max_backlog __ksym;
 __u64 drop_count = 0;
 __u64 drop_interval_start = 0;
 
+__u64 flow_limit_cpu_bitmap = 0;
+
 #ifdef BPFTUNE_LEGACY
 SEC("kretprobe/enqueue_to_backlog")
 int BPF_KRETPROBE(bpftune_enqueue_to_backlog, int ret)
@@ -41,7 +43,7 @@ int BPF_PROG(bpftune_enqueue_to_backlog, struct sk_buff *skb, int cpu,
 	struct bpftune_event event =  { 0 };
 	long old[3], new[3];
 	int max_backlog, *max_backlogp = (int *)&netdev_max_backlog;
-	__u64 time;
+	__u64 time, cpubit;
 
 	/* a high-frequency event so bail early if we can... */
 	if (ret != NET_RX_DROP)
@@ -50,7 +52,7 @@ int BPF_PROG(bpftune_enqueue_to_backlog, struct sk_buff *skb, int cpu,
 	drop_count++;
 
 	/* only sample subset of drops to reduce overhead. */
-	if ((drop_count % 4) != 0)
+	if ((drop_count % 16) != 0)
 		return 0;
 	if (bpf_probe_read_kernel(&max_backlog, sizeof(max_backlog),
 				  max_backlogp))
@@ -72,5 +74,21 @@ int BPF_PROG(bpftune_enqueue_to_backlog, struct sk_buff *skb, int cpu,
 	new[0] = BPFTUNE_GROW_BY_DELTA(max_backlog);
 	send_net_sysctl_event(NULL, NETDEV_MAX_BACKLOG_INCREASE,
 			      NETDEV_MAX_BACKLOG, old, new, &event);
+
+#ifdef BPFTUNE_LEGACY
+	int cpu = bpf_get_smp_processor_id();
+#endif
+	/* ensure flow limits prioritize small flows on this cpu */
+	if (cpu < 64) {
+		cpubit = 1 << cpu;
+		if (!(flow_limit_cpu_bitmap & cpubit)) {
+			old[0] = flow_limit_cpu_bitmap;
+			new[0] = flow_limit_cpu_bitmap |= cpubit;
+			if (!send_net_sysctl_event(NULL, FLOW_LIMIT_CPU_SET,	
+						   FLOW_LIMIT_CPU_BITMAP,
+						   old, new, &event))
+				flow_limit_cpu_bitmap = new[0];
+		}
+	}
 	return 0;
 }

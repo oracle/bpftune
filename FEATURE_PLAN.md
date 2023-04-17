@@ -124,7 +124,12 @@
   use TCP_BPF_SNDCWND_CLAMP, TCP_WINDOW_CLAMP for these.  Problem:
   "moderate rcvbuf" behaviour alters window clamp so may need to
   be a send-side only approach.
-- look at netdev_max_backlog; tune that too?
+- look at netdev_max_backlog; tune that too? Tune up when we
+  see drops, also set net.core.flow_limit_cpu_bitmap to enable
+  per-flow limits; these orient drops towards busier flows, ensuring
+  that small flows get prioritized; see
+  https://www.kernel.org/doc/html/latest/networking/scaling.html
+  Initial implementation in net_buffer_tuner for netdev_max_backlog
 - initial buffer sizing: can we find a heuristic to minimize an
   error signal (number of updates to buffer size?).  Problem:
   this could devolve into simply setting [wr]mem[1] = [wr]mem[2].
