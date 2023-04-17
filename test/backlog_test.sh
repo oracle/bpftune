@@ -46,7 +46,6 @@ for FAMILY in ipv4 ipv6 ; do
 
    backlog_orig=($(sysctl -n net.core.netdev_max_backlog))
    mask_orig=($(sysctl -n net.core.flow_limit_cpu_bitmap))
-
    test_setup true
 
    sysctl -w net.core.netdev_max_backlog=4
@@ -65,7 +64,7 @@ for FAMILY in ipv4 ipv6 ; do
 		LOGSZ=$(wc -l $LOGFILE | awk '{print $1}')
 		LOGSZ=$(expr $LOGSZ + 1)
 	fi
-	test_run_cmd_local "$IPERF3 -fm  $CLIENT_OPTS -c $PORT -c $ADDR" true
+	test_run_cmd_local "$IPERF3 -fm  -b 0 --pacing-timer 0 -C bbr -P $MAX_CONN CLIENT_OPTS -c $PORT -c $ADDR" true
 	sleep $SLEEPTIME
 
 	sresults=$(grep -E "sender" ${CMDLOG} | awk '{print $7}')

@@ -67,7 +67,7 @@ int BPF_PROG(bpftune_enqueue_to_backlog, struct sk_buff *skb, int cpu,
 		drop_count = 1;
 		drop_interval_start = time;
 	}
-	if (drop_count < (max_backlog >> 8))
+	if (drop_count < (max_backlog >> 4))
 		return 0;
 
 	old[0] = max_backlog;
