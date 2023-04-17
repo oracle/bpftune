@@ -13,6 +13,9 @@ struct tcp_buffer_tuner_bpf *skel;
 static struct bpftunable_desc descs[] = {
 { NETDEV_MAX_BACKLOG,	BPFTUNABLE_SYSCTL, "net.core.netdev_max_backlog",
 								false, 1 },
+{ FLOW_LIMIT_CPU_BITMAP,
+			BPFTUNABLE_SYSCTL, "net.core.flow_limit_cpu_bitmap",
+								false, 1 },
 };
 
 static struct bpftunable_scenario scenarios[] = {
@@ -24,7 +27,16 @@ static struct bpftunable_scenario scenarios[] = {
 
 int init(struct bpftuner *tuner)
 {
-	bpftuner_bpf_init(net_buffer, tuner, NULL);
+	long cpu_bitmap = 0;
+
+	bpftune_sysctl_read(0, "net.core.flow_limit_cpu_bitmap", &cpu_bitmap);
+
+	bpftuner_bpf_open(net_buffer, tuner);
+	bpftuner_bpf_load(net_buffer, tuner);
+	bpftuner_bpf_var_set(net_buffer, tuner, flow_limit_cpu_bitmap,
+			     cpu_bitmap);
+	bpftuner_bpf_attach(net_buffer, tuner, NULL);
+
 	return bpftuner_tunables_init(tuner, NET_BUFFER_NUM_TUNABLES, descs,
 				      ARRAY_SIZE(scenarios), scenarios);
 }
