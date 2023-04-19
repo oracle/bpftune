@@ -33,6 +33,10 @@ support auto-tuning of Linux via BPF observability.
 %package devel
 Summary:        Development files for %{name}
 Requires:       %{name} = %{version}-%{release}
+Requires:       libbpf-devel >= 0.6
+Requires:       libcap-devel
+Requires:       bpftool
+Requires:       libnl3-devel
 
 %description devel
 The %{name}-devel package contains libraries header files for
