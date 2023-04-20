@@ -132,11 +132,15 @@ The key components are
   See bpftune-cong (8).
 - neighbour table tuner: auto-tune neighbour table sizes by growing
   tables when approaching full. See bpftune-neigh (8).
+- route table tuner: auto-tune route table size by growing tables
+  when approaching full.  See bpftune-route (8).
 - sysctl tuner: monitor sysctl setting and if it collides with an
   auto-tuned sysctl value, disable the associated tuner.  See
   bpftune-sysctl (8).
 - TCP buffer tuner: auto-tune max and initial buffer sizes.  See
   bpftune-tcp-buffer (8).
+- net buffer tuner: auto-tune tunables related to core networking.
+  See bpftune-net-buffer (8).
 - netns tuner: notices addition and removal of network namespaces,
   which helps power namespace awareness for bpftune as a whole.
   Namespace awareness is important as we want to be able to auto-tune
@@ -176,6 +180,36 @@ Two aspects are important here
   per-network-namespace policy is supported.
 
 # Demo
+
+Simply starting bpftune and observing changes made via /var/log/messages
+can be instructive.  For example, on a standard VM with sysctl defaults,
+I ran
+
+```
+$ service bpftune start
+```
+
+...and went about normal development activities such as cloning git
+trees from upstream, building kernels, etc.  From the log we see
+some of the adjustments bpftune made to accommodate these activities
+
+```
+$ sudo grep bpftune /var/log/messages
+...
+Apr 19 16:14:59 bpftest bpftune[2778]: bpftune works fully
+Apr 19 16:14:59 bpftest bpftune[2778]: bpftune supports per-netns policy (via netns cookie)
+Apr 19 16:18:40 bpftest bpftune[2778]: Scenario 'specify bbr congestion control' occurred for tunable 'TCP congestion control' in global ns. Because loss rate has exceeded 1 percent for a connection, use bbr congestion control algorithm instead of default
+Apr 19 16:18:40 bpftest bpftune[2778]: due to loss events for 145.40.68.75, specify 'bbr' congestion control algorithm
+Apr 19 16:26:53 bpftest bpftune[2778]: Scenario 'need to increase TCP buffer size(s)' occurred for tunable 'net.ipv4.tcp_rmem' in global ns. Need to increase buffer size(s) to maximize throughput
+Apr 19 16:26:53 bpftest bpftune[2778]: Due to need to increase max buffer size to maximize throughput change net.ipv4.tcp_rmem(min default max) from (4096 131072 6291456) -> (4096 131072 7864320)
+Apr 19 16:26:53 bpftest bpftune[2778]: Scenario 'need to increase TCP buffer size(s)' occurred for tunable 'net.ipv4.tcp_rmem' in global ns. Need to increase buffer size(s) to maximize throughput
+Apr 19 16:26:53 bpftest bpftune[2778]: Due to need to increase max buffer size to maximize throughput change net.ipv4.tcp_rmem(min default max) from (4096 131072 7864320) -> (4096 131072 9830400)
+Apr 19 16:29:04 bpftest bpftune[2778]: Scenario 'specify bbr congestion control' occurred for tunable 'TCP congestion control' in global ns. Because loss rate has exceeded 1 percent for a connection, use bbr congestion control algorithm instead of default
+Apr 19 16:29:04 bpftest bpftune[2778]: due to loss events for 140.91.12.81, specify 'bbr' congestion control algorithm
+```
+
+To deterministically trigger bpftune behaviour, one approach we can
+take is to download a large file with inappropriate settings.
 
 In one window, set tcp rmem max to a too-low value, and run bpftune
 as a program logging to stdout/stderr (-s):
