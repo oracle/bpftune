@@ -51,7 +51,7 @@ see_also = $(subst " ",, \
 	"\n" \
 	"SEE ALSO\n" \
 	"========\n" \
-	"\t**bpf**\ (2),\n")
+	"\t**bpf**\ (2), **bpftune**\ (8),\n")
 
 $(OUTPUT)%.8: %.rst
 	$(QUIET_GEN)( cat $< ; printf "%b" $(call see_also,$<) ) | rst2man $(RST2MAN_OPTS) > $@
