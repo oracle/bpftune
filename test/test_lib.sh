@@ -58,7 +58,6 @@ check_prog "$NC" nc nmap-ncat
 export IPERF3=$(which iperf3 2>/dev/null)
 check_prog "$IPERF3" iperf3 iperf3
 export QPERF=$(which qperf 2>/dev/null)
-check_prog "$QPERF" qperf qperf
 export FIREWALL_CMD=$(which firewall-cmd 2>/dev/null)
 export AUDIT_CMD=$(which auditctl 2>/dev/null)
 export LOGFILE=${LOGFILE:-"/var/log/messages"}
