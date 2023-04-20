@@ -69,6 +69,16 @@ else
 	test_pass
 fi
 
+test_start "$0|service test: does enabling the service work?"
+test_run_cmd_local "systemctl enable bpftune"
+sleep $SETUPTIME
+test_pass
+
+test_start "$0|service test: does disabling the service work?"
+test_run_cmd_local "systemctl disable bpftune"
+sleep $SETUPTIME
+test_pass
+
 test_cleanup
 
 test_exit
