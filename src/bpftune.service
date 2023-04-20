@@ -6,3 +6,6 @@ After=systemd-sysctl.service network.target
 ExecStart=/usr/sbin/bpftune
 Restart=on-failure
 
+[Install]
+WantedBy=multi-user.target
+
