@@ -19,7 +19,7 @@
 
 #include <bpftune/bpftune.bpf.h>
 
-#include "cong_tuner.h"
+#include "tcp_cong_tuner.h"
 
 #define CONG_MAXNAME	16
 

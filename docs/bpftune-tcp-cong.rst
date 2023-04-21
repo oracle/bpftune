@@ -1,5 +1,5 @@
 ================
-BPFTUNE-CONG
+BPFTUNE-TCP-CONG
 ================
 -------------------------------------------------------------------------------
 Congestion bpftune plugin for auto-selection of congestion control algorithm

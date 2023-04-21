@@ -56,8 +56,6 @@ int BPF_KRETPROBE(bpftune_fib6_run_gc)
 	net = dst_net->net;
 
 	max_size = BPF_CORE_READ(net, ipv6.sysctl.ip6_rt_max_size);
-	__bpf_printk("gc: net: 0x%lx entries: %d max_size %d\n",
-		     net, dst_net->entries, max_size);
 	if (NEARLY_FULL(dst_net->entries, max_size)) {
 		struct bpftune_event event = {};
 		long old[3] = {};

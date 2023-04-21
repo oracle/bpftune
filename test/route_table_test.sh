@@ -49,6 +49,7 @@ for TUNER in route_table ; do
    thresh_orig=($($PREFIX_CMD sysctl -n net.ipv6.route.gc_thresh))
    $PREFIX_CMD sysctl -w net.ipv6.route.gc_thresh=16
    $PREFIX_CMD sysctl -w net.ipv6.route.max_size=32
+   max_size_pre=($($PREFIX_CMD sysctl -n net.ipv6.route.max_size))
 
    test_run_cmd_local "$BPFTUNE -s &" true
 
@@ -72,7 +73,7 @@ for TUNER in route_table ; do
    $PREFIX_CMD sysctl -w net.ipv6.route.max_size="$max_size_orig"
    $PREFIX_CMD sysctl -w net.ipv6.route.gc_thresh="$thresh_orig"
    grep "change net.ipv6.route.max_size" $LOGFILE
-   if [[ "$max_size_post" -gt "$max_size_orig" ]]; then
+   if [[ "$max_size_post" -gt "$max_size_pre" ]]; then
        test_pass
    fi
    test_cleanup
