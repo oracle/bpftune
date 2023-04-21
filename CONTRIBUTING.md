@@ -64,7 +64,7 @@ subdirectory for a simple example and sample Makefile.
 The BPF code must
 
 ```
-#include bpftune.bpf.h
+#include <bpftune/bpftune.bpf.h>
 ```
 
 ...since that header includes all relevant definitions and includes
