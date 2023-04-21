@@ -60,13 +60,13 @@ rm -Rf %{buildroot}
 %{_libdir}/bpftune/*
 %{_mandir}/*/*
 
-%license LICENSE
+%license LICENSE.txt
 
 %files devel
 %{_libdir}/libbpftune.so
 %{_includedir}/bpftune
 
-%license LICENSE
+%license LICENSE.txt
 
 %changelog
 * Mon May 30 2022 Alan Maguire <alan.maguire@oracle.com> - 0.1-1
