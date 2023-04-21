@@ -158,7 +158,7 @@ that originate from the BPF code.
 # Tests
 
 Tests are supplied for each tuner in the tests/ subdirectory.
-"make tests" runs all the tests.  Tests use network namespaces
+"make test" runs all the tests.  Tests use network namespaces
 to simulate interactions with remote hosts. See ./TESTING.md
 for more details.
 
