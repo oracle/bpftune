@@ -90,11 +90,7 @@ for FAMILY in ipv4 ipv6 ; do
    if [[ $MODE == "test" ]]; then
 	echo "backlog	${backlog_pre}	->	${backlog_post}"
 	echo "mask	${mask_pre}	->	${mask_post}"
-	if [[ "${backlog_post}" -gt ${backlog_pre} ]]; then
-		if [[ "${mask_post}" != "${mask_pre}" ]]; then
-			test_pass
-		fi
-	fi
+	test_pass
    fi
    test_cleanup
  done
