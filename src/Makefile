@@ -91,12 +91,12 @@ BPF_SKELS = $(patsubst %,%.skel.h,$(TUNERS)) probe.skel.h
 
 .PHONY: clean
 
-all: $(OPATH) $(OPATH)bpftune $(TUNER_LIBS)
+all: analyze $(OPATH) $(OPATH)bpftune $(TUNER_LIBS)
 
 $(OPATH):
 	mkdir $(OPATH)
 	
-analyze:
+analyze: $(BPF_SKELS)
 	$(CLANG) --analyze $(INCLUDES) libbpftune.c bpftune.c $(TUNER_SRCS)
 clean:
 	$(call QUIET_CLEAN, bpftune)
