@@ -227,6 +227,8 @@ void bpftuner_tunables_fini(struct bpftuner *tuner);
 			__skel->bss->var = val;				     \
 		else							     \
 			__lskel->bss->var = val;			     \
+		bpftune_log(LOG_DEBUG, "%s: set variable '%s' = '%ld'\n",    \
+			    #tuner_name, #var, (long)val);		     \
 	} while (0)
 
 #define bpftuner_bpf_var_get(tuner_name, tuner, var)			     \
