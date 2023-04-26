@@ -63,6 +63,8 @@ static struct bpftunable_scenario scenarios[] = {
  *
  * 185565 247423 371130
  *
+ * Note that on < 4GB systems, zone Normals report 0 and zone DMA32 contains
+ * the managed pages.
  */
 
 int get_from_file(FILE *fp, const char *fmt, ...)
@@ -86,6 +88,7 @@ int get_from_file(FILE *fp, const char *fmt, ...)
 long nr_free_buffer_pages(bool initial)
 {
 	unsigned long nr_pages = 0;
+	char *mzone = "Normal";
 	FILE *fp;
 	int err;
 
@@ -93,18 +96,19 @@ long nr_free_buffer_pages(bool initial)
 	if (err)
 		return err;
 
+retry:
 	fp = fopen("/proc/zoneinfo", "r");
 
 	if (!fp) {
 		bpftune_log(LOG_DEBUG, "could not open /proc/zoneinfo: %s\n", strerror(errno));
-	}	
+	}
 	while (fp && !feof(fp)) {
 		long managed = 0, high = 0, free = 0, node;
 		char zone[128] = {};
 
 		if (get_from_file(fp, "Node %d, zone %s", &node, zone) < 0)
 			break;
-		if (strcmp(zone, "Normal") != 0)
+		if (strcmp(zone, mzone) != 0)
 			continue;
 		if (get_from_file(fp, " high\t%ld", &high) < 0)
 			continue;	
@@ -120,6 +124,12 @@ long nr_free_buffer_pages(bool initial)
 	}
 	if (fp)
 		fclose(fp);
+
+	/* for < 4GB, managed pages are in DMA32 zone. */
+	if (nr_pages == 0 && strcmp(mzone, "Normal") == 0) {
+		mzone = "DMA32";
+		goto retry;
+	}
 
 	bpftune_cap_drop();
 	return nr_pages;

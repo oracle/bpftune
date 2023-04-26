@@ -315,8 +315,8 @@ static __always_inline long send_net_sysctl_event(struct net *net,
 	ret = bpf_ringbuf_output(&ring_buffer_map, event, sizeof(*event), 0);
 	bpftune_debug("tuner [%d] scenario [%d]: event send: %d ",
 		    tuner_id, scenario_id, ret);
-	bpftune_debug("\told '%d %d %d'\n", old[0], old[1], old[2]);
-	bpftune_debug("\tnew '%d %d %d'\n", new[0], new[1], new[2]);
+	bpftune_debug("\told '%ld %ld %ld'\n", old[0], old[1], old[2]);
+	bpftune_debug("\tnew '%ld %ld %ld'\n", new[0], new[1], new[2]);
 	return 0;
 }
 

@@ -108,8 +108,8 @@ struct bpftunable {
 
 struct bpftunable_update {
 	unsigned int id;
-	__s64 old[BPFTUNE_MAX_VALUES];
-	__s64 new[BPFTUNE_MAX_VALUES];
+	long old[BPFTUNE_MAX_VALUES];
+	long new[BPFTUNE_MAX_VALUES];
 };
 
 #define BPFTUNE_MAX_NAME	128
