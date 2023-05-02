@@ -57,10 +57,14 @@ FORCE:
 	
 clean: srcclean docclean
 
+distclean: clean distclean_src
+	
 srcclean:
 	cd src; make clean
 docclean:
 	cd docs; make clean
+distclean_src:
+	cd src; make distclean
 
 install: srcinstall includeinstall docinstall
 	

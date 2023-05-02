@@ -104,7 +104,9 @@ clean:
 	$(Q)$(RM) *.o *.so*
 	$(Q)$(RM) *.skel.h
 	$(Q)$(RM) bpftune
-	$(Q)$(RM) -r .output
+
+distclean: clean
+	$(Q)$(RM) -r .output .sanitize
 
 install: $(OPATH)libbpftune.so $(OPATH)bpftune bpftune.service
 	$(INSTALL) -m 0755 -d $(INSTALLPATH)/sbin
