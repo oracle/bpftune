@@ -17,7 +17,8 @@
  * Boston, MA 021110-1307, USA.
  */
 
-#define _DEFAULT_SOURCE
+#define _BSD_SOURCE
+#define _POSIX_SOURCE
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdlib.h>
@@ -38,6 +39,7 @@
 #include <dirent.h>
 #include <libgen.h>
 #include <linux/types.h>
+#include <linux/limits.h>
 #include <pthread.h>
 #include <sys/inotify.h>
 #include <ftw.h>
@@ -86,12 +88,14 @@ void fini(void)
 	bpftune_cgroup_fini();
 }
 
+#define MAX_INOTIFY_EVENTS	32
+
 void *inotify_thread(void *arg)
 {
 	int inotify_fd, wd, len = 0, i = 0;
 	const char *library_dir = arg;
-	char library_path[512];
-	char buf[sizeof(struct inotify_event) * 32];
+	char library_path[PATH_MAX];
+	char buf[sizeof(struct inotify_event) * MAX_INOTIFY_EVENTS];
 	struct bpftuner *tuner;
 
 	if (bpftune_cap_set())
@@ -119,9 +123,10 @@ void *inotify_thread(void *arg)
 			snprintf(library_path, sizeof(library_path), "%s/%s",
 				 library_dir, event->name);
 			if (event->mask & IN_CREATE) {
-				bpftune_log(BPFTUNE_LOG_LEVEL, "added lib %s, init\n",
-					    library_path);
 				tuner = bpftuner_init(library_path);
+				bpftune_log(BPFTUNE_LOG_LEVEL, "added lib %s, init %s\n",
+					    library_path,
+					    tuner ? "succeeded" : "failed");
 				if (!tuner)
 					continue;
 				if (ringbuf_map_fd == 0)
@@ -220,11 +225,11 @@ void do_help(void)
 {
 	fprintf(stderr,
 		"Usage: %s [OPTIONS]\n"
-		"	OPTIONS := { { -a|--allowlist tuner [-a tuner]}\n"
+		"	OPTIONS := { { -a|--allow tuner}\n"
 		"		     { -d|--debug} {-D|--daemon}\n"
 		"		     { -c|--cgroup_path cgroup_path}\n"
 		"		     { -L|--legacy}\n"
-		"		     {-h|--help}}\n"
+		"		     { -h|--help}}\n"
 		"		     { -l|--library_path library_path}\n"
 		"		     { -r|--learning_rate learning_rate}\n"
 		"		     { -s|--stderr}\n"
@@ -267,7 +272,7 @@ void print_support_level(enum bpftune_support_level support_level)
 int main(int argc, char *argv[])
 {
 	static const struct option options[] = {
-		{ "allowlist",	required_argument,	NULL,	'a' },
+		{ "allow",	required_argument,	NULL,	'a' },
 		{ "cgroup",	required_argument,	NULL,	'c' },
 		{ "daemon", 	no_argument,		NULL,	'D' },
 		{ "debug",	no_argument,		NULL,	'd' },
@@ -287,6 +292,7 @@ int main(int argc, char *argv[])
 	unsigned short rate = BPFTUNE_DELTA_MAX;
 	int log_level = BPFTUNE_LOG_LEVEL;
 	bool support_only = false;
+	struct sigaction sa;
 	int interval = 100;
 	int err, opt;
 
@@ -374,8 +380,6 @@ int main(int argc, char *argv[])
 	if (err)
 		exit(EXIT_FAILURE);
 
-	bpftune_cap_drop();
-
 	if (init(BPFTUNER_LIB_DIR)) {
 		bpftune_log(LOG_ERR, "could not initialize tuners in '%s'\n",
 			    BPFTUNER_LIB_DIR);
@@ -385,10 +389,15 @@ int main(int argc, char *argv[])
 	if (library_dir)
 		init(library_dir);
 
-	signal(SIGINT, cleanup);
-	signal(SIGTERM, cleanup);
-
-	err = bpftune_ring_buffer_poll(ring_buffer, interval);
+	sa.sa_handler = cleanup;
+	if (sigaction(SIGINT, &sa, NULL) == -1 ||
+	    sigaction(SIGTERM, &sa, NULL) == -1) {
+		err = -errno;
+		bpftune_log(LOG_ERR, "signal handling failure: %s\n",
+			    strerror(-err));
+	} else {
+		err = bpftune_ring_buffer_poll(ring_buffer, interval);
+	}
 
 	fini();
 
