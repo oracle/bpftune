@@ -60,13 +60,18 @@ OPTIONS
         -r, --learning_rate
 
                   Specify learning rate; supported values range from
+
                         0: tunables are changed by/within 1.0625 % of limit
+
                         1: tunables are changed by/within 3.125% of limit
+
                         2: tunables are changed by/within 6.25% of limit
+
                         3: tunables are changed by/within 12.5% of limit
+
                         4: tunables are changed by/within 25% of limit
 
-                So for example at rate 4, if we are withing 25% of a limit,
+                So for example at rate 4, if we are within 25% of a limit,
                 the limit is increased by 25%.  Default learning rate is 4.
                 Lower values are more conservative as they change only when
                 closer to limits, but may require more frequent changes as

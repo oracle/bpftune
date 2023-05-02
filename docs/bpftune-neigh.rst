@@ -69,10 +69,6 @@ DESCRIPTION
         "ip ntable change name arp_cache dev eth0 thresh3 1024"
         (this is done directly in bpftune via netlink)
 
-        ...since defaults just give initial values for new device.
-        So when adapting table size when approaching full, we
-        need to use that approach.
-
         Contrast this approach with simply choosing a large
         net.ipv4.neigh.gc_thresh3. If thresh2 and thresh3
         are far apart, we may over-garbage collect, whereas

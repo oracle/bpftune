@@ -15,7 +15,7 @@ DESCRIPTION
 
         Each tuner declares which sysctls it operates on, and if we see a sysctl
         setting that collides with one of our managed sysctls, the associated tuner
-        is disabled.
+        is disabled.  bpftune must be restarted to re-enable it.
 
         Intent is to get out of the way of the active administrator.
 
