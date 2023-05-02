@@ -7,7 +7,7 @@ LIBBPFTUNE_0.1.1 {
 		bpftune_set_log;
 		bpftune_set_bpf_log;
 		bpftune_log_bpf_err;
-		bpftune_cap_set;
+		bpftune_cap_add;
 		bpftune_cap_drop;
 		bpftune_set_learning_rate;
 		bpftune_learning_rate;
@@ -49,7 +49,7 @@ LIBBPFTUNE_0.1.1 {
 		bpftune_netns_set;
 		bpftune_netns_info;
 		bpftune_module_load;
-		bpftune_module_delete;
+		bpftune_module_unload;
 	local:
 		*;
 };

@@ -83,10 +83,12 @@ void bpftune_log_stderr(__attribute__((unused)) void *ctx,
 	}
 }
 
+#define BPFTUNE_LOG_MAX		512
+
 void bpftune_log_syslog(__attribute__((unused)) void *ctx, int level,
 			const char *fmt, va_list args)
 {
-	char buf[512];
+	char buf[BPFTUNE_LOG_MAX];
 	int buflen;
 
 	buflen = vsnprintf(buf, sizeof(buf), fmt, args);
@@ -212,7 +214,7 @@ static void bpftune_cap_init(void)
 		     CAP_SET);
 }
 
-int bpftune_cap_set(void)
+int bpftune_cap_add(void)
 {
 	int ret = 0;
 	int *count;
@@ -258,7 +260,7 @@ int bpftune_cgroup_init(const char *cgroup_path)
 {
 	int err = 0;
 
-	err = bpftune_cap_set();
+	err = bpftune_cap_add();
 	if (err)
 		return err;
 	strncpy(bpftune_cgroup_path, cgroup_path, sizeof(bpftune_cgroup_path));
@@ -285,9 +287,14 @@ int bpftune_cgroup_init(const char *cgroup_path)
 	if (__bpftune_cgroup_fd < 0)
 		__bpftune_cgroup_fd = open(cgroup_path, O_RDONLY);
 	if (__bpftune_cgroup_fd < 0) {
+		/* we mounted above, unmount here. */
+		if (err == 0)
+			umount(cgroup_path);
 		err = -errno;
 		bpftune_log(LOG_ERR, "cannot open cgroup dir '%s': %s\n",
 			    cgroup_path, strerror(-err));
+	} else {
+		err = 0;
 	}
 out:
 	bpftune_cap_drop();
@@ -317,7 +324,7 @@ int bpftuner_cgroup_attach(struct bpftuner *tuner, const char *prog_name,
 	struct bpf_program *prog;
 	const char *cgroup_dir;
 
-	err = bpftune_cap_set();
+	err = bpftune_cap_add();
 	if (err)
 		return err;
 	
@@ -356,7 +363,7 @@ void bpftuner_cgroup_detach(struct bpftuner *tuner, const char *prog_name,
 	int prog_fd, cgroup_fd, err = 0;
 	struct bpf_program *prog;
 
-	err = bpftune_cap_set();
+	err = bpftune_cap_add();
 	if (err)
 		return;
 	prog = bpf_object__find_program_by_name(tuner->obj, prog_name);
@@ -414,7 +421,7 @@ enum bpftune_support_level bpftune_bpf_support(void)
 	struct probe_bpf *probe_bpf;
 	struct probe_bpf_legacy *probe_bpf_legacy;
 
-	err = bpftune_cap_set();
+	err = bpftune_cap_add();
 	if (err)
 		return BPFTUNE_NONE;
 	/* disable bpf logging to avoid spurious errors */
@@ -496,7 +503,7 @@ static void bpftuner_map_init(struct bpftuner *tuner, const char *name,
 
 	m = bpf_object__find_map_by_name(*tuner->skeleton->obj, name);
 	if (m) {
-		char pinpath[512];
+		char pinpath[PATH_MAX];
 
 		*mapp = m;
 		/* pin first instance of map fd, since we
@@ -525,7 +532,7 @@ int __bpftuner_bpf_load(struct bpftuner *tuner, const char **optionals)
 {
 	int err = 0;
 
-	err = bpftune_cap_set();
+	err = bpftune_cap_add();
 
 	if (err)
 		return err;
@@ -570,9 +577,9 @@ out:
 
 int __bpftuner_bpf_attach(struct bpftuner *tuner)
 {
-	int err = 0;
+	int err;
 
-	err = bpftune_cap_set();
+	err = bpftune_cap_add();
 	if (err)
 		return err;
 	err = bpf_object__attach_skeleton(tuner->skeleton);
@@ -589,7 +596,7 @@ static unsigned int bpftune_num_tuners;
 
 void bpftuner_bpf_fini(struct bpftuner *tuner)
 {
-	if (bpftune_cap_set())
+	if (bpftune_cap_add())
 		return;
 	bpf_object__destroy_skeleton(tuner->skeleton);
 	free(tuner->skel);
@@ -619,7 +626,7 @@ struct bpftuner *bpftuner_init(const char *path)
 		return NULL;
 	}
 
-	bpftune_cap_set();
+	bpftune_cap_add();
 	/* if file appears via inotify we may get "file too short" errors;
 	 * retry a few times to avoid this.
 	 */
@@ -645,7 +652,13 @@ struct bpftuner *bpftuner_init(const char *path)
 	tuner->init = dlsym(tuner->handle, "init");
 	tuner->fini = dlsym(tuner->handle, "fini");
 	tuner->event_handler = dlsym(tuner->handle, "event_handler");
-	
+	if (!tuner->init || !tuner->fini || !tuner->event_handler) {	
+		bpftune_log(LOG_ERR, "missing definitions in '%s': need 'init', 'fini' and 'event_handler'\n",
+			    path);
+		dlclose(tuner->handle);
+		free(tuner);
+		return NULL;
+	}
 	bpftune_log(LOG_DEBUG, "calling init for '%s\n", path);
 	err = tuner->init(tuner);
 	if (err) {
@@ -753,7 +766,7 @@ void *bpftune_ring_buffer_init(int ring_buffer_map_fd, void *ctx)
 
 	bpftune_log(LOG_DEBUG, "calling ring_buffer__new, ringbuf_map_fd %d\n",
 		    ring_buffer_map_fd);
-	err = bpftune_cap_set();
+	err = bpftune_cap_add();
 	if (err)
 		return NULL;
 	rb = ring_buffer__new(ring_buffer_map_fd, bpftune_ringbuf_event_read, ctx, NULL);
@@ -804,11 +817,11 @@ void bpftune_sysctl_name_to_path(const char *name, char *path, size_t path_sz)
 int bpftune_sysctl_read(int netns_fd, const char *name, long *values)
 {
 	int orig_netns_fd, i, num_values = 0;
-	char path[512];
+	char path[PATH_MAX];
 	int err = 0;	
 	FILE *fp;
 
-	err = bpftune_cap_set();
+	err = bpftune_cap_add();
 	if (err)
 		return err;
 
@@ -856,7 +869,7 @@ int bpftune_sysctl_write(int netns_fd, const char *name, __u8 num_values, long *
 	long old_values[BPFTUNE_MAX_VALUES] = {};
 	int i, err = 0, orig_netns_fd;
 	int old_num_values;
-	char path[512];
+	char path[PATH_MAX];
 	FILE *fp;
 
 	bpftune_sysctl_name_to_path(name, path, sizeof(path));
@@ -864,7 +877,7 @@ int bpftune_sysctl_write(int netns_fd, const char *name, __u8 num_values, long *
 	bpftune_log(LOG_DEBUG, "writing sysctl '%s' for netns_fd %d\n",
 		    path, netns_fd);
 
-	err = bpftune_cap_set();
+	err = bpftune_cap_add();
 	if (err)
 		return err;
 	err = bpftune_netns_set(netns_fd, &orig_netns_fd);
@@ -993,9 +1006,9 @@ static void bpftuner_scenario_log(struct bpftuner *tuner, unsigned int tunable,
 			    global_ns ? "" : "non-",
 			    tuner->scenarios[scenario].description);
 		if (t->desc.type == BPFTUNABLE_SYSCTL) {
-			char oldvals[256] = { };
-			char newvals[256] = { };
-			char s[256];
+			char oldvals[PATH_MAX] = { };
+			char newvals[PATH_MAX] = { };
+			char s[PATH_MAX];
 			__u8 i;
 
 			for (i = 0; i < t->desc.num_values; i++) {
@@ -1027,7 +1040,7 @@ int bpftuner_tunable_sysctl_write(struct bpftuner *tuner, unsigned int tunable,
 {
 	struct bpftunable *t = bpftuner_tunable(tuner, tunable);
 	struct bpftuner_netns *netns;
-	int ret = 0, fd, netns_fd;
+	int ret = 0, fd = 0;
 
 	if (!t) {
 		bpftune_log(LOG_ERR, "no tunable %d for tuner '%s'\n",
@@ -1045,14 +1058,15 @@ int bpftuner_tunable_sysctl_write(struct bpftuner *tuner, unsigned int tunable,
 			return 0;
 		}
 	}
-		
-	netns_fd = bpftuner_netns_fd_from_cookie(tuner, netns_cookie);
-	if (netns_fd < 0) {
-		bpftune_log(LOG_DEBUG, "could not get netns fd for cookie %ld\n",
-			    netns_cookie);
-		return 0;
+
+	if (t->desc.namespaced) {
+		fd = bpftuner_netns_fd_from_cookie(tuner, netns_cookie);
+		if (fd < 0) {
+			bpftune_log(LOG_DEBUG, "could not get netns fd for cookie %ld\n",
+				    netns_cookie);
+			return 0;
+		}
 	}
-	fd = t->desc.namespaced ? netns_fd : 0;
 
 	ret = bpftune_sysctl_write(fd, t->desc.name, num_values, values);
 	if (!ret) {
@@ -1060,7 +1074,7 @@ int bpftuner_tunable_sysctl_write(struct bpftuner *tuner, unsigned int tunable,
 		__u8 i;
 
 		va_start(args, fmt);
-		bpftuner_scenario_log(tuner, tunable, scenario, netns_fd,
+		bpftuner_scenario_log(tuner, tunable, scenario, fd,
 				      false, fmt, args);
 		va_end(args);
 
@@ -1068,8 +1082,8 @@ int bpftuner_tunable_sysctl_write(struct bpftuner *tuner, unsigned int tunable,
 			t->current_values[i] = values[i];
 	}
 
-	if (netns_fd > 0)
-		close(netns_fd);
+	if (fd > 0)
+		close(fd);
 
 	return ret;
 }
@@ -1114,7 +1128,7 @@ static int bpftune_netns_fd(int netns_pid)
 	if (netns_pid == 0)
 		return 0;
 	snprintf(netns_path, sizeof(netns_path), "/proc/%d/ns/net", netns_pid);
-	err = bpftune_cap_set();
+	err = bpftune_cap_add();
 	if (err)
 		return err;
 	netns_fd = open(netns_path, O_RDONLY);
@@ -1129,13 +1143,10 @@ int bpftune_netns_set(int new_fd, int *orig_fd)
 {
 	int fd, err = 0;
 
-	if (orig_fd)
-		*orig_fd = 0;
-
 	if (!new_fd)
 		return 0;
 
-	err = bpftune_cap_set();
+	err = bpftune_cap_add();
 	if (err)
 		return err;
 
@@ -1149,8 +1160,8 @@ int bpftune_netns_set(int new_fd, int *orig_fd)
 		if (err < 0) {
 			err = -errno;
 			close(fd);
-			bpftune_log(LOG_ERR, "could not %ssetns(%d): %s\n",
-				    orig_fd ? "" : "restore",
+			bpftune_log(LOG_ERR, "could not %s ns(%d): %s\n",
+				    orig_fd ? "set" : "restore",
 				    new_fd, strerror(-err));
 		}
 	}
@@ -1169,7 +1180,7 @@ int bpftune_netns_set(int new_fd, int *orig_fd)
 int bpftune_netns_info(int pid, int *fd, unsigned long *cookie)
 {
 	unsigned long netns_cookie = 0;
-	int netns_fd, orig_netns_fd;
+	int netns_fd, orig_netns_fd = 0;
 	bool fdnew = true;
 	int ret, err;
 
@@ -1238,7 +1249,7 @@ static int bpftune_netns_find(unsigned long cookie)
 	if (!netns_cookie_supported || cookie == 0 || (global_netns_cookie && cookie == global_netns_cookie))
 		return 0;
 
-	ret = bpftune_cap_set();
+	ret = bpftune_cap_add();
 	if (ret)
 		return ret;
 
@@ -1427,7 +1438,7 @@ struct bpftuner_netns *bpftuner_netns_from_cookie(unsigned long tuner_id,
 	return NULL;
 }
 
-static int bpftune_module_path(const char *name, char *modpath)
+static int bpftune_module_path(const char *name, char *modpath, size_t pathsz)
 {
 	struct utsname utsname;
 	int ret;
@@ -1437,7 +1448,7 @@ static int bpftune_module_path(const char *name, char *modpath)
 		bpftune_log(LOG_DEBUG, "uname failed: %s\n", strerror(ret));
 		return ret;
 	}
-	snprintf(modpath, PATH_MAX, "/usr/lib/modules/%s/kernel/%s",
+	snprintf(modpath, pathsz, "/usr/lib/modules/%s/kernel/%s",
 		 utsname.release, name);
 	return 0;
 }
@@ -1448,10 +1459,10 @@ int bpftune_module_load(const char *name)
 	char modpath[PATH_MAX];
 	int ret, fd;
 
-	ret = bpftune_cap_set();
+	ret = bpftune_cap_add();
 	if (ret)
 		return ret;
-	ret = bpftune_module_path(name, modpath);
+	ret = bpftune_module_path(name, modpath, sizeof(modpath));
 	if (ret)
 		goto out;
 
@@ -1473,11 +1484,11 @@ out:
 	return ret;
 }
 
-int bpftune_module_delete(const char *name)
+int bpftune_module_unload(const char *name)
 {
 	int ret;
 
-	ret = bpftune_cap_set();
+	ret = bpftune_cap_add();
 	if (ret)
 		return ret;
 	ret = syscall(__NR_delete_module, name, 0);

@@ -158,7 +158,7 @@ void event_handler(struct bpftuner *tuner,
 
 	switch (event->scenario_id) {
 	case NEIGH_TABLE_FULL:
-		if (bpftune_cap_set())
+		if (bpftune_cap_add())
 			return;
 		set_gc_thresh3(tuner, stats);
 		bpftune_cap_drop();

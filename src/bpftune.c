@@ -98,7 +98,7 @@ void *inotify_thread(void *arg)
 	char buf[sizeof(struct inotify_event) * MAX_INOTIFY_EVENTS];
 	struct bpftuner *tuner;
 
-	if (bpftune_cap_set())
+	if (bpftune_cap_add())
 		return NULL;
 	inotify_fd = inotify_init();
 	if (inotify_fd < 0) {
@@ -142,7 +142,7 @@ void *inotify_thread(void *arg)
 			}
 		}
 	}
-	if (!bpftune_cap_set())
+	if (!bpftune_cap_add())
 		inotify_rm_watch(inotify_fd, wd);
 	bpftune_cap_drop();
 	close(inotify_fd);
@@ -371,7 +371,7 @@ int main(int argc, char *argv[])
 		return 0;
 
 	/* ensure no existing pin in place... */
-	if (bpftune_cap_set())
+	if (bpftune_cap_add())
 		exit(EXIT_FAILURE);
 	ftw(BPFTUNE_PIN, unlink_cb, FTW_F | FTW_D);
 	bpftune_cap_drop();

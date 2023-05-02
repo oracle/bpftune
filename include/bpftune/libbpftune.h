@@ -72,7 +72,7 @@ void bpftune_set_bpf_log(bool log);
 
 void bpftune_log_bpf_err(int err, const char *fmt);
 
-int bpftune_cap_set(void);
+int bpftune_cap_add(void);
 void bpftune_cap_drop(void);
 
 extern unsigned short bpftune_learning_rate;
@@ -138,7 +138,7 @@ void bpftuner_tunables_fini(struct bpftuner *tuner);
 	do {								     \
 		struct tuner_name##_tuner_bpf *__skel;                       \
 		struct tuner_name##_tuner_bpf_legacy *__lskel;		     \
-                int __err = bpftune_cap_set();				     \
+                int __err = bpftune_cap_add();				     \
                                                                              \
 		if (__err) return __err;				     \
                 tuner->name = #tuner_name;                                   \
@@ -272,6 +272,6 @@ int bpftuner_netns_fd_from_cookie(struct bpftuner *tuner, unsigned long cookie);
 	for (netns = &tuner->netns; netns != NULL; netns = netns->next)
 
 int bpftune_module_load(const char *name);
-int bpftune_module_delete(const char *name);
+int bpftune_module_unload(const char *name);
 
 #endif /* __LIBBPFTUNE_H */

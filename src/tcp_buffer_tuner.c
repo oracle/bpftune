@@ -92,7 +92,7 @@ long nr_free_buffer_pages(bool initial)
 	FILE *fp;
 	int err;
 
-	err = bpftune_cap_set();
+	err = bpftune_cap_add();
 	if (err)
 		return err;
 

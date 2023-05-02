@@ -124,12 +124,12 @@ $(OPATH)bpftune: bpftune.c $(OPATH)bpftune.o $(OPATH)libbpftune.so
 
 $(OPATH)libbpftune.so: libbpftune.c ../include/bpftune/libbpftune.h $(OPATH)libbpftune.o
 	$(CC) $(CFLAGS) -Wl,--version-script=$(VERSION_SCRIPT) \
-			-Wl,--soname,libbpftune.so.$(VERSION) \
+			-Wl,--soname,$(notdir $@).$(VERSION) \
 			-shared -o $(@).$(VERSION) \
 			$(patsubst %.so,%.o,$(@)) \
 			$(LDLIBS) $(LDFLAGS) ; \
-	rm -f $(OPATH)libbpftune.so ; \
-	ln -sr $(OPATH)libbpftune.so.$(VERSION) $(OPATH)libbpftune.so
+	rm -f $(@) ; \
+	ln -sr $(@).$(VERSION) $(@)
 
 $(TUNER_LIBS): $(OPATH)libbpftune.so $(BPF_SKELS) $(TUNER_OBJS)
 	$(CC) $(CFLAGS) -shared -o $(@) $(patsubst $(OPATH)%.so,%.c,$(@)) \
