@@ -29,7 +29,7 @@ can be used for other cases (see cong_tuner.c for example).
 
 # Example
 
-neigh-table-tune.bpf.c monitors neighbour table updates, and when the
+neigh_table_tuner.bpf.c monitors neighbour table updates, and when the
 neighbour table is approaching garbage collection limits, those
 limits are raised.  It consists of
 
