@@ -62,7 +62,7 @@ unsigned short bpftune_learning_rate;
 
 void *bpftune_log_ctx;
 
-int bpftune_loglevel = LOG_ALERT;
+int bpftune_loglevel = BPFTUNE_LOG_LEVEL;
 
 struct ring_buffer *ring_buffer;
 int ring_buffer_map_fd;
@@ -111,8 +111,15 @@ void bpftune_log(int level, const char *fmt, ...)
 	va_end(args);
 }
 
-static int bpftune_libbpf_log(__attribute__((unused)) enum libbpf_print_level l,
-			       const char *format, va_list args)
+static int bpftune_libbpf_nolog(__attribute__((unused))enum libbpf_print_level l,
+				__attribute__((unused))const char *format,
+				__attribute__((unused))va_list args)
+{
+	return 0;
+}
+
+static int bpftune_libbpf_log(enum libbpf_print_level l, const char *format,
+			      va_list args)
 {
 	int level;
 
@@ -136,6 +143,11 @@ static int bpftune_libbpf_log(__attribute__((unused)) enum libbpf_print_level l,
         return 0;
 }
 
+void bpftune_set_bpf_log(bool log)
+{
+	libbpf_set_print(log ? bpftune_libbpf_log : bpftune_libbpf_nolog);
+}
+
 void bpftune_set_log(int level,
 		     void (*logfn)(void *ctx, int level, const char *fmt,
 				   va_list args))
@@ -147,7 +159,7 @@ void bpftune_set_log(int level,
 		setlogmask(LOG_UPTO(level));
                 openlog("bpftune", LOG_NDELAY | LOG_PID, LOG_DAEMON);
 	}
-	libbpf_set_print(bpftune_libbpf_log);
+	bpftune_set_bpf_log(true);
 }
 
 void bpftune_log_bpf_err(int err, const char *fmt)
@@ -399,12 +411,16 @@ enum bpftune_support_level bpftune_bpf_support(void)
 {
 	bool ret;
 	int err;
-	struct probe_bpf *probe_bpf = probe_bpf__open_and_load();
+	struct probe_bpf *probe_bpf;
 	struct probe_bpf_legacy *probe_bpf_legacy;
 
 	err = bpftune_cap_set();
 	if (err)
 		return BPFTUNE_NONE;
+	/* disable bpf logging to avoid spurious errors */
+	bpftune_set_bpf_log(false);
+
+	probe_bpf = probe_bpf__open_and_load();
 	support_level = BPFTUNE_LEGACY;
 	err = libbpf_get_error(probe_bpf);
 	if (!err) {
@@ -434,6 +450,8 @@ enum bpftune_support_level bpftune_bpf_support(void)
 	ret = bpftune_netns_cookie_supported();
 	if (!ret)
 		bpftune_log(LOG_DEBUG, "netns cookie not supported\n");
+
+	bpftune_set_bpf_log(true);
 	bpftune_cap_drop();
 	return support_level;
 }
@@ -969,7 +987,7 @@ static void bpftuner_scenario_log(struct bpftuner *tuner, unsigned int tunable,
 				    t->stats.nonglobal_ns[scenario];
 		if (!count)
 			return;
-		bpftune_log(LOG_ALERT, "Summary: scenario '%s' occurred %ld times for tunable '%s' in %sglobal ns. %s\n",
+		bpftune_log(BPFTUNE_LOG_LEVEL, "Summary: scenario '%s' occurred %ld times for tunable '%s' in %sglobal ns. %s\n",
 			    tuner->scenarios[scenario].name, count,
 			    t->desc.name,
 			    global_ns ? "" : "non-",
@@ -988,16 +1006,16 @@ static void bpftuner_scenario_log(struct bpftuner *tuner, unsigned int tunable,
 					 t->current_values[i]);
 				strcat(newvals, s);
 			}
-			bpftune_log(LOG_ALERT, "sysctl '%s' changed from (%s) -> (%s)\n",
+			bpftune_log(BPFTUNE_LOG_LEVEL, "sysctl '%s' changed from (%s) -> (%s)\n",
 				    t->desc.name, oldvals, newvals);
 		}
 	} else {
-		bpftune_log(LOG_ALERT, "Scenario '%s' occurred for tunable '%s' in %sglobal ns. %s\n",
+		bpftune_log(BPFTUNE_LOG_LEVEL, "Scenario '%s' occurred for tunable '%s' in %sglobal ns. %s\n",
 			    tuner->scenarios[scenario].name,
 			    t->desc.name,
 			    global_ns ? "" : "non-",
 			    tuner->scenarios[scenario].description);
-		__bpftune_log(LOG_ALERT, fmt, args);
+		__bpftune_log(BPFTUNE_LOG_LEVEL, fmt, args);
 		bpftuner_tunable_stats_update(t, scenario, global_ns);
 	}
 }
@@ -1021,7 +1039,7 @@ int bpftuner_tunable_sysctl_write(struct bpftuner *tuner, unsigned int tunable,
 		bpftune_log(LOG_DEBUG, "found netns (cookie %ld); state %d\n",
 			    netns_cookie, netns->state);
 		if (netns->state >= BPFTUNE_MANUAL) {
-			bpftune_log(LOG_ALERT,
+			bpftune_log(BPFTUNE_LOG_LEVEL,
 				    "Skipping update of '%s' ; tuner '%s' is disabled in netns (cookie %ld)\n",
 				    t->desc.name, tuner->name, netns_cookie);
 			return 0;

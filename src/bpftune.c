@@ -98,7 +98,7 @@ void *inotify_thread(void *arg)
 		return NULL;
 	inotify_fd = inotify_init();
 	if (inotify_fd < 0) {
-		bpftune_log(LOG_ALERT, "cannot monitor '%s' for changes: %s\n",
+		bpftune_log(BPFTUNE_LOG_LEVEL, "cannot monitor '%s' for changes: %s\n",
 			    library_path, strerror(errno));
 		bpftune_cap_drop();
 		return NULL;
@@ -119,7 +119,7 @@ void *inotify_thread(void *arg)
 			snprintf(library_path, sizeof(library_path), "%s/%s",
 				 library_dir, event->name);
 			if (event->mask & IN_CREATE) {
-				bpftune_log(LOG_ALERT, "added lib %s, init\n",
+				bpftune_log(BPFTUNE_LOG_LEVEL, "added lib %s, init\n",
 					    library_path);
 				tuner = bpftuner_init(library_path);
 				if (!tuner)
@@ -130,7 +130,7 @@ void *inotify_thread(void *arg)
 				bpftune_for_each_tuner(tuner) {
 					if (!strstr(event->name, tuner->name))
 						continue;
-					bpftune_log(LOG_ALERT, "removed '%s', fini tuner %s\n",
+					bpftune_log(BPFTUNE_LOG_LEVEL, "removed '%s', fini tuner %s\n",
 						    library_path, tuner->name);
 					bpftuner_fini(tuner, BPFTUNE_MANUAL);
 				}
@@ -208,7 +208,7 @@ int init(const char *library_dir)
 		if (!ring_buffer)
 			return -1;
 	} else {
-		bpftune_log(LOG_ALERT, "no ringbuf events to watch, exiting.\n");
+		bpftune_log(BPFTUNE_LOG_LEVEL, "no ringbuf events to watch, exiting.\n");
 		return -ENOENT;
 	}
 	bpftune_netns_init_all();
@@ -248,17 +248,17 @@ void print_support_level(enum bpftune_support_level support_level)
 {
 	switch (support_level) {
 	case BPFTUNE_NONE:
-		bpftune_log(LOG_ALERT, "bpftune is not supported\n");
+		bpftune_log(BPFTUNE_LOG_LEVEL, "bpftune is not supported\n");
 		break;
 	case BPFTUNE_LEGACY:
-		bpftune_log(LOG_ALERT, "bpftune works in legacy mode\n");
+		bpftune_log(BPFTUNE_LOG_LEVEL, "bpftune works in legacy mode\n");
 		break;
 	case BPFTUNE_NORMAL:
-		bpftune_log(LOG_ALERT, "bpftune works fully\n");
+		bpftune_log(BPFTUNE_LOG_LEVEL, "bpftune works fully\n");
 		break;
 	}
 	if (support_level > BPFTUNE_NONE) {
-		bpftune_log(LOG_ALERT, "bpftune %s per-netns policy (via netns cookie)\n",
+		bpftune_log(BPFTUNE_LOG_LEVEL, "bpftune %s per-netns policy (via netns cookie)\n",
 			    bpftune_netns_cookie_supported() ?
 			    "supports" : "does not support");
 	}
@@ -285,7 +285,7 @@ int main(int argc, char *argv[])
 	char *library_dir = BPFTUNER_LOCAL_LIB_DIR;
 	enum bpftune_support_level support_level;
 	unsigned short rate = BPFTUNE_DELTA_MAX;
-	int log_level = LOG_ALERT;
+	int log_level = BPFTUNE_LOG_LEVEL;
 	bool support_only = false;
 	int interval = 100;
 	int err, opt;
@@ -351,14 +351,14 @@ int main(int argc, char *argv[])
 
 	if (setrlimit(RLIMIT_MEMLOCK, &r)) {
 		err = -errno;
-		bpftune_log(LOG_ALERT, "cannot unlock memory limit: %s.\nAre you running with CAP_SYS_ADMIN/via sudo/as root?\n",
+		bpftune_log(BPFTUNE_LOG_LEVEL, "cannot unlock memory limit: %s.\nAre you running with CAP_SYS_ADMIN/via sudo/as root?\n",
 			    strerror(-err));
 		return err;
 	}
 	support_level = bpftune_bpf_support();
 	print_support_level(support_level);
 	if (support_level < BPFTUNE_LEGACY) {
-		bpftune_log(LOG_ALERT, "bpftune is not supported on this system; exiting\n");
+		bpftune_log(BPFTUNE_LOG_LEVEL, "bpftune is not supported on this system; exiting\n");
 		return 1;
 	}
 	if (support_only)

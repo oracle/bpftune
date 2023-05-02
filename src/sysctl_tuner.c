@@ -76,7 +76,7 @@ void event_handler(struct bpftuner *tuner, struct bpftune_event *event,
 			 * gc_thresh3 in neigh table tuner for example.
 			 */
 			if (strstr(path, event->str)) {
-				bpftune_log(LOG_ALERT,
+				bpftune_log(BPFTUNE_LOG_LEVEL,
 					    "user modified sysctl '%s' that tuner '%s' uses; disabling '%s' for namespace cookie %ld\n",
 					    event->str, t->name, t->name,
 					    event->netns_cookie);

@@ -55,6 +55,9 @@
 #define ARRAY_SIZE(arr)			(sizeof(arr) / sizeof((arr)[0])) 
 #endif
 
+/* level for bpftune tunable updates */
+#define BPFTUNE_LOG_LEVEL		LOG_NOTICE
+
 int bpftune_log_level(void);
 
 void bpftune_log(int level, const char *fmt, ...);
@@ -65,6 +68,8 @@ void bpftune_log_syslog(void *ctx, int level, const char *fmt, va_list args);
 void bpftune_set_log(int level,
 		     void (*logfn)(void *ctx, int level, const char *fmt,
 				   va_list args));
+void bpftune_set_bpf_log(bool log);
+
 void bpftune_log_bpf_err(int err, const char *fmt);
 
 int bpftune_cap_set(void);
