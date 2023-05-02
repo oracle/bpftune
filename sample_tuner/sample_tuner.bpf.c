@@ -26,6 +26,9 @@ BPF_FENTRY(proc_dostring_coredump, struct ctl_table *table, int write,
 	struct bpftune_event event = {};
 	int ret, scenario_id = 0;
 
+	/* tuner id is a global declared in bpftune.bpf.h and set by bfttune
+	 * when the tuner is added.
+	 */
 	event.tuner_id = tuner_id;
 	event.scenario_id = scenario_id;
 	ret = bpf_ringbuf_output(&ring_buffer_map, &event, sizeof(event), 0);
