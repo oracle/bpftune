@@ -166,11 +166,10 @@ for h-tcp, otherwise use BBR.
   best?
 - kernel support for tunable override via bpf? Have decision points
   in kernel be over-rideable by BPF; would need to have sysctl
-  denote "BPF tuned" somehow...
+  denote "this is BPF tuned" somehow...
 - mem tuning (min_free_kbytes etc)?
 - kernel tunables (numa balancing, pid max, threads_max, etc)
 - vm tunables?
-- limiting ulimit? see
-	https://bug.oraclecorp.com/pls/bug/webbug_print.show?c_rptno=29123482
-	issue SR# 3-30085302261 / BUG: 34378084 - Excessive Locking after switch back : EMA: 119404
+- limiting ulimit? see OraBug 29123482
+	OraBug 34378084 - Excessive Locking after switch back
 
