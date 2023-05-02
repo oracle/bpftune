@@ -17,8 +17,8 @@ b) for SO_RCVBUF:
 
 same logic as above applies, with SOCK_MIN_RCVBUF being
 the minimum allowable size; this is one TCP_MESSAGE size.
-sysctl_rmem_max (net.core.rmem_max is the maximum value
-we can set).
+sysctl_rmem_max (net.core.rmem_max) is the maximum value
+we can set.
 
 The minimum values allow for three-way handshake.
 
@@ -47,8 +47,8 @@ net.core.[wr]mem_max.
 
 For b), we can see if more send/receive buffer space would
 be desirable, but is not added - due to user locks on SND/RCV. 
-For the send side, tracing tcp_new_space()/tcp_should_expand_sndbuf().
-Here we can check if we're not under memory pressure (tcp_memory_pressure)
+For the send side, tracing tcp_new_space()/tcp_should_expand_sndbuf()
+allows us to check if we are  not under memory pressure (tcp_memory_pressure)
 and other conditions would be met for buffer expansion, i.e.
 
 ```
