@@ -1,7 +1,8 @@
 # BPF/tracing tools for auto-tuning SPEC file
 
 %define name        bpftune
-%define release     1%{?dist}
+%define rel	    1
+%define release     %{rel}%{?dist}
 %define version     0.1
 %global _unitdir    /usr/lib/systemd/system/	
 
@@ -39,7 +40,7 @@ Requires:       bpftool
 Requires:       libnl3-devel
 
 %description devel
-The %{name}-devel package contains libraries header files for
+The %{name}-devel package contains libraries and header files for
 developing BPF shared object tuners that use %{name}
 
 %prep
@@ -56,7 +57,7 @@ rm -Rf %{buildroot}
 %defattr(-,root,root)
 %{_sbindir}/bpftune
 %{_unitdir}/bpftune.service
-%{_libdir}/libbpftune.so.0.1.1
+%{_libdir}/libbpftune.so.%{version}.%{rel}
 %{_libdir}/bpftune/*
 %{_mandir}/*/*
 
