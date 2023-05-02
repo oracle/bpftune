@@ -40,14 +40,29 @@ struct corr {
 	__u64 sum_prod_x_y;
 };
 
+static inline void corr_reset(struct corr *c)
+{
+	__builtin_memset(c, 0, sizeof(*c));
+}
+
+/* reset correlation if we overflow any values */
+#define corr_update_var(c, var, delta)			\
+	do {						\
+		if (((c->var) + (delta)) < c->var) {	\
+			corr_reset(c);			\
+			return;				\
+		}					\
+		(c->var) += (delta);			\
+	} while (0)
+
 static inline void corr_update(struct corr *c, __u64 x, __u64 y)
 {
-	c->n++;
-	c->sum_x += x;
-	c->sum_x_sq += (x*x);
-	c->sum_y += y;
-	c->sum_y_sq += (y*y);
-	c->sum_prod_x_y += (x*y);
+	corr_update_var(c, n, 1);
+	corr_update_var(c, sum_x, x);
+	corr_update_var(c, sum_x_sq, x*x);
+	corr_update_var(c, sum_y, y);
+	corr_update_var(c, sum_y_sq, y*y);
+	corr_update_var(c, sum_prod_x_y, x*y);
 }
 
 #ifndef __KERNEL__

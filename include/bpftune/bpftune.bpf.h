@@ -66,11 +66,11 @@ ____##name(struct pt_regs *ctx, ##args)
         ___bpf_apply(___bpf_kretprobe_args, ___bpf_narg(args))(args)
 
 /*
- *  * BPF_KRETPROBE is similar to BPF_KPROBE, except, it only provides optional
- *   * return value (in addition to `struct pt_regs *ctx`), but no input
- *    * arguments, because they will be clobbered by the time probed function
- *     * returns.
- *      */
+ * BPF_KRETPROBE is similar to BPF_KPROBE, except, it only provides optional
+ * return value (in addition to `struct pt_regs *ctx`), but no input
+ * arguments, because they will be clobbered by the time probed function
+ * returns.
+ */
 #define BPF_KRETPROBE(name, args...)                                        \
 name(struct pt_regs *ctx);                                                  \
 static __attribute__((always_inline)) typeof(name(0))                       \
