@@ -496,34 +496,25 @@ static void bpftuner_map_init(struct bpftuner *tuner, const char *name,
 			      void **mapp, int *fdp, int *tuner_fdp)
 {
 	struct bpf_map *m;
-	int err = 0;
 
 	if (*fdp > 0)
 		return;
 
 	m = bpf_object__find_map_by_name(*tuner->skeleton->obj, name);
 	if (m) {
-		char pinpath[PATH_MAX];
-
 		*mapp = m;
-		/* pin first instance of map fd, since we
-		 * do not want it to go away if a tuner does.
+
+		/* dup fd, because we do not want map to go away if tuner
+		 * does.
 		 */
-		mkdir(BPFTUNE_PIN, 0700);
-		snprintf(pinpath, sizeof(pinpath), BPFTUNE_PIN "/%s", name);
-		err = bpf_map__pin(m, pinpath);
-		if (err) {
-			bpftune_log_bpf_err(err, "could not pin ringbuf map: %s\n");
-		} else {
-			*fdp = dup(bpf_map__fd(m));
-			if (*fdp < 0) {
-				bpftune_log(LOG_ERR, "could not get pin: %s\n",
+		*fdp = dup(bpf_map__fd(m));
+		if (*fdp < 0) {
+			bpftune_log(LOG_ERR, "could not get pin: %s\n",
 					    strerror(errno));
-			} else {
-				bpftune_log(LOG_DEBUG, "got %s map fd %d\n",
-					    name, *fdp);
-				*tuner_fdp = *fdp;
-			}
+		} else {
+			bpftune_log(LOG_DEBUG, "got %s map fd %d\n",
+				    name, *fdp);
+			*tuner_fdp = bpf_map__fd(m);
 		}
 	}
 }

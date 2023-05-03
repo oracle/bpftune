@@ -60,21 +60,11 @@ char *bin_name;
 
 bool exiting;
 
-static int unlink_cb(const char *path,
-		     __attribute__((unused))const struct stat *sb,
-		     __attribute__((unused))int typeflag)
-{
-	remove(path);
-	return 0;
-}
-
 static void cleanup(int sig)
 {
 	exiting = true;
 	bpftune_log(LOG_DEBUG, "cleaning up, got signal %d\n", sig);
 	bpftune_ring_buffer_fini(ring_buffer);
-	ftw(BPFTUNE_PIN, unlink_cb, FTW_F | FTW_D);
-	unlink(BPFTUNE_PIN);
 	if (use_stderr)
 		fflush(stderr);
 }
@@ -373,7 +363,6 @@ int main(int argc, char *argv[])
 	/* ensure no existing pin in place... */
 	if (bpftune_cap_add())
 		exit(EXIT_FAILURE);
-	ftw(BPFTUNE_PIN, unlink_cb, FTW_F | FTW_D);
 	bpftune_cap_drop();
 
 	err = bpftune_cgroup_init(cgroup_dir);
