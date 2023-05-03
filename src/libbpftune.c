@@ -807,7 +807,7 @@ void bpftune_sysctl_name_to_path(const char *name, char *path, size_t path_sz)
 
 int bpftune_sysctl_read(int netns_fd, const char *name, long *values)
 {
-	int orig_netns_fd, i, num_values = 0;
+	int i, orig_netns_fd = 0, num_values = 0;
 	char path[PATH_MAX];
 	int err = 0;	
 	FILE *fp;
