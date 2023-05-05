@@ -397,5 +397,8 @@ int main(int argc, char *argv[])
 
 	fini();
 
+	if (use_stderr)
+		fflush(stderr);
+
 	return err;
 }
