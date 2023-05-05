@@ -396,8 +396,8 @@ int main(int argc, char *argv[])
 	if (library_dir)
 		init(library_dir);
 
-	if (signal(SIGINT, cleanup) == -1 ||
-	    signal(SIGTERM, cleanup) == -1) {
+	if (signal(SIGINT, cleanup) == SIG_ERR ||
+	    signal(SIGTERM, cleanup) == SIG_ERR) {
 		err = -errno;
 		bpftune_log(LOG_ERR, "signal handling failure: %s\n",
 			    strerror(-err));
