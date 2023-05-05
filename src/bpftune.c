@@ -283,7 +283,7 @@ int main(int argc, char *argv[])
 	unsigned short rate = BPFTUNE_DELTA_MAX;
 	int log_level = BPFTUNE_LOG_LEVEL;
 	bool support_only = false;
-	struct sigaction sa = {};
+	struct sigaction sa = {}, oldsa = {};
 	int interval = 100;
 	int err, opt;
 
@@ -388,8 +388,8 @@ int main(int argc, char *argv[])
 		init(library_dir);
 
 	sa.sa_handler = cleanup;
-	if (sigaction(SIGINT, &sa, NULL) == -1 ||
-	    sigaction(SIGTERM, &sa, NULL) == -1) {
+	if (sigaction(SIGINT, &sa, &oldsa) == -1 ||
+	    sigaction(SIGTERM, &sa, &oldsa) == -1) {
 		err = -errno;
 		bpftune_log(LOG_ERR, "signal handling failure: %s\n",
 			    strerror(-err));
