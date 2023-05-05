@@ -283,7 +283,7 @@ int main(int argc, char *argv[])
 	unsigned short rate = BPFTUNE_DELTA_MAX;
 	int log_level = BPFTUNE_LOG_LEVEL;
 	bool support_only = false;
-	struct sigaction sa;
+	struct sigaction sa = {};
 	int interval = 100;
 	int err, opt;
 
