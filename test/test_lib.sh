@@ -134,7 +134,7 @@ export BPFTUNE_FLAGS=${BPFTUNE_FLAGS:-""}
 if [[ "$DEBUG" != 0 ]]; then
 	export BPFTUNE_FLAGS="${BPFTUNE_FLAGS} -d"
 fi
-export CGROUPDIR=${CGROUPDIR:-"/tmp/cgroupv2"}
+export CGROUPDIR=${CGROUPDIR:-"/var/run/bpftune/cgroupv2"}
 export BPFTUNE_PROG=${BPFTUNE_PROG:-"/usr/sbin/bpftune"}
 export BPFTUNE="${BPFTUNE_PROG} -c $CGROUPDIR $BPFTUNE_FLAGS"
 export BPFTUNE_CMD=${BPFTUNE_CMD:-"$BPFTUNE"}
@@ -203,11 +203,6 @@ test_setup_local()
 		mkdir -p $CGROUPDIR
 	fi
 	set +e
-	MOUNTED=$(mount | grep $CGROUPDIR)
-	set -e
-	if [[ -z "$MOUNTED" ]]; then
-		mount -t cgroup2 none $CGROUPDIR
-	fi
 	# test_setup_local() can be called multiple times for a test...
 	set +e
 	ip netns list 2>/dev/null | grep $NETNS
