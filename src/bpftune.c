@@ -61,6 +61,15 @@ char *bin_name;
 
 bool exiting;
 
+static void mask_signals(void)
+{
+	sigset_t mask;
+
+	sigemptyset(&mask);
+	sigaddset(&mask, SIGRTMIN+3);
+        pthread_sigmask(SIG_BLOCK, &mask, NULL);
+}
+
 static void cleanup(int sig)
 {
 	exiting = true;
@@ -91,6 +100,7 @@ void *inotify_thread(void *arg)
 
 	if (bpftune_cap_add())
 		return NULL;
+	mask_signals();
 	inotify_fd = inotify_init();
 	if (inotify_fd < 0) {
 		bpftune_log(BPFTUNE_LOG_LEVEL, "cannot monitor '%s' for changes: %s\n",
