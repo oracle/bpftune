@@ -17,7 +17,7 @@
  * Boston, MA 021110-1307, USA.
  */
 
-#define _BSD_SOURCE
+#define _DEFAULT_SOURCE
 #define _POSIX_SOURCE
 #include <stdio.h>
 #include <stdarg.h>
@@ -26,6 +26,7 @@
 #include <ctype.h>
 #include <dlfcn.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <getopt.h>
 #include <inttypes.h>
 #include <signal.h>
@@ -351,6 +352,21 @@ int main(int argc, char *argv[])
 			    strerror(-err));
 		return err;
 	}
+
+	if (bpftune_cap_add())
+		exit(EXIT_FAILURE);
+
+	/* need to setup cgroup prior to probe as probe program uses sysctl */
+	err = mkdir(BPFTUNE_RUN_DIR, 0700);
+	if (err && errno != EEXIST) {
+		bpftune_log(BPFTUNE_LOG_LEVEL, "could not create '%s': %s\n",
+			    BPFTUNE_RUN_DIR, strerror(errno));
+		exit(EXIT_FAILURE);
+	}	
+	err = bpftune_cgroup_init(cgroup_dir);
+	if (err)
+		exit(EXIT_FAILURE);
+
 	support_level = bpftune_bpf_support();
 	print_support_level(support_level);
 	if (support_level < BPFTUNE_LEGACY) {
@@ -360,14 +376,7 @@ int main(int argc, char *argv[])
 	if (support_only)
 		return 0;
 
-	/* ensure no existing pin in place... */
-	if (bpftune_cap_add())
-		exit(EXIT_FAILURE);
 	bpftune_cap_drop();
-
-	err = bpftune_cgroup_init(cgroup_dir);
-	if (err)
-		exit(EXIT_FAILURE);
 
 	if (init(BPFTUNER_LIB_DIR)) {
 		bpftune_log(LOG_ERR, "could not initialize tuners in '%s'\n",

@@ -147,7 +147,8 @@ static int bpftune_libbpf_log(enum libbpf_print_level l, const char *format,
 
 void bpftune_set_bpf_log(bool log)
 {
-	libbpf_set_print(log ? bpftune_libbpf_log : bpftune_libbpf_nolog);
+	libbpf_set_print((log || bpftune_loglevel >= LOG_DEBUG) ?
+			 bpftune_libbpf_log : bpftune_libbpf_nolog);
 }
 
 void bpftune_set_log(int level,
@@ -266,7 +267,7 @@ int bpftune_cgroup_init(const char *cgroup_path)
 	strncpy(bpftune_cgroup_path, cgroup_path, sizeof(bpftune_cgroup_path));
 	__bpftune_cgroup_fd = open(cgroup_path, O_RDONLY);
 	if (__bpftune_cgroup_fd < 0) {
-		if (!mkdir(cgroup_path, 0777)) {
+		if (mkdir(cgroup_path, 0777)) {
 			err = -errno;
 			bpftune_log(LOG_ERR, "couldnt create cgroup dir '%s': %s\n",
 				    cgroup_path, strerror(-err));
@@ -274,11 +275,11 @@ int bpftune_cgroup_init(const char *cgroup_path)
 		}
 		close(__bpftune_cgroup_fd);
 	}
-	if (!mount("none" , cgroup_path, "cgroup2", 0, NULL)) {
+	if (mount("none" , cgroup_path, "cgroup2", 0, NULL)) {
 		err = -errno;
-		if (err != -EEXIST) {
+		if (err != -EEXIST && err != -EBUSY) {
 			bpftune_log(LOG_ERR, "couldnt mount cgroup2 for '%s': %s\n",
-				    strerror(-err));
+				    cgroup_path, strerror(-err));
 			if (__bpftune_cgroup_fd > 0)
 				close(__bpftune_cgroup_fd);
 			goto out;

@@ -42,7 +42,8 @@
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
 
-#define BPFTUNER_CGROUP_DIR		"/tmp/cgroupv2"
+#define BPFTUNE_RUN_DIR			"/var/run/bpftune"
+#define BPFTUNER_CGROUP_DIR		BPFTUNE_RUN_DIR "/cgroupv2"
 #define BPFTUNER_LIB_DIR		"/usr/lib64/bpftune/"
 #define BPFTUNER_LOCAL_LIB_DIR		"/usr/local/lib64/bpftune/"
 #define BPFTUNER_LIB_SUFFIX		"_tuner.so"
