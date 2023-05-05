@@ -388,6 +388,7 @@ int main(int argc, char *argv[])
 		init(library_dir);
 
 	sa.sa_handler = cleanup;
+	sigemptyset(&sa.sa_mask);
 	if (sigaction(SIGINT, &sa, &oldsa) == -1 ||
 	    sigaction(SIGTERM, &sa, &oldsa) == -1) {
 		err = -errno;
