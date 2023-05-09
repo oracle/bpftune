@@ -1134,7 +1134,7 @@ static int bpftune_netns_fd(int netns_pid)
 /* sets original netns fd if orig_fd is non-NULL */
 int bpftune_netns_set(int new_fd, int *orig_fd)
 {
-	int fd, err = 0;
+	int fd = 0, err = 0;
 
 	if (!new_fd)
 		return 0;
@@ -1143,26 +1143,31 @@ int bpftune_netns_set(int new_fd, int *orig_fd)
 	if (err)
 		return err;
 
-	fd = open("/proc/self/ns/net", O_RDONLY | O_CLOEXEC);
-	if (fd < 0) {
-		err = -errno;
-		bpftune_log(LOG_ERR, "could not get current netns fd(%d): %s\n",
-			    fd, strerror(-err));
-	} else {
-		err = setns(new_fd, CLONE_NEWNET);
-		if (err < 0) {
+	if (orig_fd) {
+		fd = open("/proc/self/ns/net", O_RDONLY | O_CLOEXEC);
+		if (fd < 0) {
 			err = -errno;
-			close(fd);
-			bpftune_log(LOG_ERR, "could not %s ns(%d): %s\n",
-				    orig_fd ? "set" : "restore",
-				    new_fd, strerror(-err));
+			bpftune_log(LOG_ERR,
+				    "could not get current netns fd(%d): %s\n",
+				    fd, strerror(-err));
+			goto out;
 		}
 	}
-	if (!err && orig_fd)
-		*orig_fd = fd;
-	else
-		close(fd);
+	err = setns(new_fd, CLONE_NEWNET);
+	if (err < 0) {
+		err = -errno;
+		bpftune_log(LOG_ERR, "could not %s ns(%d): %s\n",
+			    orig_fd ? "set" : "restore",
+			    new_fd, strerror(-err));
+	}
 
+	if (!err && orig_fd) {
+		*orig_fd = fd;
+	} else {
+		if (fd)
+			close(fd);
+	}
+out:
 	bpftune_cap_drop();
 	return err;
 }
