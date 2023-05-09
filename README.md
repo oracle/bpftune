@@ -36,7 +36,7 @@ Please consult the [security guide](./SECURITY.md) for our responsible security 
     "Copyright (c) [year,] year Oracle and/or its affiliates."
 *You must include the year the content was first released (on any platform) and the most recent year in which it was revised*
 
-Copyright (c) 2022 Oracle and/or its affiliates.
+Copyright (c) 2023 Oracle and/or its affiliates.
 
 *Replace this statement if your project is not licensed under the UPL*
 
