@@ -874,7 +874,7 @@ int bpftune_sysctl_write(int netns_fd, const char *name, __u8 num_values, long *
 		return err;
 	err = bpftune_netns_set(netns_fd, &orig_netns_fd);
 	if (err < 0)
-		goto out;
+		goto out_unset;
 
 	/* If value is already set to val, do nothing. */
 	old_num_values = bpftune_sysctl_read(0, name, old_values);
@@ -908,6 +908,7 @@ int bpftune_sysctl_write(int netns_fd, const char *name, __u8 num_values, long *
 	}
 out:
 	bpftune_netns_set(orig_netns_fd, NULL);
+out_unset:
 	bpftune_cap_drop();
         return err;
 }
