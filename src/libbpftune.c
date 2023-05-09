@@ -859,7 +859,7 @@ out_unset:
 int bpftune_sysctl_write(int netns_fd, const char *name, __u8 num_values, long *values)
 {
 	long old_values[BPFTUNE_MAX_VALUES] = {};
-	int i, err = 0, orig_netns_fd;
+	int i, err = 0, orig_netns_fd = 0;
 	int old_num_values;
 	char path[PATH_MAX];
 	FILE *fp;
