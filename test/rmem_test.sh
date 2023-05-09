@@ -86,6 +86,10 @@ for FAMILY in ipv4 ipv6 ; do
    rmem_post_netns=($(ip netns exec $NETNS sysctl -n net.ipv4.tcp_rmem))
    sysctl -w net.ipv4.tcp_rmem="${rmem_orig[0]} ${rmem_orig[1]} ${rmem_orig[2]}"
    if [[ $MODE == "test" ]]; then
+	echo "Following changes were made:"
+        set +e
+        grep bpftune $LOGFILE
+        set -e
 	if [[ "${rmem_post[2]}" -gt ${rmem_orig[1]} ]]; then
 		echo "rmem before ${rmem_orig[1]} ; after ${rmem_post[2]}"
 
