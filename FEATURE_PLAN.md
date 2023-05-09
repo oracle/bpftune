@@ -172,4 +172,6 @@ for h-tcp, otherwise use BBR.
 - vm tunables?
 - limiting ulimit? see OraBug 29123482
 	OraBug 34378084 - Excessive Locking after switch back
+- have a dedicated bpftune user, and make bpftune only executable
+  by that user so we start with the right privilege set
 
