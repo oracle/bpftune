@@ -31,15 +31,12 @@ BPF_FENTRY(setup_net, struct net *net, struct user_namespace *user_ns)
 
 #ifdef BPFTUNE_LEGACY
 SEC("raw_tracepoint/neigh_create")
-int BPF_PROG(bpftune_neigh_create, struct neigh_table *tbl,
-             struct net_device *dev, const void *pkey,
-             struct neighbour *n, bool exempt_from_gc)
 #else
 SEC("tp_btf/neigh_create")
+#endif
 int BPF_PROG(bpftune_neigh_create, struct neigh_table *tbl,
              struct net_device *dev, const void *pkey,
              struct neighbour *n, bool exempt_from_gc)
-#endif
 {
 	return 0;
 }

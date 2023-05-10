@@ -24,15 +24,12 @@ BPF_MAP_DEF(tbl_map, BPF_MAP_TYPE_HASH, __u64, struct tbl_stats, 1024);
 
 #ifdef BPFTUNE_LEGACY
 SEC("raw_tracepoint/neigh_create")
-int BPF_PROG(bpftune_neigh_create, struct neigh_table *tbl,
-	     struct net_device *dev, const void *pkey,
-	     struct neighbour *n, bool exempt_from_gc)
 #else
 SEC("tp_btf/neigh_create")
+#endif
 int BPF_PROG(bpftune_neigh_create, struct neigh_table *tbl,
 	     struct net_device *dev, const void *pkey,
 	     struct neighbour *n, bool exempt_from_gc)
-#endif
 {
 	
 	struct tbl_stats *tbl_stats;
@@ -74,6 +71,8 @@ int BPF_PROG(bpftune_neigh_create, struct neigh_table *tbl,
 			if (event.netns_cookie < 0)
 				return 0;
 		}
+		STATIC_ASSERT(sizeof(event.raw_data) >= sizeof(*tbl_stats),
+			      "event.raw_data too small");
 		__builtin_memcpy(&event.raw_data, tbl_stats, sizeof(*tbl_stats));
 		bpf_ringbuf_output(&ring_buffer_map, &event, sizeof(event), 0);
 	}

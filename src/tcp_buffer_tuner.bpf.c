@@ -76,7 +76,7 @@ static __always_inline bool tcp_nearly_out_of_memory(struct sock *sk,
 		shift_left = kernel_page_shift - sk_mem_quantum_shift;
 		if (shift_left >= 32)
 			return false;
-	} else if (sk_mem_quantum_shift > kernel_page_shift) {
+	} else {
 		shift_right = sk_mem_quantum_shift - kernel_page_shift;
 		if (shift_right >= 32)
 			return false;
@@ -204,9 +204,6 @@ BPF_FENTRY(tcp_sndbuf_expand, struct sock *sk)
 	wmem[2] = BPF_CORE_READ(net, ipv4.sysctl_tcp_wmem[2]);
 
 	if (NEARLY_FULL(sndbuf, wmem[2])) {
-
-		if (tcp_nearly_out_of_memory(sk, &event))
-			return 0;
 
 		if (!net)
 			return 0;

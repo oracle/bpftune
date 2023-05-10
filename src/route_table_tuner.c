@@ -54,19 +54,18 @@ void event_handler(struct bpftuner *tuner,
 		   struct bpftune_event *event,
 		   __attribute__((unused))void *ctx)
 {
-	long new[3], old[3];
 	int id;
 
 	switch (event->scenario_id) {
 	case ROUTE_TABLE_FULL:
 		id = event->update[0].id;
-		memcpy(new, event->update[0].new, sizeof(new));
-		memcpy(old, event->update[0].old, sizeof(old));
-		
+	
 		bpftuner_tunable_sysctl_write(tuner, id, ROUTE_TABLE_FULL,
-					      event->netns_cookie, 1, new,
+					      event->netns_cookie, 1,
+					      event->update[0].new,
 "Due to dst table filling up, change net.ipv6.route.max_size from %d -> %d\n",
-					      old[0], new[0]);
+					      event->update[0].old[0],
+					      event->update[0].new[0]);
 		break;
 	default:
 		return;

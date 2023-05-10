@@ -31,6 +31,8 @@
 
 extern __u32 LINUX_KERNEL_VERSION __kconfig;
 
+#define STATIC_ASSERT(x, msg)	_Static_assert(x, msg)
+
 #ifndef __bpf_printk
 #define __bpf_printk(fmt, ...)				\
 ({							\
