@@ -236,15 +236,12 @@ int bpftune_cong_iter(struct bpf_iter__tcp *ctx)
 	struct remote_host *remote_host;
 	char buf[CONG_MAXNAME] = {};
 	struct in6_addr key = {};
-	struct tcp_sock *tp;
         struct sock *sk = NULL;
 	int ret;
 
-	if (skc) {
-		tp = bpf_skc_to_tcp_sock(skc);
-		sk = (struct sock *)tp;
-	}	
-	if (!tp || !sk)
+	if (skc)
+		sk = (struct sock *)bpf_skc_to_tcp_sock(skc);
+	if (!sk)
 		return 0;
 
 	if (get_sk_key(sk, &key))

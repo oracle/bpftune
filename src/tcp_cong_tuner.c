@@ -52,7 +52,8 @@ int init(struct bpftuner *tuner)
  	 */
 	err = bpftune_module_load("net/ipv4/tcp_bbr.ko");
 	if (err != -EEXIST)
-		bpftune_log(LOG_DEBUG, "could not load tcp_bbr module\n");
+		bpftune_log(LOG_DEBUG, "could not load tcp_bbr module: %s\n",
+			    strerror(-err));
 
 	bpftuner_bpf_init(tcp_cong, tuner, NULL);
 
@@ -67,16 +68,14 @@ int init(struct bpftuner *tuner)
 		skel = tuner->skel;
 		link = bpf_program__attach_iter(skel->progs.bpftune_cong_iter, NULL);
 		if (!link) {
-			err = -errno;
 			bpftune_log(LOG_ERR, "cannot attach iter : %s\n",
-				    strerror(-err));
+				    strerror(errno));
 			return 1;
 		}
 		tcp_iter_fd = bpf_iter_create(bpf_link__fd(link));
 		if (tcp_iter_fd < 0) {
-			err = -errno;
 			bpftune_log(LOG_ERR, "cannot create iter fd: %s\n",
-				    strerror(-err));
+				    strerror(errno));
 			return 1;
 		}
 	}
