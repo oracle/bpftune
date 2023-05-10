@@ -64,7 +64,7 @@ void event_handler(struct bpftuner *tuner, struct bpftune_event *event,
 
 		bpftune_log(LOG_DEBUG, "checking tuner %s\n", tuner->name);
 		bpftuner_for_each_tunable(t, tunable) {
-			char path[512];
+			char path[PATH_MAX];
 
 			bpftune_sysctl_name_to_path(tunable->desc.name, path,
 						    sizeof(path));
