@@ -9,6 +9,7 @@
 #include <bpftune/corr.h>
 
 #include <unistd.h>
+#include <linux/limits.h>
 
 struct tcp_buffer_tuner_bpf *skel;
 
@@ -69,7 +70,7 @@ static struct bpftunable_scenario scenarios[] = {
 
 int get_from_file(FILE *fp, const char *fmt, ...)
 {
-	char line[256];
+	char line[PATH_MAX];
 	int ret = 0;
 	va_list ap;
 
@@ -104,7 +105,7 @@ retry:
 	}
 	while (fp && !feof(fp)) {
 		long managed = 0, high = 0, free = 0, node;
-		char zone[128] = {};
+		char zone[PATH_MAX] = "";
 
 		if (get_from_file(fp, "Node %d, zone %s", &node, zone) < 0)
 			break;
