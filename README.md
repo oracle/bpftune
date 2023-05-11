@@ -155,6 +155,32 @@ Each tuner shared object defines an init(), fini() and event_handler()
 function. These respectively set up and clean up BPF and handle events
 that originate from the BPF code.
 
+## Building
+
+Simply run
+
+```
+$ make ; sudo make install
+```
+at the top-level of the repository.  bpftune also supports a
+
+```
+$ make pkg
+```
+
+target, which will make a bpftune RPM.  See ./buildrpm/bpftune.spec.
+
+
+To build the following packages are needed (names may vary by distro);
+
+- libbpf, libbpf-devel >= 0.6
+- libcap-devel
+- bpftool >= 4.18
+- libnl3-devel
+- clang >= 11
+- llvm >= 11
+- python3-docutils
+
 ## Tests
 
 Tests are supplied for each tuner in the tests/ subdirectory.
