@@ -9,7 +9,7 @@ behaviour.  The key benefit it provides are
   than using coarse system-wide stats), we can tune at a finer grain
   too (individual socket policies, individual device policies etc)
 
-# The problem
+## The problem
 
 The Linux kernel contains a large number of tunables; these
 often take the form of sysctl(8) parameters, and are usually
@@ -55,7 +55,7 @@ not only can we observe the system and tune appropriately,
 we can also observe the effect of that tuning and re-tune
 if necessary.
 
-# Key design principles
+## Key design principles
 
 - Minimize overhead.  Use observability features sparingly; do not
   trace very high frequency events.
@@ -85,7 +85,7 @@ if necessary.
   round-trip time; if the correlation between these exceeds a
   threshould (0.7) we stop increasing buffer size.
 
-# Concepts
+## Concepts
 
 The key components are
 
@@ -104,7 +104,7 @@ The key components are
   in the log is key; this allows an admin to understand what
   changed and why.
 
-# Architecture
+## Architecture
 
 - bpftune is a daemon which manages a set of .so plugin tuners;
   each of these is a shared object that is loaded on start-up.
@@ -126,7 +126,7 @@ The key components are
   the common map definitions (ringbuf, etc) and shared variables
   such as learning rate and tuner ids that each tuner needs.
 
-# Supported tuners
+## Supported tuners
 
 - congestion tuner: auto-tune choice of congestion control algorithm.
   See bpftune-tcp-cong (8).
@@ -146,7 +146,7 @@ The key components are
   Namespace awareness is important as we want to be able to auto-tune
   containers also.  See bpftune-netns (8).
 
-# Code organization
+## Code organization
 
 Both core bpftune.c and individual tuners use the libbpftune library.
 It handles logging, tuner init/fini, and BPF init/fini.
@@ -155,7 +155,7 @@ Each tuner shared object defines an init(), fini() and event_handler()
 function. These respectively set up and clean up BPF and handle events
 that originate from the BPF code.
 
-# Tests
+## Tests
 
 Tests are supplied for each tuner in the tests/ subdirectory.
 "make test" runs all the tests.  Tests use network namespaces
@@ -184,7 +184,7 @@ SPDX-URL: https://spdx.org/licenses/GPL-2.0.html
 
 See [the license file](./LICENSE.txt) for more details.
 
-# Does my system support bpftune?
+## Does my system support bpftune?
 
 Simply run "bpftune -S" to see:
 
@@ -201,7 +201,7 @@ Two aspects are important here
 - does the system support network namespace cookies? If so
   per-network-namespace policy is supported.
 
-# Demo
+## Demo
 
 Simply starting bpftune and observing changes made via /var/log/messages
 can be instructive.  For example, on a standard VM with sysctl defaults,
@@ -265,7 +265,7 @@ bpftune: Summary: scenario 'need to increase TCP buffer size(s)' occurred 9 time
 bpftune: sysctl 'net.ipv4.tcp_rmem' changed from (4096 131072 1310720 ) -> (4096 131072 9765625 )
 ```
 
-# For more info
+## For more info
 
 See the docs/ subdirectory for manual pages covering bpftune
 and assoiated tuners.

@@ -2,11 +2,11 @@
 
 We welcome your contributions! There are multiple ways to contribute.
 
-# Opening issues
+## Opening issues
 
 For bugs or enhancement requests, please file a GitHub issue unless it is security related. When filing a bug remember that the better written the bug is, the more likely it is to be fixed. If you think you have found a security vulnerability, do not raise a GitHub issue and follow the instructions in our security policy documented in SECURITY.md.
 
-# Contributing code
+## Contributing code
 
 We welcome your code contributions. Before submitting code via a pull request, you will need to have signed the Oracle Contributor Agreement (OCA) at
 
@@ -22,7 +22,7 @@ git commit --signoff
 
 Only pull requests from committers that can be verified as having signed the OCA can be accepted.
 
-# Pull request process
+## Pull request process
 
 -   Ensure there is an issue created to track and discuss the fix or enhancement you intend to submit.
 -    Fork this repository.
@@ -34,13 +34,13 @@ Only pull requests from committers that can be verified as having signed the OCA
 -    Submit the pull request. Do not leave the pull request blank. Explain exactly what your changes are meant to do and provide simple steps on how to validate your changes. Ensure that you reference the issue you created as well.
 -    We will assign the pull request for review before it is submitted internally and the PR is closed.
 
-# Code of conduct
+## Code of conduct
 
 Follow the Golden Rule. If you would like more specific guidelines, see the Contributor Covenant Code of Conduct at
 
 https://www.contributor-covenant.org/version/1/4/code-of-conduct/
 
-# Technical guide to contribution
+## Technical guide to contribution
 
 The architecture used is
 
@@ -50,7 +50,7 @@ The architecture used is
 - a set of plug-in shared object tuners which are loaded when bpftune
   starts; sysctl_tuner.[bpf.]c, neigh_table_tuner.[bpf.]c
 
-# Adding a tuner
+## Adding a tuner
 
 Tuners are added as plug-in .so objects built as tuner_name.c, and each tuner
 has a BPF program named tuner_name.bpf.c.  To add a new tuner, add these
@@ -59,7 +59,7 @@ files and simply add tuner_name to TUNERS in src/Makefile.
 Tuners can also be built outside of bpftune; see the sample_tuner/
 subdirectory for a simple example and sample Makefile.
 
-# BPF component (tuner_name.bpf.c)
+## BPF component (tuner_name.bpf.c)
 
 The BPF code must
 
@@ -137,7 +137,7 @@ possible as that will work for both kprobe and fentry for example.
 For maps, use the BPF_MAP_DEF() definitions which will invoke
 the older libbpf map definition if using an older libbpf.
 
-# Userspace component - tuner_name.c
+## Userspace component - tuner_name.c
 
 It should #include <libbpftune.h>, and must consist of the following
 functions
@@ -191,7 +191,7 @@ should be added to a tuner_name.h file which both include.
 
 Remember to include both the skel.h and skel.legacy.h files.
 
-# Events
+## Events
 
 When an event the user-space component needs to know about occurs,
 a ringbuf event should be sent.  The event structure is:
@@ -211,7 +211,7 @@ struct bpftune_event {
 The scenario refers to the event type (seen packet loss to remote
 system), and the payload can be a string, a raw data structure etc.
 
-# Overhead
+## Overhead
 
 When choosing BPF events to instrument, please try to avoid very
 high-frequency events.  Try to use fentry instead of kprobe,
@@ -231,7 +231,7 @@ $ TUNER=tcp_buffer_tuner.so sh qperf_test.sh
 
 Replace TUNER value with the name of the tuner you want to assess.
 
-# Tests
+## Tests
 
 Tests are mandatory for tuners; in the test directory you can see
 lots of examples.  The test framework uses network namespaces to
