@@ -77,13 +77,13 @@ if necessary.
   values that we've tuned up.  In this way, we can let the system
   find a balance between providing resources and exhausting them.
   In some cases, we won't need to tune up values; they may be fine
-  as they are. But in other cases limits block optimal performance,
+  as they are. But in other cases these limits block optimal performance,
   and if they are raised safely - with awareness of global memory
   limits - we can get out the way of improved performance.  Another
   concern is that increasing buffer size leads to latency - to
   handle that, we correlate buffer size changes and TCP smoothed
   round-trip time; if the correlation between these exceeds a
-  threshould (0.7) we stop increasing buffer size.
+  threshold (0.7) we stop increasing buffer size.
 
 ## Concepts
 
@@ -192,7 +192,7 @@ $ sudo service bpftune start
 $ sudo systemctl enable bpftune
 ```
 
-bpftune logs to syslog so /var/log/messags will contain details
+bpftune logs to syslog so /var/log/messages will contain details
 of any tuning carried out.
 
 bpftune can also be run in the foreground as a program; to redirect
@@ -317,4 +317,4 @@ bpftune: sysctl 'net.ipv4.tcp_rmem' changed from (4096 131072 1310720 ) -> (4096
 ## For more info
 
 See the docs/ subdirectory for manual pages covering bpftune
-and assoiated tuners.
+and associated tuners.
