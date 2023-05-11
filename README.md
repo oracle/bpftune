@@ -155,9 +155,9 @@ Each tuner shared object defines an init(), fini() and event_handler()
 function. These respectively set up and clean up BPF and handle events
 that originate from the BPF code.
 
-## Building
+## Getting Started
 
-Simply run
+If building the repository manually, simply run
 
 ```
 $ make ; sudo make install
@@ -168,8 +168,7 @@ at the top-level of the repository.  bpftune also supports a
 $ make pkg
 ```
 
-target, which will make a bpftune RPM.  See ./buildrpm/bpftune.spec.
-
+target, which will make a bpftune RPM.  See ./buildrpm/bpftune.spec
 
 To build the following packages are needed (names may vary by distro);
 
@@ -180,6 +179,30 @@ To build the following packages are needed (names may vary by distro);
 - clang >= 11
 - llvm >= 11
 - python3-docutils
+
+To enable bpftune as a service
+
+```
+$ sudo service bpftune start
+```
+
+...and to enable it by default
+
+```
+$ sudo systemctl enable bpftune
+```
+
+bpftune logs to syslog so /var/log/messags will contain details
+of any tuning carried out.
+
+bpftune can also be run in the foreground as a program; to redirect
+output to stdout/stderr, run
+
+```
+$ sudo bpftune -s
+```
+
+On exit, bpftune will summarize any tuning done.
 
 ## Tests
 
