@@ -1,4 +1,4 @@
-# BPF/tracing tools for auto-tuning SPEC file
+# BPF-based auto-tuning SPEC file
 
 %define name        bpftune
 %define rel	    1
@@ -71,4 +71,4 @@ rm -Rf %{buildroot}
 
 %changelog
 * Mon May 30 2022 Alan Maguire <alan.maguire@oracle.com> - 0.1-1
-  - Initial packaging support
+  - Initial packaging support [Orabug: 35385703]
