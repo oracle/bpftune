@@ -1,7 +1,7 @@
 # BPF-based auto-tuning SPEC file
 
 %define name        bpftune
-%define rel	    1
+%define rel	    2
 %define release     %{rel}%{?dist}
 %define version     0.1
 %global _unitdir    /usr/lib/systemd/system/	
@@ -70,5 +70,7 @@ rm -Rf %{buildroot}
 %license LICENSE.txt
 
 %changelog
+* Wed May 24 2023 Alan Maguire <alan.maguire@oracle.com> - 0.1-2
+- Spec file reviewed [Orabug: 35385703]
 * Mon May 30 2022 Alan Maguire <alan.maguire@oracle.com> - 0.1-1
-  - Initial packaging support [Orabug: 35385703]
+- Initial packaging support
