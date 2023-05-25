@@ -37,7 +37,7 @@ rm -f /usr/local/lib64/bpftune/sample_tuner.so
 sleep 1
 test_run_cmd_local "$BPFTUNE -ds &" true
 sleep $SETUPTIME
-cd ../sample_tuner ; make install
+cd ../sample_tuner ; make clean; make install
 sleep $SLEEPTIME
 # trigger event
 sysctl kernel.core_pattern
