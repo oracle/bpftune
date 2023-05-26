@@ -53,8 +53,6 @@ check_prog()
 	fi
 }
 
-export NC=$(which nc 2>/dev/null)
-check_prog "$NC" nc nmap-ncat
 export TC=$(which tc 2>/dev/null)
 check_prog "$TC" tc iproute-tc
 export IPERF3=$(which iperf3 2>/dev/null)
