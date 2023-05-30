@@ -1,7 +1,7 @@
 # BPF-based auto-tuning SPEC file
 
 %define name        bpftune
-%define rel	    2
+%define rel	    3
 %define release     %{rel}%{?dist}
 %define version     0.1
 %global _unitdir    /usr/lib/systemd/system/	
@@ -70,7 +70,9 @@ rm -Rf %{buildroot}
 %license LICENSE.txt
 
 %changelog
+* Tue May 30 2023 Alan Maguire <alan.maguire@oracle.com> - 0.1-3
+- Fix timeout retry logic in libbpftune. [Orabug: 35385703]
 * Wed May 24 2023 Alan Maguire <alan.maguire@oracle.com> - 0.1-2
-- Spec file reviewed [Orabug: 35385703]
+- Spec file reviewed.
 * Mon May 30 2022 Alan Maguire <alan.maguire@oracle.com> - 0.1-1
 - Initial packaging support
