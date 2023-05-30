@@ -626,7 +626,7 @@ struct bpftuner *bpftuner_init(const char *path)
 		tuner->handle = dlopen(path, RTLD_NOW | RTLD_GLOBAL);
 		if (tuner->handle)
 			break;
-		usleep(100);
+		usleep(1000);
 	}
 	bpftune_cap_drop();
 	if (!tuner->handle) {
