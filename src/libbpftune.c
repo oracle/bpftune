@@ -177,6 +177,7 @@ static const cap_value_t cap_vector[] = {
 						CAP_SYS_ADMIN,
 						CAP_NET_ADMIN,
 						CAP_SYS_CHROOT,
+						CAP_SYS_MODULE,
 						CAP_SYSLOG
 };
 
@@ -1446,7 +1447,7 @@ static int bpftune_module_path(const char *name, char *modpath, size_t pathsz)
 		bpftune_log(LOG_DEBUG, "uname failed: %s\n", strerror(ret));
 		return ret;
 	}
-	snprintf(modpath, pathsz, "/usr/lib/modules/%s/kernel/%s",
+	snprintf(modpath, pathsz, "/lib/modules/%s/kernel/%s",
 		 utsname.release, name);
 	return 0;
 }
