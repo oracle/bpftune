@@ -109,7 +109,7 @@ clean:
 	$(call QUIET_CLEAN, bpftune)
 	$(Q)$(RM) $(OPATH)*.o *.d $(OPATH)*.so*
 	$(Q)$(RM) *.o *.so*
-	$(Q)$(RM) *.skel.h
+	$(Q)$(RM) *.skel.*h
 	$(Q)$(RM) bpftune
 
 distclean: clean
