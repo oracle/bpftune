@@ -57,31 +57,40 @@ int init(struct bpftuner *tuner)
 
 	bpftuner_bpf_init(tcp_cong, tuner, NULL);
 
+	err = bpftune_cap_add();
+	if (err) {
+		bpftune_log(LOG_ERR, "cannot add caps: %s\n", strerror(-err));
+		return 1;
+	}
+
 	if (tuner->bpf_legacy) {
 
 		/* attach to root cgroup */
 		if (bpftuner_cgroup_attach(tuner, "cong_tuner_sockops", BPF_CGROUP_SOCK_OPS))
-			return 1;
+			goto error;
 	} else {
 		struct bpf_link *link;
 
 		skel = tuner->skel;
 		link = bpf_program__attach_iter(skel->progs.bpftune_cong_iter, NULL);
-		if (!link) {
+		if (libbpf_get_error(link)) {
 			bpftune_log(LOG_ERR, "cannot attach iter : %s\n",
-				    strerror(errno));
-			return 1;
+				    strerror(libbpf_get_error(link)));
+			goto error;
 		}
 		tcp_iter_fd = bpf_iter_create(bpf_link__fd(link));
 		if (tcp_iter_fd < 0) {
 			bpftune_log(LOG_ERR, "cannot create iter fd: %s\n",
 				    strerror(errno));
-			return 1;
+			goto error;
 		}
 	}
 
 	return bpftuner_tunables_init(tuner, ARRAY_SIZE(descs), descs,
 				      ARRAY_SIZE(scenarios), scenarios);
+error:
+	bpftune_cap_drop();
+	return 1;
 }
 
 void fini(struct bpftuner *tuner)
@@ -110,7 +119,7 @@ void event_handler(struct bpftuner *tuner, struct bpftune_event *event,
 	if (!tuner->bpf_legacy) {
 		if (!bpftune_cap_add()) {
 			/* kick existing connections by running iter over them... */
-			while (read(tcp_iter_fd, &iterbuf, sizeof(iterbuf)) == -1 && errno == EAGAIN) {}
+			while (read(tcp_iter_fd, &iterbuf, sizeof(iterbuf)) > 0 || errno == EAGAIN) {}
 			
 			bpftune_cap_drop();
 		}
