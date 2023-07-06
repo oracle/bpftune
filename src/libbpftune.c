@@ -51,7 +51,6 @@ unsigned short bpftune_learning_rate;
 
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
-#include <bpf/libbpf_version.h>
 
 #include "probe.skel.h"
 #include "probe.skel.legacy.h"
