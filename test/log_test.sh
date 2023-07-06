@@ -37,11 +37,11 @@ for MODE in debug info syslog service; do
    syslog)
 	OPTIONS="-d"
 	BPFTUNECMD="$BPFTUNE $OPTIONS &"
-	LOGFILE=/var/log/messages
+	LOGFILE=$SYSLOGFILE
 	;;
    service)
 	BPFTUNECMD="service bpftue start"
-	LOGFILE=/var/log/messages
+	LOGFILE=$SYSLOGFILE
 	;;
    *)
 	OPTIONS="-s"

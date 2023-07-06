@@ -27,7 +27,7 @@
 SLEEPTIME=1
 
 
-LOGFILE=/var/log/messages
+LOGFILE=$SYSLOGFILE
 
 test_start "$0|service test: does enabling the service work?"
 
