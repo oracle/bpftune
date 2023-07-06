@@ -26,6 +26,7 @@ LLC ?= llc
 LLVM_STRIP ?= llvm-strip
 BPFTOOL ?= bpftool
 BPF_INCLUDE := /usr/include
+BPF_CFLAGS := -g -fno-stack-protector
 NL_INCLUDE := /usr/include/libnl3
 INCLUDES := -I../include -I$(BPF_INCLUDE) -I$(NL_INCLUDE) -I../include/uapi
 
@@ -154,9 +155,9 @@ $(OPATH)bpftune.o: $(OPATH)libbpftune.so
 	$(QUIET_GEN)$(BPFTOOL) gen skeleton $< > $@
 
 $(BPF_OBJS): $(patsubst %.o,%.c,$(BPF_OBJS))
-	$(CLANG) -g -D__TARGET_ARCH_$(SRCARCH) -O2 -target bpf			\
+	$(CLANG) $(BPF_CFLAGS) -D__TARGET_ARCH_$(SRCARCH) -O2 -target bpf			\
 		$(INCLUDES) -c $(patsubst %.o,%.c,$(@)) -o $(@);
-	$(CLANG) -g -D__TARGET_ARCH_$(SRCARCH) -DBPFTUNE_LEGACY -O2 -target bpf \
+	$(CLANG) $(BPF_CFLAGS) -D__TARGET_ARCH_$(SRCARCH) -DBPFTUNE_LEGACY -O2 -target bpf \
 		$(INCLUDES) -c $(patsubst %.o,%.c,$(@)) \
 		-o $(patsubst %.o,%.legacy.o,$(@))
 
