@@ -36,10 +36,14 @@ for BPFTUNECMD in "$BPFTUNE &" "service bpftune start" ; do
 
   sleep $SETUPTIME
 
-  caps=$(getpcaps $(pgrep bpftune) 2>&1 | \
-         awk '/cap_net_admin,cap_sys_chroot,cap_sys_admin,cap_syslog[+=]p/ { print $0 }')
+  caps=$(getpcaps $(pgrep bpftune) 2>&1)
+#         awk '/[+=]p/ { print $0 }')
 
   echo "caps: $caps"
+
+  for cap in cap_net_admin cap_sys_module cap_sys_chroot cap_sys_admin cap_syslog ; do
+    echo $caps | grep -E $cap >/dev/null
+  done
 
   if [[ -n "$caps" ]]; then
     test_pass

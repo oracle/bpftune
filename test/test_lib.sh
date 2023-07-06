@@ -60,7 +60,11 @@ check_prog "$IPERF3" iperf3 iperf3
 export QPERF=$(which qperf 2>/dev/null)
 export FIREWALL_CMD=$(which firewall-cmd 2>/dev/null)
 export AUDIT_CMD=$(which auditctl 2>/dev/null)
-export LOGFILE=${LOGFILE:-"/var/log/messages"}
+export SYSLOGFILE=${SYSLOGFILE:-"/var/log/messages"}
+if [[ ! -f $SYSLOGFILE ]]; then
+	export SYSLOGFILE="/var/log/syslog"
+fi
+export LOGFILE=$SYSLOGFILE
 export BPFTUNE_LEGACY=${BPFTUNE_LEGACY:-0}
 export BPFTUNE_NETNS=${BPFTUNE_NETNS:-1}
 

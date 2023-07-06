@@ -31,11 +31,18 @@ INCLUDES := -I../include -I$(BPF_INCLUDE) -I$(NL_INCLUDE) -I../include/uapi
 
 INSTALL ?= install
 
-DESTDIR ?=
+DESTDIR ?= /
 prefix ?= /usr
 installprefix = $(DESTDIR)/$(prefix)
 
 INSTALLPATH = $(installprefix)
+
+# Prefix path can be /usr, /usr/local or for packaging case
+# /path2rpmbuilddir/usr[/local]. We use the /usr path as a guide
+# to where to bisect the full path such that everything prior to
+# it is considered to be prefix to config path /etc.
+confprefix ?= $(shell echo $(prefix) | awk -F /usr '{ printf $1 "/etc" }')
+CONFPATH = $(DESTDIR)/$(confprefix)/ld.so.conf.d
 
 KERNEL_REL := $(shell uname -r)
 
@@ -117,6 +124,8 @@ install: $(OPATH)libbpftune.so $(OPATH)bpftune bpftune.service
 	$(INSTALL) -m 644 bpftune.service $(installprefix)/lib/systemd/system
 	$(INSTALL) -m 0755 -d $(INSTALLPATH)/lib64/bpftune
 	$(INSTALL) $(TUNER_LIBS) $(INSTALLPATH)/lib64/bpftune
+	echo $(prefix)/lib64 > $(CONFPATH)/libbpftune.conf
+	if [ $(DESTDIR) =  / ]; then ldconfig; fi
 
 $(OPATH)bpftune: bpftune.c $(OPATH)bpftune.o $(OPATH)libbpftune.so
 	$(QUIET_LINK)$(CC) $(CFLAGS) $(OPATH)bpftune.o -o $@ \
