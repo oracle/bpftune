@@ -32,7 +32,7 @@
 extern __u32 LINUX_KERNEL_VERSION __kconfig;
 
 #ifndef NULL
-#define	NULL	(0)
+#define	NULL	((void *)0)
 #endif
 
 #define STATIC_ASSERT(x, msg)	_Static_assert(x, msg)
