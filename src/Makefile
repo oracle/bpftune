@@ -43,7 +43,8 @@ INSTALLPATH = $(installprefix)
 # to where to bisect the full path such that everything prior to
 # it is considered to be prefix to config path /etc.
 confprefix ?= $(shell echo $(prefix) | awk -F /usr '{ printf $1 "/etc" }')
-CONFPATH = $(DESTDIR)/$(confprefix)/ld.so.conf.d
+CONF	 = $(DESTDIR)/$(confprefix)
+CONFPATH  = $(CONF)/ld.so.conf.d
 
 KERNEL_REL := $(shell uname -r)
 
@@ -125,6 +126,8 @@ install: $(OPATH)libbpftune.so $(OPATH)bpftune bpftune.service
 	$(INSTALL) -m 644 bpftune.service $(installprefix)/lib/systemd/system
 	$(INSTALL) -m 0755 -d $(INSTALLPATH)/lib64/bpftune
 	$(INSTALL) $(TUNER_LIBS) $(INSTALLPATH)/lib64/bpftune
+	$(INSTALL) -m 0755 -d $(CONF)
+	$(INSTALL) -m 0755 -d $(CONFPATH)
 	echo $(prefix)/lib64 > $(CONFPATH)/libbpftune.conf
 	if [ $(DESTDIR) =  / ]; then ldconfig; fi
 
