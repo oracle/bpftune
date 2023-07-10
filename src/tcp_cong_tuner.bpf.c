@@ -21,8 +21,6 @@
 
 #include "tcp_cong_tuner.h"
 
-#define CONG_MAXNAME	16
-
 struct remote_host {
 	__u64 last_retransmit;
 	__u64 retransmits;
