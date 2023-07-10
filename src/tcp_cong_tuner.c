@@ -55,7 +55,9 @@ int init(struct bpftuner *tuner)
 		bpftune_log(LOG_DEBUG, "could not load tcp_bbr module: %s\n",
 			    strerror(-err));
 
-	bpftuner_bpf_init(tcp_cong, tuner, NULL);
+	err = bpftuner_bpf_init(tcp_cong, tuner, NULL);
+	if (err)
+		return err;
 
 	err = bpftune_cap_add();
 	if (err) {

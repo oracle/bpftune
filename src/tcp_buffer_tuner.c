@@ -139,9 +139,14 @@ retry:
 int init(struct bpftuner *tuner)
 {
 	int pagesize;
+	int err;
 
-	bpftuner_bpf_open(tcp_buffer, tuner);
-	bpftuner_bpf_load(tcp_buffer, tuner);
+	err = bpftuner_bpf_open(tcp_buffer, tuner);
+	if (err)
+		return err;
+	err = bpftuner_bpf_load(tcp_buffer, tuner);
+	if (err)
+		return err;
 
 	pagesize = sysconf(_SC_PAGESIZE);
 	if (pagesize < 0)
@@ -154,7 +159,9 @@ int init(struct bpftuner *tuner)
 			     ilog2(SK_MEM_QUANTUM));
 	bpftuner_bpf_var_set(tcp_buffer, tuner, nr_free_buffer_pages,
 			     nr_free_buffer_pages(true));
-	bpftuner_bpf_attach(tcp_buffer, tuner, NULL);
+	err = bpftuner_bpf_attach(tcp_buffer, tuner, NULL);
+	if (err)
+		return err;
 	return bpftuner_tunables_init(tuner, TCP_BUFFER_NUM_TUNABLES, descs,
 				      ARRAY_SIZE(scenarios), scenarios);
 }
