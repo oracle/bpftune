@@ -19,6 +19,7 @@
 
 #include <bpftune/bpftune.bpf.h>
 #include "netns_tuner.h"
+#include "tcp_cong_tuner.h"
 
 /* probe hash map */
 BPF_MAP_DEF(probe_hash_map, BPF_MAP_TYPE_HASH, __u64, __u64, 65536);
@@ -28,6 +29,25 @@ BPF_FENTRY(setup_net, struct net *net, struct user_namespace *user_ns)
 {
 	return 0;
 }
+
+/* check BPF iterators work ad support getsockopt() */
+#ifndef BPFTUNE_LEGACY
+SEC("iter/tcp")
+int probe_cong_iter(struct bpf_iter__tcp *ctx)
+{
+	struct sock_common *skc = ctx->sk_common;
+	struct sock *sk = NULL;
+	char buf[CONG_MAXNAME] = {};
+
+	if (!skc)
+		return 0;
+	sk = (struct sock *)bpf_skc_to_tcp_sock(skc);
+	if (!sk)
+		return 0;
+	bpf_getsockopt(sk, SOL_TCP, TCP_CONGESTION, &buf, sizeof(buf));
+	return 0;
+}
+#endif
 
 #ifdef BPFTUNE_LEGACY
 SEC("raw_tracepoint/neigh_create")

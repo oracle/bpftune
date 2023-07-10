@@ -28,6 +28,8 @@ enum tcp_cong_scenarios {
 	TCP_CONG_HTCP,
 };
 
+#define CONG_MAXNAME	16
+
 /* a long fat pipe is defined as having a BDP of > 10^5; it implies latency
  * plus high bandwith.  In such cases use htcp.
  */
