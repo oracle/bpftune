@@ -26,7 +26,7 @@ LLC ?= llc
 LLVM_STRIP ?= llvm-strip
 BPFTOOL ?= bpftool
 BPF_INCLUDE := /usr/include
-BPF_CFLAGS := -g -fno-stack-protector
+BPF_CFLAGS := -g -fno-stack-protector -Wall
 NL_INCLUDE := /usr/include/libnl3
 INCLUDES := -I../include -I$(BPF_INCLUDE) -I$(NL_INCLUDE) -I../include/uapi
 

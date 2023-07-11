@@ -31,7 +31,7 @@ SEC("kprobe/fib6_run_gc")
 int BPF_KPROBE(bpftune_fib6_run_gc_entry, unsigned long expires,
 					  struct net *net, bool force)
 {
-	struct dst_net *dst_netp, dst_net = {};
+	struct dst_net *dst_netp;
 
 	get_entry_struct(dst_net_map, dst_netp);
 	/* already in gc, skip */
