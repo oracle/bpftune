@@ -147,6 +147,8 @@ void bpftuner_tunables_fini(struct bpftuner *tuner);
 		tuner->bpf_legacy = bpftuner_bpf_legacy();		     \
                 if (!tuner->bpf_legacy) {				     \
 			tuner->skel = __skel = tuner_name##_tuner_bpf__open();\
+			__err = libbpf_get_error(tuner->skel);		     \
+			if (__err) break;				     \
 			tuner->skeleton = __skel->skeleton;		     \
 			__skel->bss->debug = bpftune_log_level() >= LOG_DEBUG;\
 			__skel->bss->bpftune_pid = getpid();		     \
@@ -156,6 +158,8 @@ void bpftuner_tunables_fini(struct bpftuner *tuner);
 			tuner->netns_map = __skel->maps.netns_map;	     \
 		} else {						     \
 			tuner->skel = __lskel = tuner_name##_tuner_bpf_legacy__open();\
+			__err = libbpf_get_error(tuner->skel);		     \
+			if (__err) break;				     \
 			tuner->skeleton = __lskel->skeleton;		     \
 			__lskel->bss->debug = bpftune_log_level() >= LOG_DEBUG;\
 			__lskel->bss->bpftune_learning_rate = bpftune_learning_rate;\
@@ -164,14 +168,13 @@ void bpftuner_tunables_fini(struct bpftuner *tuner);
 			tuner->ring_buffer_map = __lskel->maps.ring_buffer_map;\
 			tuner->netns_map = __lskel->maps.netns_map;	     \
 		}							     \
-		bpftune_cap_drop();					     \
-                __err = libbpf_get_error(tuner->skel);                       \
-                if (__err) {                                                 \
-                        bpftune_log_bpf_err(__err,                           \
-                                            #tuner_name " open bpf: %s\n");  \
-			break;						     \
-                }                                                            \
 	} while (0);							     \
+	bpftune_cap_drop();						     \
+	if (__err) {							     \
+		tuner->skel = NULL;					     \
+		bpftuner_bpf_destroy(tuner_name, tuner);		     \
+		bpftune_log_bpf_err(__err, #tuner_name " open bpf: %s\n");   \
+	}								     \
 	__err;								     \
 	})
 
