@@ -28,14 +28,21 @@ static struct bpftunable_scenario scenarios[] = {
 int init(struct bpftuner *tuner)
 {
 	long cpu_bitmap = 0;
+	int err;
 
 	bpftune_sysctl_read(0, "net.core.flow_limit_cpu_bitmap", &cpu_bitmap);
 
-	bpftuner_bpf_open(net_buffer, tuner);
-	bpftuner_bpf_load(net_buffer, tuner);
+	err = bpftuner_bpf_open(net_buffer, tuner);
+	if (err)
+		return err;
+	err = bpftuner_bpf_load(net_buffer, tuner);
+	if (err)
+		return err;
 	bpftuner_bpf_var_set(net_buffer, tuner, flow_limit_cpu_bitmap,
 			     cpu_bitmap);
-	bpftuner_bpf_attach(net_buffer, tuner, NULL);
+	err = bpftuner_bpf_attach(net_buffer, tuner, NULL);
+	if (err)
+		return err;
 
 	return bpftuner_tunables_init(tuner, NET_BUFFER_NUM_TUNABLES, descs,
 				      ARRAY_SIZE(scenarios), scenarios);

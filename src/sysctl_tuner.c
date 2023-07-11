@@ -33,8 +33,10 @@ extern unsigned short learning_rate;
 
 int init(struct bpftuner *tuner)
 {
-	bpftuner_bpf_init(sysctl, tuner, NULL);
+	int err = bpftuner_bpf_init(sysctl, tuner, NULL);
 
+	if (err)
+		return err;
 	/* attach to root cgroup */
 	if (bpftuner_cgroup_attach(tuner, "sysctl_write", BPF_CGROUP_SYSCTL))
 		return 1;

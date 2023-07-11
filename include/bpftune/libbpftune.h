@@ -135,13 +135,14 @@ void bpftuner_tunables_fini(struct bpftuner *tuner);
 
 /* need a macro in order to generate code for skeleton-specific struct */
 
-#define bpftuner_bpf_open(tuner_name, tuner)				     \
+#define bpftuner_bpf_open(tuner_name, tuner) ({				     \
+	int __err = 0;							     \
 	do {								     \
 		struct tuner_name##_tuner_bpf *__skel;                       \
 		struct tuner_name##_tuner_bpf_legacy *__lskel;		     \
-                int __err = bpftune_cap_add();				     \
-                                                                             \
-		if (__err) return __err;				     \
+									     \
+                __err = bpftune_cap_add();				     \
+		if (__err) break;					     \
                 tuner->name = #tuner_name;                                   \
 		tuner->bpf_legacy = bpftuner_bpf_legacy();		     \
                 if (!tuner->bpf_legacy) {				     \
@@ -168,9 +169,11 @@ void bpftuner_tunables_fini(struct bpftuner *tuner);
                 if (__err) {                                                 \
                         bpftune_log_bpf_err(__err,                           \
                                             #tuner_name " open bpf: %s\n");  \
-                        return __err;                                        \
+			break;						     \
                 }                                                            \
-	} while (0)
+	} while (0);							     \
+	__err;								     \
+	})
 
 #define bpftuner_bpf_destroy(tuner_name, tuner)				     \
 	do {								     \
@@ -178,51 +181,61 @@ void bpftuner_tunables_fini(struct bpftuner *tuner);
 			tuner_name##_tuner_bpf__destroy(tuner->skel);	     \
 		else							     \
 			tuner_name##_tuner_bpf_legacy__destroy(tuner->skel); \
+		tuner->skel = NULL;					     \
 	} while (0)
 
-#define _bpftuner_bpf_load(tuner_name, tuner, optionals)		     \
+#define _bpftuner_bpf_load(tuner_name, tuner, optionals) ({		     \
+	int __err = 0;							     \
 	do {								     \
 		struct tuner_name##_tuner_bpf *__skel = tuner->skel;	     \
 		struct tuner_name##_tuner_bpf_legacy *__lskel = tuner->skel; \
-		int __err;						     \
 									     \
 		__err = __bpftuner_bpf_load(tuner, optionals);		     \
 		if (__err) {						     \
 			bpftuner_bpf_destroy(tuner_name, tuner);	     \
-			return __err;					     \
+			break;						     \
 		}							     \
 		if (!tuner->bpf_legacy)					     \
 			__skel->bss->tuner_id = bpftune_tuner_num();	     \
 		else							     \
 			__lskel->bss->tuner_id = bpftune_tuner_num();	     \
-	} while (0)
+	} while (0);							     \
+	__err;								     \
+	})
 
 #define bpftuner_bpf_load(tuner_name, tuner)				     \
 	_bpftuner_bpf_load(tuner_name, tuner, NULL)
 
-#define bpftuner_bpf_attach(tuner_name, tuner, optionals)		     \
+#define bpftuner_bpf_attach(tuner_name, tuner, optionals) ({		     \
+	int __err = 0;							     \
 	do {								     \
-                int __err;                                                   \
-                                                                             \
                 __err = __bpftuner_bpf_attach(tuner);			     \
 		if (__err && optionals != NULL) {			     \
 			bpftuner_bpf_fini(tuner);			     \
-			bpftuner_bpf_open(tuner_name, tuner);		     \
-			_bpftuner_bpf_load(tuner_name, tuner, optionals);    \
+			__err = bpftuner_bpf_open(tuner_name, tuner);	     \
+			if (!__err)					     \
+			__err = _bpftuner_bpf_load(tuner_name, tuner,	     \
+						   optionals);    	     \
+			if (!__err)					     \
 			__err = __bpftuner_bpf_attach(tuner);		     \
 		}							     \
-                if (__err) {                                                 \
+                if (__err)                                                   \
 			bpftuner_bpf_destroy(tuner_name, tuner);	     \
-                        return __err;                                        \
-		}							     \
-	} while (0)
+	} while (0);							     \
+	__err;								     \
+	})
 
-#define bpftuner_bpf_init(tuner_name, tuner, optionals)			     \
+#define bpftuner_bpf_init(tuner_name, tuner, optionals) ({		     \
+	int __err = 0;							     \
 	do {								     \
-		bpftuner_bpf_open(tuner_name, tuner);			     \
-		bpftuner_bpf_load(tuner_name, tuner);			     \
-		bpftuner_bpf_attach(tuner_name, tuner, optionals);	     \
-	} while (0)
+		__err = bpftuner_bpf_open(tuner_name, tuner);		     \
+		if (!__err)						     \
+		__err = bpftuner_bpf_load(tuner_name, tuner);		     \
+		if (!__err)						     \
+		__err = bpftuner_bpf_attach(tuner_name, tuner, optionals);   \
+	} while (0);							     \
+	__err;								     \
+	})
 
 
 #define bpftuner_bpf_var_set(tuner_name, tuner, var, val)		     \

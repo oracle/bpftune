@@ -24,8 +24,7 @@
 
 int init(struct bpftuner *tuner)
 {
-	bpftuner_bpf_init(sample, tuner, NULL);
-	return 0;
+	return bpftuner_bpf_init(sample, tuner, NULL);
 }
 
 void fini(struct bpftuner *tuner)
