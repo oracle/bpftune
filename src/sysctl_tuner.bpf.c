@@ -36,7 +36,7 @@ int BPF_KPROBE(bpftune_sysctl, struct ctl_table_header *head,
 	struct bpftune_event event = {};
 	struct ctl_dir *root, *parent, *gparent, *ggparent;
 	struct ctl_dir *gggparent;
-	struct ctl_table *tbl, *parent_table;
+	struct ctl_table *parent_table;
 	int len = sizeof(event.str);
 	const char *procname;
 	int current_pid = 0;	
@@ -81,8 +81,6 @@ int BPF_KPROBE(bpftune_sysctl, struct ctl_table_header *head,
 		procname = BPF_CORE_READ(parent_table, procname);
 		if (procname) {
 			if (!bpf_probe_read(event.str, sizeof(event.str), procname)) {
-				int i;
-
 				for (; len > 0 && *str; len--, str++) {}
 				if (len == 0)
 					return 0;

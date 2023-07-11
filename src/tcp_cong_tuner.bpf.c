@@ -68,22 +68,6 @@ retransmit_threshold(struct remote_host *remote_host,
 	return remote_host->retransmit_threshold;
 }
 
-static __always_inline int get_sk_key(struct sock *sk, struct in6_addr *key)
-{
-	int family = BPF_CORE_READ(sk, sk_family);
-	switch (family) {
-	case AF_INET:
-		return bpf_probe_read_kernel(key, sizeof(sk->sk_daddr),
-					     __builtin_preserve_access_index(&sk->sk_daddr));
-		
-	case AF_INET6:
-		return bpf_probe_read_kernel(key, sizeof(*key),
-					     __builtin_preserve_access_index(&sk->sk_v6_daddr));
-	default:
-		return -EINVAL;
-	}
-}
-
 static __always_inline struct remote_host *get_remote_host(struct in6_addr *key)
 {
 	struct remote_host *remote_host = NULL;
@@ -129,8 +113,6 @@ int cong_tuner_sockops(struct bpf_sock_ops *ops)
 	struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)&event.raw_data;
 	struct in6_addr *key = &sin6->sin6_addr;
 	bool prior_retransmit_threshold;
-	char buf[CONG_MAXNAME] = {};
-	int ret;
 
 	switch (ops->op) {
 	case BPF_SOCK_OPS_ACTIVE_ESTABLISHED_CB:
@@ -179,6 +161,22 @@ int cong_tuner_sockops(struct bpf_sock_ops *ops)
 	return 1;
 }
 #else
+static __always_inline int get_sk_key(struct sock *sk, struct in6_addr *key)
+{
+	int family = BPF_CORE_READ(sk, sk_family);
+
+	switch (family) {
+	case AF_INET:
+		return bpf_probe_read_kernel(key, sizeof(sk->sk_daddr),
+					     __builtin_preserve_access_index(&sk->sk_daddr));
+	case AF_INET6:
+		return bpf_probe_read_kernel(key, sizeof(*key),
+					     __builtin_preserve_access_index(&sk->sk_v6_daddr));
+	default:
+		return -EINVAL;
+	}
+}
+
 SEC("tp_btf/tcp_retransmit_skb")
 int BPF_PROG(cong_retransmit, struct sock *sk, struct sk_buff *skb)
 {
@@ -188,7 +186,6 @@ int BPF_PROG(cong_retransmit, struct sock *sk, struct sk_buff *skb)
 	struct tcp_sock *tp = (struct tcp_sock *)sk;
 	struct in6_addr *key = &sin6->sin6_addr;
 	__u32 segs_out = 0, total_retrans = 0;
-	const char bbr[CONG_MAXNAME] = "bbr";
 	int id = TCP_CONG_BBR;
 	struct net *net;
 
@@ -232,10 +229,8 @@ int bpftune_cong_iter(struct bpf_iter__tcp *ctx)
 {
 	struct sock_common *skc = ctx->sk_common;
 	struct remote_host *remote_host;
-	char buf[CONG_MAXNAME] = {};
 	struct in6_addr key = {};
         struct sock *sk = NULL;
-	int ret;
 
 	if (skc)
 		sk = (struct sock *)bpf_skc_to_tcp_sock(skc);

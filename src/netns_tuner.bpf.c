@@ -39,7 +39,6 @@ SEC("kretprobe/setup_net")
 int BPF_KRETPROBE(bpftune_setup_net_return, int ret)
 {
 	struct bpftune_event event = {};
-	__u64 current, *netnsp;
 	struct net *netns;
 	
 	if (ret != 0)
