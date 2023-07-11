@@ -31,7 +31,7 @@
 
 static struct bpftunable_desc descs[] = {
 { 
- TCP_CONG, BPFTUNABLE_OTHER, "TCP congestion control", false, 0 },
+ TCP_CONG, BPFTUNABLE_OTHER, "TCP congestion control", 0, 0 },
 };
 
 static struct bpftunable_scenario scenarios[] = {
