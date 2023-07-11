@@ -85,11 +85,14 @@ struct bpftunable_scenario {
 
 #define BPFTUNE_MAX_VALUES	3
 
+#define BPFTUNABLE_NAMESPACED	0x1	/* settable in non-global namespace? */
+#define BPFTUNABLE_OPTIONAL	0x2	/* do not fail it tunable not found (e.g. ipv6 */
+
 struct bpftunable_desc {
 	unsigned int id;
 	enum bpftunable_type type;
 	const char *name;
-	bool namespaced;	/* settable in non-global namespace? */
+	__u64 flags;
 	__u8 num_values;
 };
 

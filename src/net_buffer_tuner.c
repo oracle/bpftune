@@ -12,10 +12,10 @@ struct tcp_buffer_tuner_bpf *skel;
 
 static struct bpftunable_desc descs[] = {
 { NETDEV_MAX_BACKLOG,	BPFTUNABLE_SYSCTL, "net.core.netdev_max_backlog",
-								false, 1 },
+								0, 1 },
 { FLOW_LIMIT_CPU_BITMAP,
 			BPFTUNABLE_SYSCTL, "net.core.flow_limit_cpu_bitmap",
-								false, 1 },
+								0, 1 },
 };
 
 static struct bpftunable_scenario scenarios[] = {

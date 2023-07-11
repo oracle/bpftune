@@ -210,6 +210,7 @@ test_setup_local()
 	ip netns list 2>/dev/null | grep $NETNS
 	FOUND=$?
 	set -e
+	sysctl -qw net.ipv6.conf.all.disable_ipv6=0
 	if [[ $FOUND -ne 0 ]]; then
 		ip netns pids $NETNS 2>/dev/null| xargs -r kill
 		ip netns del $NETNS 2>/dev/null|true
@@ -278,6 +279,7 @@ test_cleanup_local()
 	ip --all netns del ${NETNS_PREFIX}\*
 	ip link del $VETH2 2>/dev/null
 	ip link del bpftunelocal 2>/dev/null
+	sysctl -w net.ipv6.conf.all.disable_ipv6=0
 	set -e
 
 	if [[ ! -f /usr/lib64/bpftune/tcp_buffer_tuner.so ]]; then

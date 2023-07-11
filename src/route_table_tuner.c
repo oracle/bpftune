@@ -27,7 +27,8 @@ struct route_table_tuner_bpf *skel;
 
 static struct bpftunable_desc descs[] = {
 { ROUTE_TABLE_IPV6_MAX_SIZE,		BPFTUNABLE_SYSCTL,
-		"net.ipv6.route.max_size",		true, 1 },
+		"net.ipv6.route.max_size",
+		BPFTUNABLE_NAMESPACED | BPFTUNABLE_OPTIONAL, 1 },
 };
 
 static struct bpftunable_scenario scenarios[] = {

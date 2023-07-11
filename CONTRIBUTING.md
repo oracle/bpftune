@@ -169,6 +169,7 @@ struct bpftunable_desc {
         unsigned int id;
         enum bpftunable_type type;
         const char *name;
+        __u64 flags;
         __u8 num_values;
 };
 ```

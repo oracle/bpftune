@@ -940,6 +940,11 @@ int bpftuner_tunables_init(struct bpftuner *tuner, unsigned int num_descs,
 		num_values = bpftune_sysctl_read(0, descs[i].name,
 				tuner->tunables[i].current_values);
 		if (num_values < 0) {
+			if (descs[i].flags & BPFTUNABLE_OPTIONAL) {
+				bpftune_log(LOG_DEBUG, "error reading optional tunable '%s': %s\n",
+					    descs[i].name, strerror(-num_values));
+				continue;
+			}
 			bpftune_log(LOG_ERR, "error reading tunable '%s': %s\n",
 				    descs[i].name, strerror(-num_values));
 			return num_values;
@@ -1052,7 +1057,7 @@ int bpftuner_tunable_sysctl_write(struct bpftuner *tuner, unsigned int tunable,
 		}
 	}
 
-	if (t->desc.namespaced) {
+	if (t->desc.flags & BPFTUNABLE_NAMESPACED) {
 		fd = bpftuner_netns_fd_from_cookie(tuner, netns_cookie);
 		if (fd < 0) {
 			bpftune_log(LOG_DEBUG, "could not get netns fd for cookie %ld\n",
