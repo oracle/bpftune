@@ -21,6 +21,8 @@
 
 #include "tcp_cong_tuner.h"
 
+const char bbr[4] = { 'b', 'b', 'r', '\0' };
+
 struct remote_host {
 	__u64 last_retransmit;
 	__u64 retransmits;
@@ -40,7 +42,6 @@ static __always_inline bool
 retransmit_threshold(struct remote_host *remote_host,
 		     u32 segs_out, u32 total_retrans)
 {
-	const char bbr[CONG_MAXNAME] = "bbr";
 	__u64 now;
 
 	if (!remote_host)
