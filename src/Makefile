@@ -93,8 +93,10 @@ TUNER_LIBS = $(patsubst %,$(OPATH)%.so,$(TUNERS))
 BPF_TUNERS = $(patsubst %,%.bpf.o,$(TUNERS))
 
 BPF_OBJS = $(BPF_TUNERS) probe.bpf.o
+LEGACY_BPF_OBJS = $(patsubst %.bpf.o,%.bpf.legacy.o,$(BPF_OBJS))
 
 BPF_SKELS = $(patsubst %,%.skel.h,$(TUNERS)) probe.skel.h
+LEGACY_BPF_SKELS = $(patsubst %.skel.h,%.skel.legacy.h,$(BPF_SKELS))
 
 .DELETE_ON_ERROR:
 
@@ -105,7 +107,7 @@ all: analyze $(OPATH) $(OPATH)bpftune $(TUNER_LIBS)
 $(OPATH):
 	mkdir $(OPATH)
 	
-analyze: $(BPF_SKELS)
+analyze: $(BPF_SKELS) $(LEGACY_BPF_SKELS)
 	$(CLANG) --analyze $(INCLUDES) libbpftune.c bpftune.c $(TUNER_SRCS)
 clean:
 	$(call QUIET_CLEAN, bpftune)
@@ -144,7 +146,9 @@ $(OPATH)libbpftune.so: libbpftune.c ../include/bpftune/libbpftune.h $(OPATH)libb
 	rm -f $(@) ; \
 	ln -sr $(@).$(VERSION) $(@)
 
-$(TUNER_LIBS): $(OPATH)libbpftune.so $(BPF_SKELS) $(TUNER_OBJS)
+$(TUNER_OBJS): $(BPF_SKELS) $(LEGACY_BPF_SKELS)
+
+$(TUNER_LIBS): $(OPATH)libbpftune.so $(TUNER_OBJS)
 	$(CC) $(CFLAGS) -shared -o $(@) $(patsubst $(OPATH)%.so,%.c,$(@)) \
 		$(LDLIBS) -lbpftune $(LDFLAGS)
 
@@ -158,13 +162,17 @@ $(OPATH)bpftune.o: $(OPATH)libbpftune.so
 	$(QUIET_GEN)$(BPFTOOL) gen skeleton $< > $@
 
 $(BPF_OBJS): $(patsubst %.o,%.c,$(BPF_OBJS))
-	$(CLANG) $(BPF_CFLAGS) -D__TARGET_ARCH_$(SRCARCH) -O2 -target bpf			\
+	$(CLANG) $(BPF_CFLAGS) -D__TARGET_ARCH_$(SRCARCH) -O2 -target bpf \
 		$(INCLUDES) -c $(patsubst %.o,%.c,$(@)) -o $(@);
+
+$(LEGACY_BPF_OBJS): $(patsubst %.legacy.o,%.c,$(LEGACY_BPF_OBJS))
 	$(CLANG) $(BPF_CFLAGS) -D__TARGET_ARCH_$(SRCARCH) -DBPFTUNE_LEGACY -O2 -target bpf \
-		$(INCLUDES) -c $(patsubst %.o,%.c,$(@)) \
-		-o $(patsubst %.o,%.legacy.o,$(@))
+		$(INCLUDES) -c $(patsubst %.legacy.o,%.c,$(@)) \
+		-o $(@)
 
 $(BPF_SKELS): $(BPF_OBJS)
-	$(BPFTOOL) gen skeleton $(subst .skel.h,.bpf.o,$@) > $@ ;\
-	$(BPFTOOL) gen skeleton $(subst .skel.h,.bpf.legacy.o,$@) > $(subst .skel.h,.skel.legacy.h,$@)
+	$(BPFTOOL) gen skeleton $(subst .skel.h,.bpf.o,$@) > $@
+
+$(LEGACY_BPF_SKELS): $(LEGACY_BPF_OBJS)
+	$(BPFTOOL) gen skeleton $(subst .skel.legacy.h,.bpf.legacy.o,$@) > $(subst .skel.h,.skel.legacy.h,$@)
 
