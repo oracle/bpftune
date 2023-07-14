@@ -65,7 +65,7 @@ void event_handler(struct bpftuner *tuner,
 		bpftuner_tunable_sysctl_write(tuner, id, ROUTE_TABLE_FULL,
 					      event->netns_cookie, 1,
 					      event->update[0].new,
-"Due to dst table filling up, change net.ipv6.route.max_size from %d -> %d\n",
+"Due to dst table filling up, change net.ipv6.route.max_size from %ld -> %ld\n",
 					      event->update[0].old[0],
 					      event->update[0].new[0]);
 		break;

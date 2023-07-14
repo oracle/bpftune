@@ -219,7 +219,7 @@ void event_handler(struct bpftuner *tuner,
 
 	if (!bpf_map_lookup_elem(tuner->corr_map_fd, &key, &c)) {
 		corr = corr_compute(&c);
-		bpftune_log(LOG_INFO, "covar for '%s' netns %ld (new %ld %ld %ld): %LF ; corr %LF\n",
+		bpftune_log(LOG_DEBUG, "covar for '%s' netns %ld (new %ld %ld %ld): %LF ; corr %LF\n",
 			    tunable, key.netns_cookie, new[0], new[1], new[2],
 			    covar_compute(&c), corr);
 		if (corr > CORR_THRESHOLD && scenario == TCP_BUFFER_INCREASE)
@@ -229,7 +229,7 @@ void event_handler(struct bpftuner *tuner,
 	case TCP_BUFFER_TCP_MEM:
 		bpftuner_tunable_sysctl_write(tuner, id, scenario,
 					      event->netns_cookie, 3, new,
-"Due to %s change %s(min pressure max) from (%d %d %d) -> (%d %d %d)\n",
+"Due to %s change %s(min pressure max) from (%ld %ld %ld) -> (%ld %ld %ld)\n",
 					     lowmem, tunable, old[0], old[1], old[2],
 					     new[0], new[1], new[2]);
 
@@ -250,7 +250,7 @@ void event_handler(struct bpftuner *tuner,
 		}
 		bpftuner_tunable_sysctl_write(tuner, id, scenario,
 					      event->netns_cookie, 3, new,
-"Due to %s change %s(min default max) from (%d %d %d) -> (%d %d %d)\n",
+"Due to %s change %s(min default max) from (%ld %ld %ld) -> (%ld %ld %ld)\n",
 					      reason, tunable,
 					      old[0], old[1], old[2],
 					      new[0], new[1], new[2]);

@@ -151,7 +151,7 @@ out:
 			    stats->dev, strerror(-ret));
 	} else {
 		bpftuner_tunable_update(tuner, tunable, NEIGH_TABLE_FULL, 0,
-"updated gc_thresh3 for %s table, dev '%s' (ifindex %d) from %d to %d\n",
+"updated gc_thresh3 for %s table, dev '%s' (ifindex %d) from %ld to %ld\n",
 			    tbl_name, stats->dev, stats->ifindex,
 			    stats->max, new_gc_thresh3);
 	}
