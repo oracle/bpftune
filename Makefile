@@ -35,12 +35,15 @@ INSTALLPATH = $(installprefix)
 
 .PHONY: all clean
 
-all: srcdir docdir
+all: srcdir docdir testdir
 	
 srcdir:
 	cd src; make
 docdir:
 	cd docs; make man
+
+testdir: srcdir
+	cd test; make
 
 test:	FORCE
 	cd test; make test
@@ -55,7 +58,7 @@ pkg:    all
 
 FORCE:
 	
-clean: srcclean docclean
+clean: srcclean docclean testclean
 
 distclean: clean distclean_src
 	
@@ -65,6 +68,8 @@ docclean:
 	cd docs; make clean
 distclean_src:
 	cd src; make distclean
+testclean:
+	cd test; make clean
 
 install: srcinstall includeinstall docinstall
 	

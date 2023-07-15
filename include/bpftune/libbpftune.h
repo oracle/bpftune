@@ -111,6 +111,9 @@ static inline const char *bpftuner_tunable_name(struct bpftuner *tuner,
 #define bpftuner_for_each_tunable(tuner, tunable)			     \
 	for (unsigned int __itun = 0; (tunable = bpftuner_tunable(tuner, __itun)); __itun++)
 
+#define bpftuner_for_each_strategy(tuner, strategy)			     \
+	for (unsigned int __s = 0; (strategy = tuner->strategies[__s]); __s++)
+
 int bpftuner_tunable_sysctl_write(struct bpftuner *tuner,
 				  unsigned int tunable,
 				  unsigned int scenario,
@@ -168,6 +171,7 @@ void bpftuner_tunables_fini(struct bpftuner *tuner);
 			tuner->ring_buffer_map = __lskel->maps.ring_buffer_map;\
 			tuner->netns_map = __lskel->maps.netns_map;	     \
 		}							     \
+		bpftuner_bpf_set_autoload(tuner);			     \
 	} while (0);							     \
 	bpftune_cap_drop();						     \
 	if (__err) {							     \
@@ -290,5 +294,11 @@ int bpftuner_netns_fd_from_cookie(struct bpftuner *tuner, unsigned long cookie);
 
 int bpftune_module_load(const char *name);
 int bpftune_module_unload(const char *name);
+
+int bpftuner_strategy_set(struct bpftuner *tuner, struct bpftuner_strategy *strategy);
+int bpftuner_strategies_add(struct bpftuner *tuner, struct bpftuner_strategy **strategies,
+			    struct bpftuner_strategy *default_strategy);
+bool bpftuner_bpf_prog_in_strategy(struct bpftuner *tuner, const char *prog);
+void bpftuner_bpf_set_autoload(struct bpftuner *tuner);
 
 #endif /* __LIBBPFTUNE_H */

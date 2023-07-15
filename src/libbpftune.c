@@ -44,6 +44,8 @@
 #include <mntent.h>
 #include <sys/capability.h>
 #include <pthread.h>
+#include <signal.h>
+#include <time.h>
 
 unsigned short bpftune_learning_rate;
 
@@ -325,6 +327,10 @@ int bpftuner_cgroup_attach(struct bpftuner *tuner, const char *prog_name,
 	struct bpf_program *prog;
 	const char *cgroup_dir;
 
+	/* if cgroup prog is not in current strategy prog list, skip attach */
+	if (!bpftuner_bpf_prog_in_strategy(tuner, prog_name))
+		return 0;
+
 	err = bpftune_cap_add();
 	if (err)
 		return err;
@@ -363,6 +369,10 @@ void bpftuner_cgroup_detach(struct bpftuner *tuner, const char *prog_name,
 {
 	int prog_fd, cgroup_fd, err = 0;
 	struct bpf_program *prog;
+
+	/* if cgroup prog is not in current strategy prog list, skip attach */
+	if (!bpftuner_bpf_prog_in_strategy(tuner, prog_name))
+		return;
 
 	err = bpftune_cap_add();
 	if (err)
@@ -617,6 +627,7 @@ struct bpftuner *bpftuner_init(const char *path)
 		bpftune_log(LOG_ERR, "could not allocate tuner\n");
 		return NULL;
 	}
+	tuner->name = path;
 
 	bpftune_cap_add();
 	/* if file appears via inotify we may get "file too short" errors;
@@ -1502,4 +1513,131 @@ int bpftune_module_unload(const char *name)
 	}
 	bpftune_cap_drop();
 	return ret;
+}
+
+static void bpftuner_strategy_update(struct bpftuner *tuner)
+{
+	struct bpftuner_strategy *strategy, *max_strategy = NULL;
+	int curr, max = 0;
+
+	if (!tuner->strategies)
+		return;
+
+	bpftune_log(LOG_DEBUG, "%s: updating strategy...\n", tuner->name);
+
+	bpftuner_for_each_strategy(tuner, strategy) {
+		curr = strategy->evaluate(tuner, strategy);
+		if (curr < max)
+			continue;
+		max = curr;
+		max_strategy = strategy;
+	}
+	if (max_strategy && max_strategy != tuner->strategy)
+		bpftuner_strategy_set(tuner, max_strategy);
+}
+
+static void bpftuner_strategy_timeout(sigval_t sigval)
+{
+	struct bpftuner *tuner = sigval.sival_ptr;
+
+	if (tuner)
+		bpftuner_strategy_update(tuner);
+}
+
+int bpftuner_strategy_set(struct bpftuner *tuner,
+			  struct bpftuner_strategy *strategy)
+{
+	bpftune_log(LOG_DEBUG, "setting stragegy for tuner '%s' to '%s': %s\n",
+		    tuner->name, strategy->name, strategy->description);
+	int err = 0;
+
+	if (!strategy)
+		return 0;
+
+	if (tuner->strategy) {
+		/* clean up for current strategy */
+		bpftune_log(LOG_DEBUG, "%s: cleaning up current strategy '%s'\n",
+			    tuner->name, strategy->name);
+		tuner->fini(tuner);
+	}
+	/* arm timer for timeout */
+	if (strategy->timeout) {
+		struct sigevent sev = {};
+		struct itimerspec its = {};
+		timer_t tid;
+
+		sev.sigev_notify = SIGEV_THREAD;
+		sev.sigev_notify_function = &bpftuner_strategy_timeout;
+		sev.sigev_value.sival_ptr = tuner;
+
+		if (timer_create(CLOCK_REALTIME, &sev, &tid)
+		    == -1) {
+			err = -errno;
+			bpftune_log(LOG_DEBUG, "%s: could not arm timer for strategy '%s'\n",
+				    strerror(-err));
+			return 0;
+		}
+		its.it_value.tv_sec = strategy->timeout;
+		if (timer_settime(tid, 0, &its, NULL)) {
+			err = -errno;
+			bpftune_log(LOG_DEBUG, "%s: could not arm timer for strategy '%s: %s'\n",
+				    tuner->name, strategy->name, strerror(-err));
+			return 0;
+		}
+	}
+	if (!err) {
+		tuner->strategy = strategy;
+		err = tuner->init(tuner);
+	}
+	return err;
+}
+
+int bpftuner_strategies_add(struct bpftuner *tuner, struct bpftuner_strategy **strategies,
+			    struct bpftuner_strategy *default_strategy)
+{
+	if (!strategies || tuner->strategies)
+		return 0;
+	tuner->strategies = strategies;
+	if (default_strategy)
+		return bpftuner_strategy_set(tuner, default_strategy);
+	bpftuner_strategy_update(tuner);
+	return 0;
+}
+
+bool bpftuner_bpf_prog_in_strategy(struct bpftuner *tuner, const char *prog)
+{
+	const char **progs;
+	int i;
+
+	if (!tuner->strategy || !tuner->strategy->bpf_progs)
+		return true;
+	progs = tuner->strategy->bpf_progs;
+
+	for (i = 0; progs[i] != NULL; i++) {
+		if (strcmp(prog, progs[i]) == 0)
+			return true;
+	}
+	return false;
+}
+
+void bpftuner_bpf_set_autoload(struct bpftuner *tuner)
+{
+	struct bpf_program *prog = NULL;
+	int err;
+
+	if (!tuner->strategy || !tuner->strategy->bpf_progs)
+		return;
+
+	bpf_object__for_each_program(prog, tuner->obj) {
+		const char *name = bpf_program__name(prog);
+
+		if (bpftuner_bpf_prog_in_strategy(tuner, name))
+			continue;
+		err = bpf_program__set_autoload(prog, false);
+		if (err) {
+			bpftune_log(LOG_ERR, "%s: could not disable autoload for prog '%s' for strategy '%s': %s\n",
+				    tuner->name, name,
+				    tuner->strategy->name, strerror(err));
+		}
+	}
 }

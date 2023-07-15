@@ -32,6 +32,8 @@ LIBBPFTUNE_0.1.1 {
 		bpftuner_tunable_update;
 		bpftuner_fini;
 		bpftuner_bpf_fini;
+		bpftuner_bpf_set_autoload;
+		bpftuner_bpf_prog_in_strategy;
 		bpftuner_tunables_fini;
 		bpftune_netns_cookie_supported;
 		bpftuner_netns_init;
@@ -39,6 +41,8 @@ LIBBPFTUNE_0.1.1 {
 		bpftuner_netns_from_cookie;
 		bpftuner_netns_fd_from_cookie;
 	        bpftuner_ring_buffer_map_fd;
+		bpftuner_strategy_set;
+		bpftuner_strategies_add;
 		bpftune_ring_buffer_init;
 		bpftune_ring_buffer_poll;
 		bpftune_ring_buffer_fini;

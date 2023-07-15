@@ -138,6 +138,18 @@ struct bpftuner_netns {
 	enum bpftune_state state;
 };
 
+struct bpftuner;
+
+struct bpftuner_strategy {
+	const char *name;
+	const char *description;
+	/* return a number to compare with other strategies */
+	int (*evaluate)(struct bpftuner *tuner, struct bpftuner_strategy *strategy);
+	unsigned long timeout;	/* time in seconds until evaluation */
+	const char **bpf_progs;	/* programs to load in BPF skeleton for this
+				 * strategy; if NULL, all */
+};
+
 struct bpftuner {
 	unsigned int id;
 	enum bpftune_state state;
@@ -151,6 +163,8 @@ struct bpftuner {
 	void *obj;
 	int (*init)(struct bpftuner *tuner);
 	void (*fini)(struct bpftuner *tuner);
+	struct bpftuner_strategy **strategies;
+	struct bpftuner_strategy *strategy;
 	void *ring_buffer_map;
 	int ring_buffer_map_fd;
 	void *corr_map;
