@@ -17,10 +17,12 @@
 # Boston, MA 021110-1307, USA.
 #
 
+
 PERF_TESTS = iperf3_test qperf_test
 
 TUNER_TESTS =	support_test log_test service_test inotify_test cap_test \
 		sample_test sample_legacy_test \
+		strategy_test strategy_legacy_test \
 		sysctl_test sysctl_legacy_test sysctl_netns_test \
 		netns_test netns_legacy_test \
 		backlog_test backlog_legacy_test \
@@ -53,14 +55,20 @@ INSTALLPATH = $(installprefix)/lib/tcptune_test/
 install_sh_PROGRAM = install
 install_sh_DIR = install -dv
 
-all: $(PROGS)
+all: strategydir $(PROGS)
 	
+strategydir:
+	cd strategy; make
+
 PHONY: clean
 	
-clean:
+clean: strategyclean
 	rm -f $(PROGS)
 
-test: $(TESTS)
+strategyclean:
+	cd strategy; make clean
+
+test: all $(TESTS)
 	
 test_perf: $(PERF_TESTS)
 

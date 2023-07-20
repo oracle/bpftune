@@ -93,14 +93,33 @@ The key components are
   from BPF programs to userspace via the shared ring buffer.
   Each tuner has an associated set of tunables that it manages.
 
+- optional strategies: a tuner can specify multiple strategies;
+  after running for a while a strategy times out and we assess
+  if a better strategy is available.  Each strategy specifies a
+	- name
+	- description
+	- timeout	
+	- evaluation function
+	- set of BPF program names in tuner associated with strategy
+
+  Strategies are optional and should be set in the tuner init()
+  method via bpftune_strategies_add().  See test/strategy
+  for a coded example.  When a strategy times out, the various
+  evaluation functions are called and the highest-value evaluation
+  dictates the next stratgey.
+
+  Strategies provide a way of providing multiple schemes for
+  auto-tuning the same set of tunables, where the choice is
+  guided by an evaluation of the effectiveness of the strategies.
+
 - events specify a
 	- tuner id: which tuner the event is destined for
 	- a scenario: what happened
 	- an associated netns (if supported)
 	- information about the event (IP address etc)
 
-- the tuner then responds to the event with a strategy; increase
-  or decrease a tunable value, etc.  Describing the event
+- the tuner then responds to the event guided by the active strategy;
+  increase or decrease a tunable value, etc.  Describing the event
   in the log is key; this allows an admin to understand what
   changed and why.
 
@@ -179,6 +198,12 @@ To build the following packages are needed (names may vary by distro);
 - clang >= 11
 - llvm >= 11
 - python3-docutils
+
+From the kernel side, the kernel needs to support BPF ring buffer
+(around the 5.6 kernel, though 5.4 is supported on Oracle Linux
+as ring buffer support was backported), and kernel BTF is
+required (CONFIG_DEBUG_INFO_BTF=y).  Verify /sys/kernel/btf/vmlinux
+is present.
 
 To enable bpftune as a service
 
