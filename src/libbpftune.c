@@ -1622,15 +1622,20 @@ bool bpftuner_bpf_prog_in_strategy(struct bpftuner *tuner, const char *prog)
 
 void bpftuner_bpf_set_autoload(struct bpftuner *tuner)
 {
-	struct bpf_program *prog = NULL;
-	int err;
+	const char **progs;
+	int err, i;
 
 	if (!tuner->strategy || !tuner->strategy->bpf_progs)
 		return;
 
-	bpf_object__for_each_program(prog, tuner->obj) {
-		const char *name = bpf_program__name(prog);
-
+	progs = tuner->strategy->bpf_progs;
+	for (i = 0; progs[i]; i++) {
+		struct bpf_program *prog = bpf_object__find_program_by_name(tuner->obj, progs[i]);
+		const char *name;
+	
+		if (!prog)
+			continue;
+		name = bpf_program__name(prog);
 		if (bpftuner_bpf_prog_in_strategy(tuner, name))
 			continue;
 		err = bpf_program__set_autoload(prog, false);
