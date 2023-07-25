@@ -26,6 +26,7 @@ LLC ?= llc
 LLVM_STRIP ?= llvm-strip
 BPFTOOL ?= bpftool
 BPF_INCLUDE := ../../include
+BPF_CFLAGS := -g -fno-stack-protector -Wall
 NL_INCLUDE := /usr/include/libnl3
 INCLUDES := -I$(BPF_INCLUDE) -I$(NL_INCLUDE) -I/usr/include/uapi
 
@@ -61,8 +62,10 @@ TUNER_LIBS = $(patsubst %,%.so,$(TUNERS))
 BPF_TUNERS = $(patsubst %,%.bpf.o,$(TUNERS))
 
 BPF_OBJS = $(BPF_TUNERS)
+LEGACY_BPF_OBJS = $(patsubst %.bpf.o,%.bpf.legacy.o,$(BPF_OBJS))
 
 BPF_SKELS = $(patsubst %,%.skel.h,$(TUNERS))
+LEGACY_BPF_SKELS = $(patsubst %.skel.h,%.skel.legacy.h,$(BPF_SKELS))
 
 .DELETE_ON_ERROR:
 
@@ -79,17 +82,20 @@ $(TUNER_LIBS): $(BPF_SKELS) $(TUNER_OBJS)
 	$(CC) $(CFLAGS) -shared -o $(@) $(patsubst %.so,%.c,$(@)) \
 		$(LDLIBS) -lbpftune $(LDFLAGS)
 
-%.skel.h: %.bpf.o
-	$(QUIET_GEN)$(BPFTOOL) gen skeleton $< > $@
+$(TUNER_OBJS): $(BPF_SKELS) $(LEGACY_BPF_SKELS)
 
 $(BPF_OBJS): $(patsubst %.o,%.c,$(BPF_OBJS))
-	$(CLANG) -g -D__TARGET_ARCH_$(SRCARCH) -O2 -target bpf			\
-		$(INCLUDES) -c $(patsubst %.o,%.c,$(@)) -o $(@);
-	$(CLANG) -g -D__TARGET_ARCH_$(SRCARCH) -DBPFTUNE_LEGACY -O2 -target bpf \
-		$(INCLUDES) -c $(patsubst %.o,%.c,$(@)) \
-		-o $(patsubst %.o,%.legacy.o,$(@))
+	$(CLANG) $(BPF_CFLAGS) -D__TARGET_ARCH_$(SRCARCH) -O2 -target bpf \
+		$(INCLUDES) -c $(patsubst %.o,%.c,$(@)) -o $(@)
+
+$(LEGACY_BPF_OBJS): $(patsubst %.legacy.o,%.c,$(LEGACY_BPF_OBJS))
+	$(CLANG) $(BPF_CFLAGS) -D__TARGET_ARCH_$(SRCARCH) -DBPFTUNE_LEGACY -O2 -target bpf \
+		$(INCLUDES) -c $(patsubst %.legacy.o,%.c,$(@)) \
+		-o $(@)
 
 $(BPF_SKELS): $(BPF_OBJS)
-	$(BPFTOOL) gen skeleton $(subst .skel.h,.bpf.o,$@) > $@ ;\
-	$(BPFTOOL) gen skeleton $(subst .skel.h,.bpf.legacy.o,$@) > $(subst .skel.h,.skel.legacy.h,$@)
+	$(BPFTOOL) gen skeleton $(subst .skel.h,.bpf.o,$@) > $@
+
+$(LEGACY_BPF_SKELS): $(LEGACY_BPF_OBJS)
+	$(BPFTOOL) gen skeleton $(subst .skel.legacy.h,.bpf.legacy.o,$@) > $(subst .skel.h,.skel.legacy.h,$@)
 
