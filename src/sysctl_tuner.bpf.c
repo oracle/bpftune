@@ -72,6 +72,7 @@ int BPF_KPROBE(bpftune_sysctl, struct ctl_table_header *head,
 	net = (void *)root -
 		(__u64)__builtin_preserve_access_index(&dummy_net->sysctls) -
 		(__u64)__builtin_preserve_access_index(&dummy_ctl_table_set->dir);
+	event.pid = current_pid;
 	event.netns_cookie = get_netns_cookie(net);
 	if (event.netns_cookie == (unsigned long)-1)
 		return 0;
