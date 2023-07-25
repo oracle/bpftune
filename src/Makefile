@@ -163,7 +163,7 @@ $(OPATH)bpftune.o: $(OPATH)libbpftune.so
 
 $(BPF_OBJS): $(patsubst %.o,%.c,$(BPF_OBJS))
 	$(CLANG) $(BPF_CFLAGS) -D__TARGET_ARCH_$(SRCARCH) -O2 -target bpf \
-		$(INCLUDES) -c $(patsubst %.o,%.c,$(@)) -o $(@);
+		$(INCLUDES) -c $(patsubst %.o,%.c,$(@)) -o $(@)
 
 $(LEGACY_BPF_OBJS): $(patsubst %.legacy.o,%.c,$(LEGACY_BPF_OBJS))
 	$(CLANG) $(BPF_CFLAGS) -D__TARGET_ARCH_$(SRCARCH) -DBPFTUNE_LEGACY -O2 -target bpf \
