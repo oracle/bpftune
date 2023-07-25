@@ -80,8 +80,8 @@ void event_handler(struct bpftuner *tuner, struct bpftune_event *event,
 			 */
 			if (strstr(path, event->str)) {
 				bpftune_log(BPFTUNE_LOG_LEVEL,
-					    "user modified sysctl '%s' that tuner '%s' uses; disabling '%s' for namespace cookie %ld\n",
-					    event->str, t->name, t->name,
+					    "user (pid %ld) modified sysctl '%s' that tuner '%s' uses; disabling '%s' for namespace cookie %ld\n",
+					    event->pid, event->str, t->name, t->name,
 					    event->netns_cookie);
 				bpftuner_netns_fini(t, event->netns_cookie, BPFTUNE_MANUAL);
 				break;
