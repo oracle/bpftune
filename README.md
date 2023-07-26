@@ -236,28 +236,6 @@ Tests are supplied for each tuner in the tests/ subdirectory.
 to simulate interactions with remote hosts. See ./TESTING.md
 for more details.
 
-## Contributing
-
-This project welcomes contributions from the community. Before submitting a pull request, please [review our contribution guide](./CONTRIBUTING.md)
-
-## Security
-
-Please consult the [security guide](./SECURITY.md) for our responsible security vulnerability disclosure process
-
-## License
-
-Copyright (c) 2023 Oracle and/or its affiliates.
-
-This software is available to you under
-
-SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note
-
-Being under the terms of the GNU General Public License version 2.
-
-SPDX-URL: https://spdx.org/licenses/GPL-2.0.html
-
-See [the license file](./LICENSE.txt) for more details.
-
 ## Does my system support bpftune?
 
 Simply run "bpftune -S" to see:
@@ -343,3 +321,25 @@ bpftune: sysctl 'net.ipv4.tcp_rmem' changed from (4096 131072 1310720 ) -> (4096
 
 See the docs/ subdirectory for manual pages covering bpftune
 and associated tuners.
+
+## Contributing
+
+This project welcomes contributions from the community. Before submitting a pull request, please [review our contribution guide](./CONTRIBUTING.md)
+
+## Security
+
+Please consult the [security guide](./SECURITY.md) for our responsible security vulnerability disclosure process
+
+## License
+
+Copyright (c) 2023 Oracle and/or its affiliates.
+
+This software is available to you under
+
+SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note
+
+Being under the terms of the GNU General Public License version 2.
+
+SPDX-URL: https://spdx.org/licenses/GPL-2.0.html
+
+See [the license file](./LICENSE.txt) for more details.
