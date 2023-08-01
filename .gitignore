@@ -2,4 +2,6 @@
 *.so*
 *.8
 *.skel.h
+*.skel.legacy.h
 *.swp
+*.plist
