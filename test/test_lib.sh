@@ -168,7 +168,7 @@ test_run_cmd_local()
 		if [[ $VERBOSE -gt 0 ]]; then
 			echo "For output see ${CMDLOG}"
 		fi
-        fi
+	fi
 
 	BGCMD="&"
 	if [[ "$CMD" =~ $BGCMD ]]; then
@@ -217,7 +217,7 @@ test_setup_local()
 		sleep 0.2
 		ip netns add $NETNS
 		ip link add dev $VETH1 mtu $MTU netns $NETNS type veth \
-		   peer name $VETH2 mtu $MTU
+			peer name $VETH2 mtu $MTU
 		ip netns exec $NETNS ip addr add ${VETH1_IPV4}/24 dev $VETH1
 		ip netns exec $NETNS ip -6 addr add ${VETH1_IPV6}/64 dev $VETH1
 		ip netns exec $NETNS ip link set $VETH1 up
@@ -227,9 +227,9 @@ test_setup_local()
 		 if [[ -n "$DROP" ]]; then
 		  D="${DROP}%"
 		 fi
-       	         tc qdisc add dev $VETH2 root netem loss ${D} ${LATENCY}
+		 tc qdisc add dev $VETH2 root netem loss ${D} ${LATENCY}
 		 ethtool -K $VETH2 gso off
-        	fi
+		fi
 		ip addr add ${VETH2_IPV4}/24 dev $VETH2
 		ip -6 addr add ${VETH2_IPV6}/64 dev $VETH2
 		ip link set $VETH2 up
@@ -328,9 +328,9 @@ test_cleanup()
 test_cleanup_exit()
 {
 	BC=${BASH_COMMAND}
-        if [[ -n "$BC" ]]; then
-                echo "Last command executed: '$BC'"
-        fi
+	if [[ -n "$BC" ]]; then
+		echo "Last command executed: '$BC'"
+	fi
 	if [[ $SKIP_CLEANUP -ne 0 ]]; then
 		echo "skipping cleanup as requested"
 		if [ $EXITCODE -ne 0 ]; then
