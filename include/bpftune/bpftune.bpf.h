@@ -18,6 +18,20 @@
  */
 
 #define __KERNEL__
+
+/* No BTF means we cannot include implicit CO-RE relocations from vmlinux.h.
+ * Also implies legacy mode since no fentry etc.
+ */
+#ifdef BPFTUNE_NOBTF
+#define BPF_NO_PRESERVE_ACCESS_INDEX
+#define BPFTUNE_PRESERVE_ACCESS_INDEX(obj, field)	\
+	(obj + __builtin_offsetof(typeof(*obj), field))
+#define BPFTUNE_LEGACY
+#else
+#define BPFTUNE_PRESERVE_ACCESS_INDEX(obj, field)	\
+	__builtin_preserve_access_index(&obj->field)
+#endif
+
 #if defined(__TARGET_ARCH_x86)
 #include <bpftune/vmlinux_x86_64.h>
 #elif defined(__TARGET_ARCH_arm64)
@@ -44,6 +58,13 @@ extern __u32 LINUX_KERNEL_VERSION __kconfig;
 	bpf_trace_printk(____fmt, sizeof(____fmt),	\
 			 ##__VA_ARGS__);		\
 })
+#endif
+
+/* No BTF -> no CO-RE support */
+#ifdef BPFTUNE_NOBTF
+#define BPFTUNE_CORE_READ	BPF_PROBE_READ
+#else
+#define BPFTUNE_CORE_READ	BPF_CORE_READ
 #endif
 
 /* provide BPF_KPROBE/BPF_KRETPROBE to simplify legacy support */
@@ -264,8 +285,10 @@ static __always_inline int __strncmp(char *s1, char *s2, size_t n)
 
 static __always_inline long get_netns_cookie(struct net *net)
 {
+#ifndef BPFTUNE_NOBTF
 	if (bpf_core_field_exists(net->net_cookie))
-		return BPF_CORE_READ(net, net_cookie);
+		return BPFTUNE_CORE_READ(net, net_cookie);
+#endif
 	if (net == &init_net || net == (void *)bpftune_init_net)
 		return 0;
 	/* not global ns, no cookie support. */
@@ -331,7 +354,7 @@ static __always_inline long send_sk_sysctl_event(struct sock *sk,
                                               long *old, long *new,
                                               struct bpftune_event *event)
 {
-	struct net *net = BPF_CORE_READ(sk, sk_net.net);
+	struct net *net = BPFTUNE_CORE_READ(sk, sk_net.net);
 
 	return send_net_sysctl_event(net, scenario_id, event_id,
 				     old, new, event);

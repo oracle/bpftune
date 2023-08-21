@@ -164,7 +164,7 @@ int cong_tuner_sockops(struct bpf_sock_ops *ops)
 #else
 static __always_inline int get_sk_key(struct sock *sk, struct in6_addr *key)
 {
-	int family = BPF_CORE_READ(sk, sk_family);
+	int family = BPFTUNE_CORE_READ(sk, sk_family);
 
 	switch (family) {
 	case AF_INET:
@@ -201,16 +201,16 @@ int BPF_PROG(cong_retransmit, struct sock *sk, struct sk_buff *skb)
 	if (remote_host->retransmit_threshold)
 		return 0;
 
-	segs_out = BPF_CORE_READ(tp, segs_out);
-	total_retrans = BPF_CORE_READ(tp, total_retrans);
+	segs_out = BPFTUNE_CORE_READ(tp, segs_out);
+	total_retrans = BPFTUNE_CORE_READ(tp, total_retrans);
 
 	if (!retransmit_threshold(remote_host, segs_out, total_retrans))
                 return 0;
 
-	sin6->sin6_family = BPF_CORE_READ(sk, sk_family);
+	sin6->sin6_family = BPFTUNE_CORE_READ(sk, sk_family);
 	event.tuner_id = tuner_id;
 	event.scenario_id = id;
-	net = BPF_CORE_READ(sk, sk_net.net);
+	net = BPFTUNE_CORE_READ(sk, sk_net.net);
 	event.netns_cookie = get_netns_cookie(net);
 	if (event.netns_cookie < 0)
 		return 0;

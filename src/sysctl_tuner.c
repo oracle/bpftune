@@ -21,6 +21,7 @@
 #include <bpftune/bpftune.h>
 #include "sysctl_tuner.skel.h"
 #include "sysctl_tuner.skel.legacy.h"
+#include "sysctl_tuner.skel.nobtf.h"
 
 #include <errno.h>
 #include <string.h>

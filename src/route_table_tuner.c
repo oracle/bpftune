@@ -22,6 +22,7 @@
 #include "route_table_tuner.h"
 #include "route_table_tuner.skel.h"
 #include "route_table_tuner.skel.legacy.h"
+#include "route_table_tuner.skel.nobtf.h"
 
 struct route_table_tuner_bpf *skel;
 

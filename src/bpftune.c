@@ -253,17 +253,20 @@ static void do_usage(void)
 void print_support_level(enum bpftune_support_level support_level)
 {
 	switch (support_level) {
-	case BPFTUNE_NONE:
+	case BPFTUNE_SUPPORT_NONE:
 		bpftune_log(BPFTUNE_LOG_LEVEL, "bpftune is not supported\n");
 		break;
-	case BPFTUNE_LEGACY:
+	case BPFTUNE_SUPPORT_NOBTF:
+		bpftune_log(BPFTUNE_LOG_LEVEL, "bpftune works, but no BPF Type Format information (BTF) is available.  This means kernel data structure offsets may not match those at compile-time, and tuners may not operate as expected. This mode of operation is unsupported, and failures are expected, so be warned.\n");
+		break;
+	case BPFTUNE_SUPPORT_LEGACY:
 		bpftune_log(BPFTUNE_LOG_LEVEL, "bpftune works in legacy mode\n");
 		break;
-	case BPFTUNE_NORMAL:
+	case BPFTUNE_SUPPORT_NORMAL:
 		bpftune_log(BPFTUNE_LOG_LEVEL, "bpftune works fully\n");
 		break;
 	}
-	if (support_level > BPFTUNE_NONE) {
+	if (support_level > BPFTUNE_SUPPORT_NONE) {
 		bpftune_log(BPFTUNE_LOG_LEVEL, "bpftune %s per-netns policy (via netns cookie)\n",
 			    bpftune_netns_cookie_supported() ?
 			    "supports" : "does not support");
@@ -325,7 +328,7 @@ int main(int argc, char *argv[])
 			library_dir = optarg;
 			break;
 		case 'L':
-			bpftuner_force_bpf_legacy();
+			bpftune_force_bpf_support(BPFTUNE_SUPPORT_LEGACY);
 			break;
 		case 'r':
 			rate = atoi(optarg);
@@ -379,7 +382,7 @@ int main(int argc, char *argv[])
 
 	support_level = bpftune_bpf_support();
 	print_support_level(support_level);
-	if (support_level < BPFTUNE_LEGACY) {
+	if (support_level < BPFTUNE_SUPPORT_NOBTF) {
 		bpftune_log(BPFTUNE_LOG_LEVEL, "bpftune is not supported on this system; exiting\n");
 		return 1;
 	}

@@ -5,6 +5,7 @@
 #include "net_buffer_tuner.h"
 #include "net_buffer_tuner.skel.h"
 #include "net_buffer_tuner.skel.legacy.h"
+#include "net_buffer_tuner.skel.nobtf.h"
 
 #include <unistd.h>
 

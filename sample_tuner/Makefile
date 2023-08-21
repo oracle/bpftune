@@ -92,9 +92,13 @@ $(BPF_OBJS): $(patsubst %.o,%.c,$(BPF_OBJS))
 		$(INCLUDES) -c $(patsubst %.o,%.c,$(@)) -o $(@);
 	$(CLANG) -g -D__TARGET_ARCH_$(SRCARCH) -DBPFTUNE_LEGACY -O2 -target bpf \
 		$(INCLUDES) -c $(patsubst %.o,%.c,$(@)) \
-		-o $(patsubst %.o,%.legacy.o,$(@))
+		-o $(patsubst %.o,%.legacy.o,$(@));
+	$(CLANG) -g -D__TARGET_ARCH_$(SRCARCH) -DBPFTUNE_NOBTF -DBPFTUNE_LEGACY -O2 -target bpf \
+		$(INCLUDES) -c $(patsubst %.o,%.c,$(@)) \
+		-o $(patsubst %.o,%.nobtf.o,$(@));
 
 $(BPF_SKELS): $(BPF_OBJS)
 	$(BPFTOOL) gen skeleton $(subst .skel.h,.bpf.o,$@) > $@ ;\
-	$(BPFTOOL) gen skeleton $(subst .skel.h,.bpf.legacy.o,$@) > $(subst .skel.h,.skel.legacy.h,$@)
+	$(BPFTOOL) gen skeleton $(subst .skel.h,.bpf.legacy.o,$@) > $(subst .skel.h,.skel.legacy.h,$@);\
+	$(BPFTOOL) gen skeleton $(subst .skel.h,.bpf.nobtf.o,$@) > $(subst .skel.h,.skel.nobtf.h,$@)
 

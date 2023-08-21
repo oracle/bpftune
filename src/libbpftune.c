@@ -56,6 +56,7 @@ unsigned short bpftune_learning_rate;
 
 #include "probe.skel.h"
 #include "probe.skel.legacy.h"
+#include "probe.skel.nobtf.h"
 
 #ifndef SO_NETNS_COOKIE
 #define SO_NETNS_COOKIE 71
@@ -391,13 +392,7 @@ void bpftuner_cgroup_detach(struct bpftuner *tuner, const char *prog_name,
 	bpftune_cap_drop();
 }
 
-static bool force_bpf_legacy;
 static bool netns_cookie_supported;
-
-void bpftuner_force_bpf_legacy(void)
-{
-	force_bpf_legacy = true;
-}
 
 bool bpftune_netns_cookie_supported(void)
 {
@@ -423,65 +418,84 @@ bool bpftune_netns_cookie_supported(void)
 	return true;
 }
 
-enum bpftune_support_level support_level = BPFTUNE_NONE;
+enum bpftune_support_level support_level = BPFTUNE_SUPPORT_NONE;
+enum bpftune_support_level force_support_level = BPFTUNE_SUPPORT_NONE;
+
+void bpftune_force_bpf_support(enum bpftune_support_level level)
+{
+	force_support_level = level;
+}
 
 enum bpftune_support_level bpftune_bpf_support(void)
 {
 	bool ret;
 	int err;
-	struct probe_bpf *probe_bpf;
-	struct probe_bpf_legacy *probe_bpf_legacy;
+	struct probe_bpf *probe_bpf = NULL;
+	struct probe_bpf_legacy *probe_bpf_legacy = NULL;
+	struct probe_bpf_nobtf *probe_bpf_nobtf = NULL;
+
+	if (support_level > BPFTUNE_SUPPORT_NONE)
+		goto done;
 
 	err = bpftune_cap_add();
 	if (err)
-		return BPFTUNE_NONE;
+		return BPFTUNE_SUPPORT_NONE;
 	/* disable bpf logging to avoid spurious errors */
 	bpftune_set_bpf_log(false);
 
 	probe_bpf = probe_bpf__open_and_load();
-	support_level = BPFTUNE_LEGACY;
+	support_level = BPFTUNE_SUPPORT_LEGACY;
 	err = libbpf_get_error(probe_bpf);
 	if (!err) {
 		if (!probe_bpf__attach(probe_bpf))
-			support_level = BPFTUNE_NORMAL;
-		probe_bpf__destroy(probe_bpf);
+			support_level = BPFTUNE_SUPPORT_NORMAL;
 	}
 
-	if (support_level == BPFTUNE_LEGACY) {
+	if (support_level == BPFTUNE_SUPPORT_LEGACY) {
 		bpftune_log(LOG_DEBUG, "full bpftune support not available: %s\n",
 			    strerror(err));
 		probe_bpf_legacy = probe_bpf_legacy__open_and_load();		
 		err = libbpf_get_error(probe_bpf_legacy);
-		if (err) {
-			support_level = BPFTUNE_NONE;
-			bpftune_log(LOG_DEBUG, "legacy bpftune support not available (load): %s\n",
+		if (!err && (err = probe_bpf_legacy__attach(probe_bpf_legacy)) == 0) {
+			support_level = BPFTUNE_SUPPORT_LEGACY;
+		} else {	
+			bpftune_log(LOG_DEBUG, "legacy bpftune support not available: %s\n",
 				    strerror(err));
-		} else {
-			if (probe_bpf_legacy__attach(probe_bpf_legacy)) {
-				support_level = BPFTUNE_NONE;
-				bpftune_log(LOG_DEBUG, "legacy bpftune support not available (attach): %s\n",
-					    strerror(errno));
+			probe_bpf_nobtf = probe_bpf_nobtf__open_and_load();
+			err = libbpf_get_error(probe_bpf_nobtf);
+			if (err) {
+				support_level = BPFTUNE_SUPPORT_NONE;
+				bpftune_log(LOG_DEBUG, "no-BTF bpftune support not available (load): %s\n",
+				    strerror(err));
+			} else {
+				err = probe_bpf_nobtf__attach(probe_bpf_nobtf);
+				if (!err) {
+					support_level = BPFTUNE_SUPPORT_NOBTF;
+				} else {
+					support_level = BPFTUNE_SUPPORT_NONE;
+					bpftune_log(LOG_DEBUG, "no-BTF bpftune support not available (attach): %s\n",
+						    strerror(err));
+				}
 			}
-			probe_bpf_legacy__destroy(probe_bpf_legacy);
 		}
 	}
+	probe_bpf__destroy(probe_bpf);
+	if (probe_bpf_legacy)
+		probe_bpf_legacy__destroy(probe_bpf_legacy);
+	if (probe_bpf_nobtf)
+		probe_bpf_nobtf__destroy(probe_bpf_nobtf);
+
 	ret = bpftune_netns_cookie_supported();
 	if (!ret)
 		bpftune_log(LOG_DEBUG, "netns cookie not supported\n");
 
 	bpftune_set_bpf_log(true);
 	bpftune_cap_drop();
+
+done:
+	if (force_support_level && force_support_level <= support_level)
+		return force_support_level;
 	return support_level;
-}
-
-bool bpftuner_bpf_legacy(void)
-{
-	if (force_bpf_legacy)
-		return true;
-
-	if (support_level == BPFTUNE_NONE)
-		support_level = bpftune_bpf_support();
-	return support_level < BPFTUNE_NORMAL;
 }
 
 /* called with caps set */

@@ -63,9 +63,11 @@ BPF_TUNERS = $(patsubst %,%.bpf.o,$(TUNERS))
 
 BPF_OBJS = $(BPF_TUNERS)
 LEGACY_BPF_OBJS = $(patsubst %.bpf.o,%.bpf.legacy.o,$(BPF_OBJS))
+NOBTF_BPF_OBJS = $(patsubst %.bpf.o,%.bpf.nobtf.o,$(BPF_OBJS))
 
 BPF_SKELS = $(patsubst %,%.skel.h,$(TUNERS))
 LEGACY_BPF_SKELS = $(patsubst %.skel.h,%.skel.legacy.h,$(BPF_SKELS))
+NOBTF_BPF_SKELS = $(patsubst %.skel.h,%.skel.nobtf.h,$(BPF_SKELS))
 
 .DELETE_ON_ERROR:
 
@@ -82,7 +84,7 @@ $(TUNER_LIBS): $(BPF_SKELS) $(TUNER_OBJS)
 	$(CC) $(CFLAGS) -shared -o $(@) $(patsubst %.so,%.c,$(@)) \
 		$(LDLIBS) -lbpftune $(LDFLAGS)
 
-$(TUNER_OBJS): $(BPF_SKELS) $(LEGACY_BPF_SKELS)
+$(TUNER_OBJS): $(BPF_SKELS) $(LEGACY_BPF_SKELS) $(NOBTF_BPF_SKELS)
 
 $(BPF_OBJS): $(patsubst %.o,%.c,$(BPF_OBJS))
 	$(CLANG) $(BPF_CFLAGS) -D__TARGET_ARCH_$(SRCARCH) -O2 -target bpf \
@@ -93,9 +95,17 @@ $(LEGACY_BPF_OBJS): $(patsubst %.legacy.o,%.c,$(LEGACY_BPF_OBJS))
 		$(INCLUDES) -c $(patsubst %.legacy.o,%.c,$(@)) \
 		-o $(@)
 
+$(NOBTF_BPF_OBJS): $(patsubst %.nobtf.o,%.c,$(NOBTF_BPF_OBJS))
+	$(CLANG) $(BPF_CFLAGS) -D__TARGET_ARCH_$(SRCARCH) -DBPFTUNE_NOBTF -O2 -target bpf \
+		$(INCLUDES) -c $(patsubst %.nobtf.o,%.c,$(@)) \
+		-o $(@)
+
 $(BPF_SKELS): $(BPF_OBJS)
 	$(BPFTOOL) gen skeleton $(subst .skel.h,.bpf.o,$@) > $@
 
 $(LEGACY_BPF_SKELS): $(LEGACY_BPF_OBJS)
 	$(BPFTOOL) gen skeleton $(subst .skel.legacy.h,.bpf.legacy.o,$@) > $(subst .skel.h,.skel.legacy.h,$@)
+
+$(NOBTF_BPF_SKELS): $(NOBTF_BPF_OBJS)
+	$(BPFTOOL) gen skeleton $(subst .skel.nobtf.h,.bpf.nobtf.o,$@) > $(subst .skel.h,.skel.nobtf.h,$@)
 

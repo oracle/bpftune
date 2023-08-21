@@ -27,6 +27,8 @@ BPF_MAP_DEF(probe_hash_map, BPF_MAP_TYPE_HASH, __u64, __u64, 65536);
 /* probe kprobe/fentry */
 BPF_FENTRY(setup_net, struct net *net, struct user_namespace *user_ns)
 {
+	if (get_netns_cookie(net))
+		return 0;
 	return 0;
 }
 

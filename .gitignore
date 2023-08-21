@@ -3,5 +3,6 @@
 *.8
 *.skel.h
 *.skel.legacy.h
+*.skel.nobtf.h
 *.swp
 *.plist

@@ -21,8 +21,7 @@ LIBBPFTUNE_0.1.1 {
 		bpftune_tuner_num;
 		bpftune_bpf_support;
 		bpftuner_init;
-		bpftuner_force_bpf_legacy;
-		bpftuner_bpf_legacy;
+		bpftune_force_bpf_support;
 		__bpftuner_bpf_load;
 		__bpftuner_bpf_attach;
 		bpftuner_tunables_init;

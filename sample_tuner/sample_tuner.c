@@ -21,6 +21,7 @@
 #include <bpftune/bpftune.h>
 #include "sample_tuner.skel.h"
 #include "sample_tuner.skel.legacy.h"
+#include "sample_tuner.skel.nobtf.h"
 
 int init(struct bpftuner *tuner)
 {
