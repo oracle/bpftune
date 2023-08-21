@@ -21,6 +21,7 @@
 #include "netns_tuner.h"
 #include "netns_tuner.skel.h"
 #include "netns_tuner.skel.legacy.h"
+#include "netns_tuner.skel.nobtf.h"
 
 struct netns_tuner_bpf *skel;
 

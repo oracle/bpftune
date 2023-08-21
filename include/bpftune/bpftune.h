@@ -150,6 +150,13 @@ struct bpftuner_strategy {
 				 * strategy; if NULL, all */
 };
 
+enum bpftune_support_level {
+	BPFTUNE_SUPPORT_NONE,
+	BPFTUNE_SUPPORT_NOBTF,
+	BPFTUNE_SUPPORT_LEGACY,
+	BPFTUNE_SUPPORT_NORMAL
+};
+
 struct bpftuner {
 	unsigned int id;
 	enum bpftune_state state;
@@ -158,6 +165,7 @@ struct bpftuner {
 	void *handle;
 	const char *name;
 	struct bpf_object_skeleton *skeleton;
+	enum bpftune_support_level bpf_support;
 	bool bpf_legacy;
 	void *skel;
 	void *obj;

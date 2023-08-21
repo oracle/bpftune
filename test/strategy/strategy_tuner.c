@@ -21,6 +21,7 @@
 #include <bpftune/bpftune.h>
 #include "strategy_tuner.skel.h"
 #include "strategy_tuner.skel.legacy.h"
+#include "strategy_tuner.skel.nobtf.h"
 
 static int evaluate_A(struct bpftuner *tuner, struct bpftuner_strategy *strategy)
 {

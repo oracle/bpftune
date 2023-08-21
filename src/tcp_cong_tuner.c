@@ -21,6 +21,7 @@
 #include "tcp_cong_tuner.h"
 #include "tcp_cong_tuner.skel.h"
 #include "tcp_cong_tuner.skel.legacy.h"
+#include "tcp_cong_tuner.skel.nobtf.h"
 
 #include <arpa/inet.h>
 #include <errno.h>
@@ -65,7 +66,7 @@ int init(struct bpftuner *tuner)
 		return 1;
 	}
 
-	if (tuner->bpf_legacy) {
+	if (tuner->bpf_support <= BPFTUNE_SUPPORT_LEGACY) {
 
 		/* attach to root cgroup */
 		if (bpftuner_cgroup_attach(tuner, "cong_tuner_sockops", BPF_CGROUP_SOCK_OPS))
@@ -98,7 +99,7 @@ error:
 void fini(struct bpftuner *tuner)
 {
 	bpftune_log(LOG_DEBUG, "calling fini for %s\n", tuner->name);
-	if (tuner->bpf_legacy)
+	if (bpftune_bpf_support() <= BPFTUNE_SUPPORT_LEGACY)
 		bpftuner_cgroup_detach(tuner, "cong_tuner_sockops", BPF_CGROUP_SOCK_OPS);
 	if (tcp_iter_fd)
 		close(tcp_iter_fd);
@@ -118,7 +119,7 @@ void event_handler(struct bpftuner *tuner, struct bpftune_event *event,
 "due to loss events for %s, specify '%s' congestion control algorithm\n",
 				buf, "bbr");
 
-	if (!tuner->bpf_legacy) {
+	if (bpftune_bpf_support() == BPFTUNE_SUPPORT_NORMAL) {
 		if (!bpftune_cap_add()) {
 			/* kick existing connections by running iter over them... */
 			while (read(tcp_iter_fd, &iterbuf, sizeof(iterbuf)) > 0 || errno == EAGAIN) {}

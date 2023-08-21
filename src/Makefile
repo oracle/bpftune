@@ -94,9 +94,11 @@ BPF_TUNERS = $(patsubst %,%.bpf.o,$(TUNERS))
 
 BPF_OBJS = $(BPF_TUNERS) probe.bpf.o
 LEGACY_BPF_OBJS = $(patsubst %.bpf.o,%.bpf.legacy.o,$(BPF_OBJS))
+NOBTF_BPF_OBJS = $(patsubst %.bpf.o,%.bpf.nobtf.o,$(BPF_OBJS))
 
 BPF_SKELS = $(patsubst %,%.skel.h,$(TUNERS)) probe.skel.h
 LEGACY_BPF_SKELS = $(patsubst %.skel.h,%.skel.legacy.h,$(BPF_SKELS))
+NOBTF_BPF_SKELS = $(patsubst %.skel.h,%.skel.nobtf.h,$(BPF_SKELS))
 
 .DELETE_ON_ERROR:
 
@@ -107,7 +109,7 @@ all: analyze $(OPATH) $(OPATH)bpftune $(TUNER_LIBS)
 $(OPATH):
 	mkdir $(OPATH)
 	
-analyze: $(BPF_SKELS) $(LEGACY_BPF_SKELS)
+analyze: $(BPF_SKELS) $(LEGACY_BPF_SKELS) $(NOBTF_BPF_SKELS)
 	$(CLANG) --analyze $(INCLUDES) libbpftune.c bpftune.c $(TUNER_SRCS)
 clean:
 	$(call QUIET_CLEAN, bpftune)
@@ -146,13 +148,13 @@ $(OPATH)libbpftune.so: libbpftune.c ../include/bpftune/libbpftune.h $(OPATH)libb
 	rm -f $(@) ; \
 	ln -sr $(@).$(VERSION) $(@)
 
-$(TUNER_OBJS): $(BPF_SKELS) $(LEGACY_BPF_SKELS)
+$(TUNER_OBJS): $(BPF_SKELS) $(LEGACY_BPF_SKELS) $(NOBTF_BPF_SKELS)
 
 $(TUNER_LIBS): $(OPATH)libbpftune.so $(TUNER_OBJS)
 	$(CC) $(CFLAGS) -shared -o $(@) $(patsubst $(OPATH)%.so,%.c,$(@)) \
 		$(LDLIBS) -lbpftune $(LDFLAGS)
 
-$(OPATH)libbpftune.o: probe.skel.h probe.skel.legacy.h
+$(OPATH)libbpftune.o: probe.skel.h probe.skel.legacy.h probe.skel.nobtf.h
 	$(QUIET_CC)$(CC) $(CFLAGS) -c libbpftune.c -o $@
 
 $(OPATH)bpftune.o: $(OPATH)libbpftune.so
@@ -170,9 +172,17 @@ $(LEGACY_BPF_OBJS): $(patsubst %.legacy.o,%.c,$(LEGACY_BPF_OBJS))
 		$(INCLUDES) -c $(patsubst %.legacy.o,%.c,$(@)) \
 		-o $(@)
 
+$(NOBTF_BPF_OBJS): $(patsubst %.nobtf.o,%.c,$(NOBTF_BPF_OBJS))
+	$(CLANG) $(BPF_CFLAGS) -D__TARGET_ARCH_$(SRCARCH) -DBPFTUNE_NOBTF -O2 -target bpf \
+		$(INCLUDES) -c $(patsubst %.nobtf.o,%.c,$(@)) \
+		-o $(@)
+
 $(BPF_SKELS): $(BPF_OBJS)
 	$(BPFTOOL) gen skeleton $(subst .skel.h,.bpf.o,$@) > $@
 
 $(LEGACY_BPF_SKELS): $(LEGACY_BPF_OBJS)
 	$(BPFTOOL) gen skeleton $(subst .skel.legacy.h,.bpf.legacy.o,$@) > $(subst .skel.h,.skel.legacy.h,$@)
+
+$(NOBTF_BPF_SKELS): $(NOBTF_BPF_OBJS)
+	$(BPFTOOL) gen skeleton $(subst .skel.nobtf.h,.bpf.nobtf.o,$@) > $(subst .skel.h,.skel.nobtf.h,$@)
 

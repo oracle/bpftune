@@ -41,28 +41,28 @@ int BPF_PROG(bpftune_neigh_create, struct neigh_table *tbl,
 	if (!tbl_stats) {
 		struct tbl_stats new_tbl_stats = {};
 
-		new_tbl_stats.family = BPF_CORE_READ(tbl, family);
-		new_tbl_stats.entries = BPF_CORE_READ(tbl, entries.counter);
-		new_tbl_stats.max = BPF_CORE_READ(tbl, gc_thresh3);
+		new_tbl_stats.family = BPFTUNE_CORE_READ(tbl, family);
+		new_tbl_stats.entries = BPFTUNE_CORE_READ(tbl, entries.counter);
+		new_tbl_stats.max = BPFTUNE_CORE_READ(tbl, gc_thresh3);
 		if (dev) {
 			bpf_probe_read(&new_tbl_stats.dev, sizeof(new_tbl_stats.dev), dev);
-			new_tbl_stats.ifindex = BPF_CORE_READ(dev, ifindex);
+			new_tbl_stats.ifindex = BPFTUNE_CORE_READ(dev, ifindex);
 		}
 		bpf_map_update_elem(&tbl_map, &key, &new_tbl_stats, BPF_ANY);
 		tbl_stats = bpf_map_lookup_elem(&tbl_map, &key);
 		if (!tbl_stats)
 			return 0;
 	}
-	tbl_stats->entries = BPF_CORE_READ(tbl, entries.counter);
-	tbl_stats->gc_entries = BPF_CORE_READ(tbl, gc_entries.counter);
-	tbl_stats->max = BPF_CORE_READ(tbl, gc_thresh3);
+	tbl_stats->entries = BPFTUNE_CORE_READ(tbl, entries.counter);
+	tbl_stats->gc_entries = BPFTUNE_CORE_READ(tbl, gc_entries.counter);
+	tbl_stats->max = BPFTUNE_CORE_READ(tbl, gc_thresh3);
 
 	/* exempt from gc entries are not subject to space constraints, but
  	 * do take up table entries.
  	 */
 	if (NEARLY_FULL(tbl_stats->entries, tbl_stats->max)) {
-		struct neigh_parms *parms = BPF_CORE_READ(n, parms);
-		struct net *net = BPF_CORE_READ(parms, net.net);
+		struct neigh_parms *parms = BPFTUNE_CORE_READ(n, parms);
+		struct net *net = BPFTUNE_CORE_READ(parms, net.net);
 
 		event.tuner_id = tuner_id;
 		event.scenario_id = NEIGH_TABLE_FULL;

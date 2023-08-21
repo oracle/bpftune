@@ -50,36 +50,36 @@ int BPF_KPROBE(bpftune_sysctl, struct ctl_table_header *head,
 	current_pid = bpf_get_current_pid_tgid() >> 32;
 	if (current_pid == bpftune_pid)
 		return 0;
-	parent = BPF_CORE_READ(head, parent);
+	parent = BPFTUNE_CORE_READ(head, parent);
 	if (!parent)
 		return 0;
-	gparent = BPF_CORE_READ(parent, header.parent);
+	gparent = BPFTUNE_CORE_READ(parent, header.parent);
 	if (!gparent)
 		return 0;
-	ggparent = BPF_CORE_READ(gparent, header.parent);
+	ggparent = BPFTUNE_CORE_READ(gparent, header.parent);
 	if (!ggparent) {
 		root = gparent;
 	} else {
-		gggparent = BPF_CORE_READ(ggparent, header.parent);
+		gggparent = BPFTUNE_CORE_READ(ggparent, header.parent);
 		if (!gggparent) {
 			root = ggparent;
 		} else {
-			root = BPF_CORE_READ(gggparent, header.parent);
+			root = BPFTUNE_CORE_READ(gggparent, header.parent);
 			if (!root)
 				root = gggparent;
 		}
 	}
 	net = (void *)root -
-		(__u64)__builtin_preserve_access_index(&dummy_net->sysctls) -
-		(__u64)__builtin_preserve_access_index(&dummy_ctl_table_set->dir);
+		(__u64)BPFTUNE_PRESERVE_ACCESS_INDEX(dummy_net, sysctls) -
+		(__u64)BPFTUNE_PRESERVE_ACCESS_INDEX(dummy_ctl_table_set, dir);
 	event.pid = current_pid;
 	event.netns_cookie = get_netns_cookie(net);
 	if (event.netns_cookie == (unsigned long)-1)
 		return 0;
-	parent_table = BPF_CORE_READ(parent, header.ctl_table);
+	parent_table = BPFTUNE_CORE_READ(parent, header.ctl_table);
 	str = event.str;
 	if (parent_table) {
-		procname = BPF_CORE_READ(parent_table, procname);
+		procname = BPFTUNE_CORE_READ(parent_table, procname);
 		if (procname) {
 			if (!bpf_probe_read(event.str, sizeof(event.str), procname)) {
 				for (; len > 0 && *str; len--, str++) {}
@@ -92,7 +92,7 @@ int BPF_KPROBE(bpftune_sysctl, struct ctl_table_header *head,
 		}
 	}
 
-	procname = BPF_CORE_READ(table, procname);
+	procname = BPFTUNE_CORE_READ(table, procname);
 	if (!procname)
 		return 0;
 	if (bpf_probe_read(str, len, procname) < 0)

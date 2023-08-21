@@ -5,6 +5,7 @@
 #include "tcp_buffer_tuner.h"
 #include "tcp_buffer_tuner.skel.h"
 #include "tcp_buffer_tuner.skel.legacy.h"
+#include "tcp_buffer_tuner.skel.nobtf.h"
 
 #include <bpftune/corr.h>
 
