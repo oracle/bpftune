@@ -806,7 +806,9 @@ int bpftune_ring_buffer_poll(void *ring_buffer, int interval)
 	while (!ring_buffer_done) {
 		err = ring_buffer__poll(rb, interval);
 		if (err < 0) {
-			bpftune_log_bpf_err(err, "ring_buffer__poll: %s\n");
+			/* -EINTR means we got signal; don't report as error. */
+			if (err != -EINTR)
+				bpftune_log_bpf_err(err, "ring_buffer__poll: %s\n");
 			break;
 		}
 	}
