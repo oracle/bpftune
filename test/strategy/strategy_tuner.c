@@ -23,12 +23,12 @@
 #include "strategy_tuner.skel.legacy.h"
 #include "strategy_tuner.skel.nobtf.h"
 
-static int evaluate_A(struct bpftuner *tuner, struct bpftuner_strategy *strategy)
+static long double evaluate_A(struct bpftuner *tuner, struct bpftuner_strategy *strategy)
 {
 	if (tuner->strategy == strategy)
-		return 0;
+		return (long double)0;
 	else
-		return 1;
+		return (long double)1;
 }
 
 const char *progs_A[] = { "entry__proc_dostring_coredump", NULL };
@@ -41,12 +41,12 @@ struct bpftuner_strategy strategy_A = {
 	.bpf_progs	= progs_A,
 };
 
-static int evaluate_B(struct bpftuner *tuner, struct bpftuner_strategy *strategy)
+static long double evaluate_B(struct bpftuner *tuner, struct bpftuner_strategy *strategy)
 {
 	if (tuner->strategy == strategy)
-		return 0;
+		return (long double)0;
 	else
-		return 1;
+		return (long double)1;
 }
 
 const char *progs_B[] = { "entry__proc_dostring", NULL };

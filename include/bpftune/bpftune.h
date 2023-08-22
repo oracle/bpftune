@@ -144,7 +144,7 @@ struct bpftuner_strategy {
 	const char *name;
 	const char *description;
 	/* return a number to compare with other strategies */
-	int (*evaluate)(struct bpftuner *tuner, struct bpftuner_strategy *strategy);
+	long double (*evaluate)(struct bpftuner *tuner, struct bpftuner_strategy *strategy);
 	unsigned long timeout;	/* time in seconds until evaluation */
 	const char **bpf_progs;	/* programs to load in BPF skeleton for this
 				 * strategy; if NULL, all */
