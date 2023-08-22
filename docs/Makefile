@@ -34,7 +34,7 @@ installprefix = $(DESTDIR)/$(prefix)
 mandir ?= $(prefix)/man
 man8dir = $(mandir)/man8
 
-MAN8_RST = bpftune.rst bpftune-sysctl.rst bpftune-tcp-cong.rst \
+MAN8_RST = bpftune.rst bpftune-sysctl.rst bpftune-tcp-conn.rst \
 	   bpftune-neigh.rst bpftune-tcp-buffer.rst bpftune-netns.rst \
 	   bpftune-net-buffer.rst
 

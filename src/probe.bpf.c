@@ -19,7 +19,7 @@
 
 #include <bpftune/bpftune.bpf.h>
 #include "netns_tuner.h"
-#include "tcp_cong_tuner.h"
+#include "tcp_conn_tuner.h"
 
 /* probe hash map */
 BPF_MAP_DEF(probe_hash_map, BPF_MAP_TYPE_HASH, __u64, __u64, 65536);

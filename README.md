@@ -147,8 +147,8 @@ The key components are
 
 ## Supported tuners
 
-- congestion tuner: auto-tune choice of congestion control algorithm.
-  See bpftune-tcp-cong (8).
+- TCP connection tuner: auto-tune choice of congestion control algorithm.
+  See bpftune-tcp-conn (8).
 - neighbour table tuner: auto-tune neighbour table sizes by growing
   tables when approaching full. See bpftune-neigh (8).
 - route table tuner: auto-tune route table size by growing tables

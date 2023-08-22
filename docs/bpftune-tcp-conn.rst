@@ -1,16 +1,16 @@
 ================
 BPFTUNE-TCP-CONG
 ================
--------------------------------------------------------------------------------
-Congestion bpftune plugin for auto-selection of congestion control algorithm
--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+TCP connection bpftune plugin for auto-selection of congestion control algorithm
+--------------------------------------------------------------------------------
 
 :Manual section: 8
 
 
 DESCRIPTION
 ===========
-        The congestion algorithm tuner sets congestion control algorithm on
+        The TCP connection algorithm tuner sets congestion control algorithm on
         TCP sockets.  Linux uses cubic by default, and it works well in a wide
         range of settings, however it can under-perform in lossy networks.
 

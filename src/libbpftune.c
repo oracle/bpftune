@@ -1543,7 +1543,7 @@ int bpftune_module_unload(const char *name)
 static void bpftuner_strategy_update(struct bpftuner *tuner)
 {
 	struct bpftuner_strategy *strategy, *max_strategy = NULL;
-	int curr, max = 0;
+	long double curr, max = 0;
 
 	if (!tuner->strategies)
 		return;

@@ -19,7 +19,7 @@
 
 #include <bpftune/bpftune.bpf.h>
 
-#include "tcp_cong_tuner.h"
+#include "tcp_conn_tuner.h"
 
 const char bbr[4] = { 'b', 'b', 'r', '\0' };
 
