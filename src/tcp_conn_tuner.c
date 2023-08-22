@@ -18,10 +18,10 @@
  */
 
 #include <bpftune/libbpftune.h>
-#include "tcp_cong_tuner.h"
-#include "tcp_cong_tuner.skel.h"
-#include "tcp_cong_tuner.skel.legacy.h"
-#include "tcp_cong_tuner.skel.nobtf.h"
+#include "tcp_conn_tuner.h"
+#include "tcp_conn_tuner.skel.h"
+#include "tcp_conn_tuner.skel.legacy.h"
+#include "tcp_conn_tuner.skel.nobtf.h"
 
 #include <arpa/inet.h>
 #include <errno.h>
@@ -40,7 +40,7 @@ static struct bpftunable_scenario scenarios[] = {
   "Because loss rate has exceeded 1 percent for a connection, use bbr congestion control algorithm instead of default" },
 };
 
-struct tcp_cong_tuner_bpf *skel;
+struct tcp_conn_tuner_bpf *skel;
 
 int tcp_iter_fd;
 
@@ -56,7 +56,7 @@ int init(struct bpftuner *tuner)
 		bpftune_log(LOG_DEBUG, "could not load tcp_bbr module: %s\n",
 			    strerror(-err));
 
-	err = bpftuner_bpf_init(tcp_cong, tuner, NULL);
+	err = bpftuner_bpf_init(tcp_conn, tuner, NULL);
 	if (err)
 		return err;
 
