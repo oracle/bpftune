@@ -167,12 +167,17 @@ void bpftune_set_log(int level,
 	bpftune_set_bpf_log(true);
 }
 
-void bpftune_log_bpf_err(int err, const char *fmt)
+static void bpftune_log_bpf(int level, int err, const char *fmt)
 {
 	char errbuf[256];
 
 	(void) libbpf_strerror(err, errbuf, sizeof(errbuf));
-	bpftune_log(LOG_ERR, fmt, errbuf);
+	bpftune_log(level, fmt, errbuf);
+}
+
+void bpftune_log_bpf_err(int err, const char *fmt)
+{
+	bpftune_log_bpf(LOG_ERR, err, fmt);
 }
 
 static const cap_value_t cap_vector[] = {
@@ -807,9 +812,13 @@ int bpftune_ring_buffer_poll(void *ring_buffer, int interval)
 		err = ring_buffer__poll(rb, interval);
 		if (err < 0) {
 			/* -EINTR means we got signal; don't report as error. */
+			bpftune_log_bpf(err == -EINTR ? LOG_DEBUG : LOG_ERR,
+					err, "ring_buffer__poll: %s\n");
+			/* signals we have not masked will fini the ring buffer
+			 * so do not exit for -EINTR.
+			 */
 			if (err != -EINTR)
-				bpftune_log_bpf_err(err, "ring_buffer__poll: %s\n");
-			break;
+				break;
 		}
 	}
 	ring_buffer__free(rb);
