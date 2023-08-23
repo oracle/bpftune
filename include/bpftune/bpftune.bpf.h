@@ -197,6 +197,7 @@ BPF_RINGBUF(ring_buffer_map, 128 * 1024);
 BPF_MAP_DEF(netns_map, BPF_MAP_TYPE_HASH, __u64, __u64, 65536);
 
 unsigned int tuner_id;
+unsigned int strategy_id;
 unsigned int bpftune_pid;
 /* init_net value used for older kernels since __ksym does not work */
 unsigned long bpftune_init_net;
