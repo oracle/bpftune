@@ -163,16 +163,16 @@ $(OPATH)bpftune.o: $(OPATH)libbpftune.so
 %.skel.h: %.bpf.o
 	$(QUIET_GEN)$(BPFTOOL) gen skeleton $< > $@
 
-$(BPF_OBJS): $(patsubst %.o,%.c,$(BPF_OBJS))
+$(BPF_OBJS): $(patsubst %.o,%.c,$(BPF_OBJS)) ../include/bpftune/bpftune.bpf.h
 	$(CLANG) $(BPF_CFLAGS) -D__TARGET_ARCH_$(SRCARCH) -O2 -target bpf \
 		$(INCLUDES) -c $(patsubst %.o,%.c,$(@)) -o $(@)
 
-$(LEGACY_BPF_OBJS): $(patsubst %.legacy.o,%.c,$(LEGACY_BPF_OBJS))
+$(LEGACY_BPF_OBJS): $(patsubst %.legacy.o,%.c,$(LEGACY_BPF_OBJS)) ../include/bpftune/bpftune.bpf.h
 	$(CLANG) $(BPF_CFLAGS) -D__TARGET_ARCH_$(SRCARCH) -DBPFTUNE_LEGACY -O2 -target bpf \
 		$(INCLUDES) -c $(patsubst %.legacy.o,%.c,$(@)) \
 		-o $(@)
 
-$(NOBTF_BPF_OBJS): $(patsubst %.nobtf.o,%.c,$(NOBTF_BPF_OBJS))
+$(NOBTF_BPF_OBJS): $(patsubst %.nobtf.o,%.c,$(NOBTF_BPF_OBJS)) ../include/bpftune/bpftune.bpf.h
 	$(CLANG) $(BPF_CFLAGS) -D__TARGET_ARCH_$(SRCARCH) -DBPFTUNE_NOBTF -O2 -target bpf \
 		$(INCLUDES) -c $(patsubst %.nobtf.o,%.c,$(@)) \
 		-o $(@)

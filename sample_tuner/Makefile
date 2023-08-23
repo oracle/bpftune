@@ -87,8 +87,8 @@ $(TUNER_LIBS): $(BPF_SKELS) $(TUNER_OBJS)
 %.skel.h: %.bpf.o
 	$(QUIET_GEN)$(BPFTOOL) gen skeleton $< > $@
 
-$(BPF_OBJS): $(patsubst %.o,%.c,$(BPF_OBJS))
-	$(CLANG) -g -D__TARGET_ARCH_$(SRCARCH) -O2 -target bpf			\
+$(BPF_OBJS): $(patsubst %.o,%.c,$(BPF_OBJS)) ../include/bpftune/bpftune.bpf.h
+	$(CLANG) -g -D__TARGET_ARCH_$(SRCARCH) -O2 -target bpf		\
 		$(INCLUDES) -c $(patsubst %.o,%.c,$(@)) -o $(@);
 	$(CLANG) -g -D__TARGET_ARCH_$(SRCARCH) -DBPFTUNE_LEGACY -O2 -target bpf \
 		$(INCLUDES) -c $(patsubst %.o,%.c,$(@)) \

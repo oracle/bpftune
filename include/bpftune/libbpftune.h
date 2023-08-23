@@ -147,6 +147,8 @@ void bpftuner_tunables_fini(struct bpftuner *tuner);
 		__skel->bss->bpftune_pid = getpid();			     \
 		__skel->bss->bpftune_learning_rate = bpftune_learning_rate;  \
 		__skel->bss->tuner_id = bpftune_tuner_num();		     \
+		if (tuner->strategy)					     \
+			__skel->bss->strategy_id = tuner->strategy->id;	     \
 		tuner->obj = __skel->obj;				     \
 		tuner->ring_buffer_map = __skel->maps.ring_buffer_map;	     \
 		tuner->netns_map = __skel->maps.netns_map;		     \

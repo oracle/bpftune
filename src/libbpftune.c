@@ -1620,9 +1620,15 @@ int bpftuner_strategy_set(struct bpftuner *tuner,
 int bpftuner_strategies_add(struct bpftuner *tuner, struct bpftuner_strategy **strategies,
 			    struct bpftuner_strategy *default_strategy)
 {
+	struct bpftuner_strategy *strategy;
+	unsigned int strategy_id = 0;
+
 	if (!strategies || tuner->strategies)
 		return 0;
 	tuner->strategies = strategies;
+	/* assign ids to each strategy added; used in BPF context */
+	bpftuner_for_each_strategy(tuner, strategy)
+		strategy->id = strategy_id++;
 	if (default_strategy)
 		return bpftuner_strategy_set(tuner, default_strategy);
 	bpftuner_strategy_update(tuner);
