@@ -54,6 +54,7 @@
 int ringbuf_map_fd;
 void *ring_buffer;
 bool use_stderr;
+bool rollback;
 
 char *allowlist[BPFTUNE_MAX_TUNERS];
 int nr_allowlist;
@@ -200,6 +201,8 @@ int init(const char *library_dir)
 		/* individual tuner failure shouldn't prevent progress */
 		if (!tuner)
 			continue;
+		if (rollback)
+			bpftuner_rollback_set(tuner);
 		if (ringbuf_map_fd == 0)
 			ringbuf_map_fd = bpftuner_ring_buffer_map_fd(tuner);
 	}
@@ -233,6 +236,7 @@ void do_help(void)
 		"		     { -h|--help}}\n"
 		"		     { -l|--library_path library_path}\n"
 		"		     { -r|--learning_rate learning_rate}\n"
+		"		     { -R|--rollback}\n"
 		"		     { -s|--stderr}\n"
 		"		     { -S|--suppport}\n"
 		"		     { -V|--version}}\n",
@@ -284,6 +288,7 @@ int main(int argc, char *argv[])
 		{ "help",	no_argument,		NULL,	'h' },
 		{ "libdir",	required_argument,	NULL,	'l' },
 		{ "learning_rate", required_argument,	NULL,	'r' },
+		{ "rollback",	no_argument,		NULL,	'R' },
 		{ "stderr", 	no_argument,		NULL,	's' },
 		{ "support",	no_argument,		NULL,	'S' },
 		{ "version",	no_argument,		NULL,	'V' },
@@ -302,7 +307,7 @@ int main(int argc, char *argv[])
 
 	bin_name = argv[0];
 
-	while ((opt = getopt_long(argc, argv, "a:c:dDhl:Lr:sSV", options, NULL))
+	while ((opt = getopt_long(argc, argv, "a:c:dDhl:Lr:RsSV", options, NULL))
 		>= 0) {
 		switch (opt) {
 		case 'a':
@@ -337,6 +342,9 @@ int main(int argc, char *argv[])
 					BPFTUNE_DELTA_MIN, BPFTUNE_DELTA_MAX);
 				return 1;
 			}
+			break;
+		case 'R':
+			rollback = true;
 			break;
 		case 's':
 			use_stderr = true;

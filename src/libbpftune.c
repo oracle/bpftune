@@ -1055,6 +1055,18 @@ static void bpftuner_scenario_log(struct bpftuner *tuner, unsigned int tunable,
 			}
 			bpftune_log(BPFTUNE_LOG_LEVEL, "sysctl '%s' changed from (%s) -> (%s)\n",
 				    t->desc.name, oldvals, newvals);
+
+			if (tuner->rollback && global_ns) {
+				bpftuner_tunable_sysctl_write(tuner,
+					tunable,
+					scenario,
+					0,
+					t->desc.num_values,
+					t->initial_values,
+					"Rolling back sysctl values for '%s' from (%s) to original values (%s)...\n",
+					t->desc.name,
+					newvals, oldvals);
+			}
 		}
 	} else {
 		bpftune_log(BPFTUNE_LOG_LEVEL, "Scenario '%s' occurred for tunable '%s' in %sglobal ns. %s\n",
@@ -1676,4 +1688,9 @@ void bpftuner_bpf_set_autoload(struct bpftuner *tuner)
 				    tuner->strategy->name, strerror(err));
 		}
 	}
+}
+
+void bpftuner_rollback_set(struct bpftuner *tuner)
+{
+	tuner->rollback = true;
 }

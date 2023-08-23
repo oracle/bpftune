@@ -42,6 +42,7 @@ LIBBPFTUNE_0.1.1 {
 	        bpftuner_ring_buffer_map_fd;
 		bpftuner_strategy_set;
 		bpftuner_strategies_add;
+		bpftuner_rollback_set;
 		bpftune_ring_buffer_init;
 		bpftune_ring_buffer_poll;
 		bpftune_ring_buffer_fini;
