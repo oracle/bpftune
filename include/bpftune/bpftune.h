@@ -167,7 +167,7 @@ struct bpftuner {
 	const char *name;
 	struct bpf_object_skeleton *skeleton;
 	enum bpftune_support_level bpf_support;
-	bool bpf_legacy;
+	bool rollback;
 	void *skel;
 	void *obj;
 	int (*init)(struct bpftuner *tuner);

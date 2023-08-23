@@ -299,4 +299,6 @@ int bpftuner_strategies_add(struct bpftuner *tuner, struct bpftuner_strategy **s
 bool bpftuner_bpf_prog_in_strategy(struct bpftuner *tuner, const char *prog);
 void bpftuner_bpf_set_autoload(struct bpftuner *tuner);
 
+void bpftuner_rollback_set(struct bpftuner *tuner);
+
 #endif /* __LIBBPFTUNE_H */

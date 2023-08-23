@@ -16,6 +16,7 @@ SYNOPSIS
 	| { [**-s** | **--stderr** } | { [**-c** | **--cgroup**] cgroup} |
         { [**-l** | **--libdir** ] libdir} | [{ **-d** | **--debug** }] }
         { [**-r** | **--learning_rate** ] learning_rate}
+        { [**-R** | **--rollback** ]}
         { [**-S** | **--support** ]}
 
 DESCRIPTION
@@ -75,5 +76,12 @@ OPTIONS
                 the limit is increased by 25%.  Default learning rate is 4.
                 Lower values are more conservative as they change only when
                 closer to limits, but may require more frequent changes as
-                a result
+                a result.
 
+        -R, --rollback
+
+                Roll back sysctl settings on exit; this allows us to explore
+                tunable updates bpftune makes without making long-term changes
+                to the system.  On exit, bpftune summarizes the changes made
+                and rolls back to the sysctl values that were set prior to
+                bpftune running.
