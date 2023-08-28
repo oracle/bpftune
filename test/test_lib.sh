@@ -58,6 +58,8 @@ check_prog "$TC" tc iproute-tc
 export IPERF3=$(which iperf3 2>/dev/null)
 check_prog "$IPERF3" iperf3 iperf3
 export QPERF=$(which qperf 2>/dev/null)
+export NC=$(which nc 2>/dev/null)
+check_prog "$NC" nc nmap-netcat
 export FIREWALL_CMD=$(which firewall-cmd 2>/dev/null)
 export AUDIT_CMD=$(which auditctl 2>/dev/null)
 export SYSLOGFILE=${SYSLOGFILE:-"/var/log/messages"}

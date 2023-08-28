@@ -30,7 +30,7 @@ TIMEOUT=30
 
 for FAMILY in ipv4 ipv6 ; do
 
-for DROP_PERCENT in 10 0 ; do
+for DROP_PERCENT in 0 10 ; do
 
  for CLIENT_OPTS in "" "-R" ; do
    case $FAMILY in
@@ -54,17 +54,26 @@ for DROP_PERCENT in 10 0 ; do
    for MODE in baseline test ; do
 
 	echo "Running ${MODE}..."
-	test_run_cmd_local "ip netns exec $NETNS $IPERF3 -p $PORT -s -1 &"
+	test_run_cmd_local "ip netns exec $NETNS $IPERF3 -p $PORT -s &"
 	if [[ $MODE != "baseline" ]]; then
-		test_run_cmd_local "$BPFTUNE -s &" true
+		test_run_cmd_local "$BPFTUNE -ds &" true
 		sleep $SETUPTIME
+		# warm up connection...
+		for i in {1..40}; do
+			set +e
+			$IPERF3 -fm $CLIENT_OPTS -p $PORT -t 1 -c $ADDR > /dev/null 2>&1
+			set -e
+		done
 	else
 		sleep $SLEEPTIME
 	fi
 	set +e
 	test_run_cmd_local "$IPERF3 -fm $CLIENT_OPTS -p $PORT -c $ADDR" true
 	set -e
-	sleep $SLEEPTIME
+	if [[ $MODE != "baseline" ]]; then
+		pkill -TERM bpftune
+		sleep $SETUPTIME
+	fi
 	sresults=$(grep -E "sender" ${CMDLOG} | awk '{print $7}')
 	rresults=$(grep -E "receiver" ${CMDLOG} | awk '{print $7}')
 	units=$(grep -E "sender|receiver" ${CMDLOG} | awk '{print $8}' |head -1)
@@ -76,17 +85,6 @@ for DROP_PERCENT in 10 0 ; do
         else
                 read -r -a stest_results <<< $sresults
 		read -r -a rtest_results <<< $rresults
-		if [[ -z "$CLIENT_OPTS" ]]; then
-			if [[ $DROP_PERCENT -gt 0 ]]; then
-				grep -E "due to loss events for ${ADDR}, specify 'bbr'" $LOGFILE
-			fi
-		fi
-		if [[ $MODE == "test" ]]; then
-			echo "Following changes were made:"
-			set +e
-			grep bpftune $LOGFILE
-			set -e
-		fi
         fi
 	sleep $SLEEPTIME
    done
@@ -114,6 +112,8 @@ for DROP_PERCENT in 10 0 ; do
 	fi      
    done 
 
+   sleep $SETUPTIME
+   grep "Summary: tcp_conn_tuner" $LOGFILE
 
    test_pass
 

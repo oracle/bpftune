@@ -25,7 +25,7 @@ struct dst_net {
 	int entries;
 };
 
-BPF_MAP_DEF(dst_net_map, BPF_MAP_TYPE_HASH, __u64, struct dst_net, 65536);
+BPF_MAP_DEF(dst_net_map, BPF_MAP_TYPE_HASH, __u64, struct dst_net, 65536, 0);
 
 SEC("kprobe/fib6_run_gc")
 int BPF_KPROBE(bpftune_fib6_run_gc_entry, unsigned long expires,

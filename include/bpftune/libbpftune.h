@@ -236,6 +236,12 @@ void bpftuner_tunables_fini(struct bpftuner *tuner);
 	__err;								     \
 })
 
+#define bpftuner_bpf_skel_val(tuner_name, tuner, val)			     \
+	(tuner->bpf_support == BPFTUNE_SUPPORT_NORMAL ?		   	     \
+	 ((struct tuner_name##_tuner_bpf *)tuner->skel)->val :		     \
+	 tuner->bpf_support == BPFTUNE_SUPPORT_LEGACY ?			     \
+	 ((struct tuner_name##_tuner_bpf_legacy *)tuner->skel)->val :	     \
+	 ((struct tuner_name##_tuner_bpf_nobtf *)tuner->skel)->val)
 
 #define bpftuner_bpf_var_set(tuner_name, tuner, var, val)		     \
 	do {								     \
@@ -259,11 +265,10 @@ void bpftuner_tunables_fini(struct bpftuner *tuner);
 	} while (0)
 
 #define bpftuner_bpf_var_get(tuner_name, tuner, var)			     \
-	(tuner->bpf_support == BPFTUNE_SUPPORT_NORMAL ?		     \
-	 ((struct tuner_name##_tuner_bpf *)tuner->skel)->bss->var :    \
-	 tuner->bpf_support == BPFTUNE_SUPPORT_LEGACY ?		     \
-	 ((struct tuner_name##_tuner_bpf_legacy *)tuner->skel)->bss->var :   \
-	 ((struct tuner_name##_tuner_bpf_nobtf *)tuner->skel)->bss->var)
+	bpftuner_bpf_skel_val(tuner_name, tuner, bss->var)
+
+#define bpftuner_bpf_map_get(tuner_name, tuner, map)			     \
+	bpftuner_bpf_skel_val(tuner_name, tuner, maps.map)
 
 enum bpftune_support_level bpftune_bpf_support(void);
 bool bpftune_have_vmlinux_btf(void);
