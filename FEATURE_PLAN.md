@@ -52,11 +52,13 @@
    Done on a per-table basis via netlink to target changes to
    tables which need it (tested)
 
-### congestion tuner
- - tuner counts retransmissions keyed by remote IP, and if we see
-   >3% retransmission for a connection to a remote host, we apply
-   BBR on connection setup to ensure we do not over-estimate
-   congestion (and thus under-estimate link capacity) (tested)
+### connection tuner
+ - tuner monitors min RTT, max delivery rate on a per-host basis
+   in order to identify which congestion control algorithm
+   approaches the ideal rate where it fills the pipe but does
+   not under- or over-estimate congestion.  Reinforcement learning
+   is used to select actions that minimize cost (which is defined
+   as divergence from optimal min RTT/max delivery rate).
 
 ### TCP buffer size tuner
  - tuner watches for tcp_expand_sndbuf() and checks if we approach
@@ -81,14 +83,20 @@
  - bpftune reports what changes were made to tunables on exit
    as a kind of summarization mode.
 
+### Rollback mode
+
+ - If run with "-R" (rollback), sysctl changes will be undone,
+   so the user can explore what auto-tuning is done without
+   making long-term changes.
+
 ### Packaging
  - added a "make pkg" target which creates rpm
  - set up other/bpftune for ol8 builds
 
 ### add support for aarch64/older kernels
 - Add legacy kprobe support also as this will be needed for
-  aarch64 which does not yet have BPF trampoline; legacy also
-  needed for older kernels that do not have fentry/fexit or
+  aarch64 which did not get BPF trampoline until 6.5; legacy
+  is needed for older kernels that do not have fentry/fexit or
   iterators.  Added "bpftune -S" support that auto-detects
   level of support provided, and legacy tuners are used
   if full support is not possible.
@@ -145,12 +153,8 @@
   where SO_[SND|RCV]BUF is not honoured do to [wr]mem_max
   settings and adjust [wr]mem_max?
 
-### Congestion tuner improvements
-- use htcp for large bandwidth-delay product links - a large
-BDP is > 10^5, so use htcp for those cases.  Use rate estimates
-to generate BDP estimate.  Problem - h-tcp is terrible at
-high loss rates so investigate sweet spot of loss rate/perf
-for h-tcp, otherwise use BBR.
+### Connection tuner improvements
+- done; see bpftune-tcp-conn (8)
 
 ### neigh table tuner
 
@@ -163,7 +167,7 @@ for h-tcp, otherwise use BBR.
 
 - assessing tuner strategy: are we helping or making things
   worse? Support multiple strategies per tuner, explore the
-  best?
+  best?  Multiple strategy support has landed, not used yet.
 - kernel support for tunable override via bpf? Have decision points
   in kernel be over-rideable by BPF; would need to have sysctl
   denote "this is BPF tuned" somehow...
