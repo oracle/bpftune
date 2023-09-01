@@ -59,6 +59,8 @@ extern unsigned short bpftune_learning_rate;
 #define MINUTE				(60 * SECOND)
 #define HOUR				(3600 * SECOND)
 
+#define USEC_PER_SEC			1000000
+
 #define NEARLY_FULL(val, limit) \
 	((val) >= (limit) || (val) + ((limit) >> BPFTUNE_BITSHIFT) >= (limit))
 

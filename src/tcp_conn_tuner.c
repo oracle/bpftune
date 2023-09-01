@@ -18,17 +18,19 @@
  */
 
 #include <bpftune/libbpftune.h>
-#include "tcp_conn_tuner.h"
-#include "tcp_conn_tuner.skel.h"
-#include "tcp_conn_tuner.skel.legacy.h"
-#include "tcp_conn_tuner.skel.nobtf.h"
 
 #include <arpa/inet.h>
 #include <errno.h>
+#include <math.h>
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+
+#include "tcp_conn_tuner.h"
+#include "tcp_conn_tuner.skel.h"
+#include "tcp_conn_tuner.skel.legacy.h"
+#include "tcp_conn_tuner.skel.nobtf.h"
 
 static struct bpftunable_desc descs[] = {
 { 
@@ -46,15 +48,20 @@ int tcp_iter_fd;
 
 int init(struct bpftuner *tuner)
 {
-	int err;
+	int i, err;
 
 	/* make sure cong modules are loaded; might be builtin so do not
  	 * shout about errors.
  	 */
-	err = bpftune_module_load("net/ipv4/tcp_bbr.ko");
-	if (err != -EEXIST)
-		bpftune_log(LOG_DEBUG, "could not load tcp_bbr module: %s\n",
-			    strerror(-err));
+	for (i = 0; i < NUM_TCP_CONN_METRICS; i++) {
+		char name[32];
+
+		snprintf(name, sizeof(name), "net/ipv4/tcp_%s.ko", congs[i]);
+		err = bpftune_module_load(name);
+		if (err != -EEXIST)
+			bpftune_log(LOG_DEBUG, "could not load module '%s': %s\n",
+				    name, strerror(-err));
+	}
 
 	err = bpftuner_bpf_init(tcp_conn, tuner, NULL);
 	if (err)
@@ -66,28 +73,9 @@ int init(struct bpftuner *tuner)
 		return 1;
 	}
 
-	if (tuner->bpf_support <= BPFTUNE_SUPPORT_LEGACY) {
-
-		/* attach to root cgroup */
-		if (bpftuner_cgroup_attach(tuner, "cong_tuner_sockops", BPF_CGROUP_SOCK_OPS))
-			goto error;
-	} else {
-		struct bpf_link *link;
-
-		skel = tuner->skel;
-		link = bpf_program__attach_iter(skel->progs.bpftune_cong_iter, NULL);
-		if (libbpf_get_error(link)) {
-			bpftune_log(LOG_ERR, "cannot attach iter : %s\n",
-				    strerror(libbpf_get_error(link)));
-			goto error;
-		}
-		tcp_iter_fd = bpf_iter_create(bpf_link__fd(link));
-		if (tcp_iter_fd < 0) {
-			bpftune_log(LOG_ERR, "cannot create iter fd: %s\n",
-				    strerror(errno));
-			goto error;
-		}
-	}
+	/* attach to root cgroup */
+	if (bpftuner_cgroup_attach(tuner, "conn_tuner_sockops", BPF_CGROUP_SOCK_OPS))
+		goto error;
 
 	return bpftuner_tunables_init(tuner, ARRAY_SIZE(descs), descs,
 				      ARRAY_SIZE(scenarios), scenarios);
@@ -96,35 +84,64 @@ error:
 	return 1;
 }
 
+static void summarize_conn_choices(struct bpftuner *tuner)
+{
+	struct bpf_map *map = bpftuner_bpf_map_get(tcp_conn, tuner, remote_host_map);
+	struct in6_addr key, *prev_key = NULL;
+	int map_fd = bpf_map__fd(map);
+	bool first = false;
+
+	while (!bpf_map_get_next_key(map_fd, prev_key, &key)) {
+		char buf[INET6_ADDRSTRLEN];
+		struct remote_host r;
+		int i;
+
+		prev_key = &key;
+
+		if (bpf_map_lookup_elem(map_fd, &key, &r))
+			continue;
+
+		if (!first) {
+			bpftune_log(LOG_DEBUG, "Summary: tcp_conn_tuner: %48s %8s %20s %8s %8s %8s %8s\n",
+				    "IPAddress", "CongAlg", "Metric", "Count", "Greedy", "MinRtt", "MaxRtDlvr");
+			first = false;
+		}
+		inet_ntop(AF_INET6, &key, buf, sizeof(buf));
+
+		for (i = 0; i < NUM_TCP_CONN_METRICS; i++) {
+
+			bpftune_log(LOG_DEBUG, "Summary: tcp_conn_tuner: %48s %8s %20llu %8llu %8llu %8llu %8llu\n",
+				    buf, congs[i],
+				    r.metrics[i].metric_value,
+				    r.metrics[i].metric_count,
+				    r.metrics[i].greedy_count,
+				    r.metrics[i].min_rtt,
+				    r.metrics[i].max_rate_delivered);
+		}
+	}
+}
+
 void fini(struct bpftuner *tuner)
 {
 	bpftune_log(LOG_DEBUG, "calling fini for %s\n", tuner->name);
-	if (bpftune_bpf_support() <= BPFTUNE_SUPPORT_LEGACY)
-		bpftuner_cgroup_detach(tuner, "cong_tuner_sockops", BPF_CGROUP_SOCK_OPS);
-	if (tcp_iter_fd)
-		close(tcp_iter_fd);
+	bpftuner_cgroup_detach(tuner, "conn_tuner_sockops", BPF_CGROUP_SOCK_OPS);
+	summarize_conn_choices(tuner);
 	bpftuner_bpf_fini(tuner);
 }
 
 void event_handler(struct bpftuner *tuner, struct bpftune_event *event,
 		   __attribute__((unused))void *ctx)
 {
-	struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)&event->raw_data;
-	unsigned int id = event->scenario_id;
+	struct tcp_conn_event_data *event_data = (struct tcp_conn_event_data *)&event->raw_data;
+	__u8 state = event_data->state_flags & 0x3;
 	char buf[INET6_ADDRSTRLEN];
-	char iterbuf;
 
-	inet_ntop(sin6->sin6_family, &sin6->sin6_addr, buf, sizeof(buf));
-	bpftuner_tunable_update(tuner, TCP_CONG, id, 0,
-"due to loss events for %s, specify '%s' congestion control algorithm\n",
-				buf, "bbr");
+	inet_ntop(AF_INET6, &event_data->raddr, buf, sizeof(buf));
 
-	if (bpftune_bpf_support() == BPFTUNE_SUPPORT_NORMAL) {
-		if (!bpftune_cap_add()) {
-			/* kick existing connections by running iter over them... */
-			while (read(tcp_iter_fd, &iterbuf, sizeof(iterbuf)) > 0 || errno == EAGAIN) {}
-			
-			bpftune_cap_drop();
-		}
-	}
+	bpftune_log(LOG_DEBUG,
+"%s: cong alg '%s': got rate_delivered %lld, rtt %lld, metric %lld\n",
+				buf, congs[state],
+				event_data->rate_delivered,
+				event_data->min_rtt,
+				event_data->metric);
 }

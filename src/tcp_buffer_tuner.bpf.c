@@ -21,7 +21,7 @@
 #include "tcp_buffer_tuner.h"
 #include <bpftune/corr.h>
 
-BPF_MAP_DEF(corr_map, BPF_MAP_TYPE_HASH, struct corr_key, struct corr, 1024);
+BPF_MAP_DEF(corr_map, BPF_MAP_TYPE_HASH, struct corr_key, struct corr, 1024, 0);
 
 bool under_memory_pressure = false;
 bool near_memory_pressure = false;

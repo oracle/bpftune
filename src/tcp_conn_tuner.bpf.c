@@ -21,53 +21,9 @@
 
 #include "tcp_conn_tuner.h"
 
-const char bbr[4] = { 'b', 'b', 'r', '\0' };
+BPF_MAP_DEF(remote_host_map, BPF_MAP_TYPE_HASH, struct in6_addr, struct remote_host, 1024, 0);
 
-struct remote_host {
-	__u64 last_retransmit;
-	__u64 retransmits;
-	bool retransmit_threshold;
-	char cong_alg[CONG_MAXNAME];
-};
-
-struct {
-	__uint(type, BPF_MAP_TYPE_HASH);
-	__uint(max_entries, 1024);
-	__type(key, struct in6_addr);
-	__type(value, struct remote_host);
-} remote_host_map SEC(".maps");
-
-
-static __always_inline bool
-retransmit_threshold(struct remote_host *remote_host,
-		     u32 segs_out, u32 total_retrans)
-{
-	__u64 now;
-
-	if (!remote_host)
-		return false;
-
-	remote_host->retransmits++;
-
-	now = bpf_ktime_get_ns();
-
-	/* If last time we surpassed the retransmit threshold is greater than
-	 * an hour, reset.
-	 */
-	if (remote_host->last_retransmit &&
-	    (now - remote_host->last_retransmit) > HOUR) {
-		remote_host->retransmits = 0;
-		remote_host->retransmit_threshold = false;
-	} else if (total_retrans > (segs_out >> 5)) {
-		/* with retransmission rate of > 1%, BBR performs better. */
-		remote_host->retransmit_threshold = true;
-		__builtin_memcpy(remote_host->cong_alg, bbr,
-				 sizeof(remote_host->cong_alg));
-	}
-	remote_host->last_retransmit = now;
-
-	return remote_host->retransmit_threshold;
-}
+BPF_MAP_DEF(sk_storage_map, BPF_MAP_TYPE_SK_STORAGE, int, __u64, 0, BPF_F_NO_PREALLOC);
 
 static __always_inline struct remote_host *get_remote_host(struct in6_addr *key)
 {
@@ -84,173 +40,205 @@ static __always_inline struct remote_host *get_remote_host(struct in6_addr *key)
 	return remote_host;
 }
 
-static __always_inline void set_cong(void *ctx, struct remote_host *remote_host)
+static __always_inline void set_cong(struct bpf_sock_ops *ops, struct remote_host *remote_host,
+				     __u8 i)
 {
-	char buf[CONG_MAXNAME] = {};
 	int ret;
 
-	/* check if cong alg already set */
-	if (bpf_getsockopt(ctx, SOL_TCP, TCP_CONGESTION, &buf, sizeof(buf)) ||
-	    __strncmp(remote_host->cong_alg, buf, sizeof(buf)) == 0)
-		return;
-	ret = bpf_setsockopt(ctx, SOL_TCP, TCP_CONGESTION,
-			     &remote_host->cong_alg,
-			     sizeof(remote_host->cong_alg));
-	bpftune_debug("cong_tuner: set cong '%s': %d\n",
-		      remote_host->cong_alg, ret);
+	ret = bpf_setsockopt(ops, SOL_TCP, TCP_CONGESTION, (void *)congs[i],
+			     sizeof(congs[i]));
+	/* update state */
+	if (!ret) {
+		struct bpf_sock *sk = ops->sk;
+		__u64 *statep;
+
+		if (!sk)
+			return;
+		statep = bpf_sk_storage_get(&sk_storage_map, sk, 0,
+                                            BPF_SK_STORAGE_GET_F_CREATE);
+                if (statep)
+			*statep = (__u64)i;
+	}
 }
 
-#ifdef BPFTUNE_LEGACY
-/* in legacy mode, use sockops prog to set cong algoritm when retransmit
- * threshold is passed.  Because we need to enable retransmit sock ops
- * events on socket accept/connect, this does not work for existing
- * connections which were initiated prior to bpftune starting.
- */
 SEC("sockops")
-int cong_tuner_sockops(struct bpf_sock_ops *ops)
+int conn_tuner_sockops(struct bpf_sock_ops *ops)
 {
+	int cb_flags = BPF_SOCK_OPS_STATE_CB_FLAG;
 	struct remote_host *remote_host;
 	struct bpftune_event event = {};
-	struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)&event.raw_data;
-	struct in6_addr *key = &sin6->sin6_addr;
-	bool prior_retransmit_threshold;
+	struct tcp_conn_event_data *event_data = (struct tcp_conn_event_data *)&event.raw_data;
+	struct in6_addr *key = &event_data->raddr;
+	struct bpf_sock *sk = ops->sk;
+	struct tcp_sock *tp = NULL;
+	__u64 *statep = NULL;
+	int state;
 
 	switch (ops->op) {
 	case BPF_SOCK_OPS_ACTIVE_ESTABLISHED_CB:
 	case BPF_SOCK_OPS_PASSIVE_ESTABLISHED_CB:
 		/* enable retransmission events */
-		bpf_sock_ops_cb_flags_set(ops, BPF_SOCK_OPS_RETRANS_CB_FLAG);
-		return 1;
-	case BPF_SOCK_OPS_RETRANS_CB:
+		bpf_sock_ops_cb_flags_set(ops, cb_flags);
+		break;
+	case BPF_SOCK_OPS_STATE_CB:
+		state = ops->args[1];
+		switch (state) {
+		case BPF_TCP_FIN_WAIT1:
+		case BPF_TCP_CLOSE_WAIT:
+			if (!sk)
+				return 1;
+			break;
+		default:
+			return 1;
+		}
+		tp = bpf_skc_to_tcp_sock(sk);
+		if (!tp)
+			return 1;
+
+		/* retrieve state indicating which cong alg was set */
+		statep = bpf_sk_storage_get(&sk_storage_map, sk, 0, 0);
+		if (!statep)
+			return 1;
 		break;
 	default:
 		return 1;
 	}
-	sin6->sin6_family = ops->family;
 	switch (ops->family) {
 	case AF_INET:
-		sin6->sin6_addr.s6_addr32[0] = ops->remote_ip4;
+		key->s6_addr32[2] = bpf_htonl(0xffff);
+		key->s6_addr32[3] = ops->remote_ip4;
 		break;
 	case AF_INET6:
-		sin6->sin6_addr.s6_addr32[0] = ops->remote_ip6[0];
-		sin6->sin6_addr.s6_addr32[1] = ops->remote_ip6[1];
-		sin6->sin6_addr.s6_addr32[2] = ops->remote_ip6[2];
-		sin6->sin6_addr.s6_addr32[3] = ops->remote_ip6[3];
+		key->s6_addr32[0] = ops->remote_ip6[0];
+		key->s6_addr32[1] = ops->remote_ip6[1];
+		key->s6_addr32[2] = ops->remote_ip6[2];
+		key->s6_addr32[3] = ops->remote_ip6[3];
 		break;
 	default:
 		return 1;
 	}
-
 	remote_host = get_remote_host(key);
 	if (!remote_host)
 		return 1;
-	prior_retransmit_threshold = remote_host->retransmit_threshold;
 
-	if (!retransmit_threshold(remote_host, ops->segs_out,
-				  ops->total_retrans))
+	switch (ops->op) {
+	case BPF_SOCK_OPS_ACTIVE_ESTABLISHED_CB:
+	case BPF_SOCK_OPS_PASSIVE_ESTABLISHED_CB: {
+		__u64 metric_value = 0, metric_min = ~((__u64)0x0);
+		__u8 i, ncands = 0, minindex = 0, s;
+		__u8 cands[NUM_TCP_CONN_METRICS];
+
+		/* find highest metric and use cong alg based on it. */
+		for (i = 0; i < NUM_TCP_CONN_METRICS; i++) {
+			metric_value = remote_host->metrics[i].metric_value;
+			bpftune_debug("conn_tuner: addr 0x%x cong '%s' metric_value %lld\n",
+				      ops->remote_ip4, congs[i], metric_value);
+
+			if (metric_value > metric_min)
+				continue;
+			if (metric_value < metric_min) {
+				cands[0] = i;
+				ncands = 1;
+			} else if (metric_value == metric_min) {
+				cands[ncands++] = i;
+			}
+			metric_min = metric_value;
+		}
+		/* if multiple min values, choose randomly. */
+		if (ncands > 1) {
+			int choice = bpf_get_prandom_u32() % ncands;
+
+			/* verifier refused to believe the index used was valid, so
+			 * unroll the mapping from chice to cands[] index to keep
+			 * verification happy.
+			 */
+			switch (choice) {
+			case 0:
+				minindex = cands[0];
+				break;
+			case 1:
+				minindex = cands[1];
+				break;
+			case 2:
+				minindex = cands[2];
+				break;
+			case 3:
+				minindex = cands[3];
+				break;
+			default:
+				return 1;
+			}
+		} else if (ncands == 1) {
+			minindex = cands[0];
+		} else {
+			return 1;
+		}
+		minindex &= 0x3;
+		/* choose random alg 5% of the time (1/20) */
+		s = epsilon_greedy(minindex, NUM_TCP_CONN_METRICS, 20);
+		if (s != minindex) {
+			bpftune_debug("conn_tuner: choose state %d instead of greedy state %d\n",
+			      s, minindex);
+			metric_min = 0;
+		}
+		s &= 0x3;
+
+		bpftune_debug("conn_tuner: setting cong alg '%s' for 0x%x, metric_min %ld\n",
+			      congs[s], ops->remote_ip4, metric_min);
+		set_cong(ops, remote_host, s);
+
 		return 1;
-
-	set_cong(ops, remote_host);
-
-	/* if first sock to cross threshold for remote host, send event. */
-	if (!prior_retransmit_threshold) {
-		event.tuner_id = tuner_id;
-		event.scenario_id = TCP_CONG_BBR;
-		bpf_ringbuf_output(&ring_buffer_map, &event, sizeof(event), 0);
 	}
+	case BPF_SOCK_OPS_STATE_CB: {
+		/* update metric/send metric event on connection close. */
+		__u64 metric, metric_old, min_rtt, rate_interval_us, rate_delivered, mss;
+		struct tcp_conn_metric *m;
+		__u8 i, s = *statep & 0x3;
+		bool greedy = true;
 
+		if (!tp)
+			return 1;
+
+		min_rtt = (__u64)tp->rtt_min.s[0].v;
+		rate_interval_us = (__u64)tp->rate_interval_us;
+		rate_delivered = (__u64)tp->rate_delivered;
+		mss = (__u64)tp->mss_cache;
+		rate_delivered = rate_interval_us ?
+			(__u64)(rate_delivered * mss)/rate_interval_us : 0;
+
+		m = &remote_host->metrics[s];
+		if (!m->min_rtt || min_rtt < m->min_rtt)
+                	m->min_rtt = min_rtt;
+                if (!m->max_rate_delivered || rate_delivered > m->max_rate_delivered)
+                	m->max_rate_delivered = rate_delivered;
+
+		metric = tcp_metric_calc(remote_host, min_rtt, m->max_rate_delivered);
+		event_data->state_flags = *statep;
+		event_data->min_rtt = min_rtt;
+		event_data->rate_delivered = rate_delivered;
+		event_data->metric = metric;
+
+		for (i = 0; i < NUM_TCP_CONN_METRICS; i++) {
+			if (s == i)
+				continue;
+			if (remote_host->metrics[i].metric_value < m->metric_value) {
+				greedy = false;
+				break;
+			}
+		}
+		metric_old = m->metric_value;
+		m->metric_value = rl_update(metric_old, metric, BPFTUNE_BITSHIFT);
+		m->metric_count++;
+		if (greedy)
+			m->greedy_count++;
+		if (debug) {
+			event.tuner_id = tuner_id;
+			bpf_ringbuf_output(&ring_buffer_map, &event, sizeof(event), 0);
+		}
+		return 1;
+	}
+	default:
+		return 1;
+	}
 	return 1;
 }
-#else
-static __always_inline int get_sk_key(struct sock *sk, struct in6_addr *key)
-{
-	int family = BPFTUNE_CORE_READ(sk, sk_family);
-
-	switch (family) {
-	case AF_INET:
-		return bpf_probe_read_kernel(key, sizeof(sk->sk_daddr),
-					     __builtin_preserve_access_index(&sk->sk_daddr));
-	case AF_INET6:
-		return bpf_probe_read_kernel(key, sizeof(*key),
-					     __builtin_preserve_access_index(&sk->sk_v6_daddr));
-	default:
-		return -EINVAL;
-	}
-}
-
-SEC("tp_btf/tcp_retransmit_skb")
-int BPF_PROG(cong_retransmit, struct sock *sk, struct sk_buff *skb)
-{
-	struct remote_host *remote_host;
-	struct bpftune_event event = {};
-	struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)&event.raw_data;
-	struct tcp_sock *tp = (struct tcp_sock *)sk;
-	struct in6_addr *key = &sin6->sin6_addr;
-	__u32 segs_out = 0, total_retrans = 0;
-	int id = TCP_CONG_BBR;
-	struct net *net;
-
-	if (get_sk_key(sk, key))
-		return 0;
-
-	remote_host = get_remote_host(key);
-	if (!remote_host)
-		return 0;
-
-	/* already sent ringbuf message */
-	if (remote_host->retransmit_threshold)
-		return 0;
-
-	segs_out = BPFTUNE_CORE_READ(tp, segs_out);
-	total_retrans = BPFTUNE_CORE_READ(tp, total_retrans);
-
-	if (!retransmit_threshold(remote_host, segs_out, total_retrans))
-                return 0;
-
-	sin6->sin6_family = BPFTUNE_CORE_READ(sk, sk_family);
-	event.tuner_id = tuner_id;
-	event.scenario_id = id;
-	net = BPFTUNE_CORE_READ(sk, sk_net.net);
-	event.netns_cookie = get_netns_cookie(net);
-	if (event.netns_cookie < 0)
-		return 0;
-	bpf_ringbuf_output(&ring_buffer_map, &event, sizeof(event), 0);
-
-	return 0;
-}
-
-
-/* specify congestion control algorithm here via iterator (to catch
- * existing + new TCP connections) for connections to remote hosts which
- * have seen retransmits in the past.  The event sent from the retransmit
- * threshold being surpassed will trigger the iterator.
- */
-SEC("iter/tcp")
-int bpftune_cong_iter(struct bpf_iter__tcp *ctx)
-{
-	struct sock_common *skc = ctx->sk_common;
-	struct remote_host *remote_host;
-	struct in6_addr key = {};
-        struct sock *sk = NULL;
-
-	if (skc)
-		sk = (struct sock *)bpf_skc_to_tcp_sock(skc);
-	if (!sk)
-		return 0;
-
-	if (get_sk_key(sk, &key))
-		return 0;
-
-	remote_host = get_remote_host(&key);
-	if (!remote_host)
-		return 0;
-
-	if (!remote_host->retransmit_threshold ||
-	    remote_host->cong_alg[0] == '\0')
-		return 0;
-
-	set_cong(sk, remote_host);
-
-	return 0;
-}
-#endif

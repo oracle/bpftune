@@ -393,7 +393,10 @@ void bpftuner_cgroup_detach(struct bpftuner *tuner, const char *prog_name,
                         bpftune_log(LOG_ERR, "error detaching prog fd %d, cgroup fd %d: %s\n",
                                 prog_fd, cgroup_fd, strerror(-err));
                 }
-        }
+        } else {
+		bpftune_log(LOG_ERR, "bpftuner_cgroup_detach: could not find prog '%s'\n",
+			    prog_name);
+	}
 	bpftune_cap_drop();
 }
 

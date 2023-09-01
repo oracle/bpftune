@@ -124,12 +124,13 @@ static __always_inline typeof(name(0)) ____##name(struct pt_regs *ctx, ##args)
 #endif /* BPFTUNE_LEGACY */
 
 #if LIBBPF_DEPRECATED_APIS
-#define BPF_MAP_DEF(_name, _type, _key_size, _value, _max_entries)	\
+#define BPF_MAP_DEF(_name, _type, _key_size, _value, _max_entries, _flags)\
 	struct bpf_map_def SEC("maps") _name = {			\
 		.type = _type,						\
 		.key_size = sizeof(_key),				\
 		.value_size = sizeof(_value),				\
 		.max_entries = _max_entries,				\
+		.map_flags = _flags,					\
 	}
 
 #define BPF_RINGBUF(_name, _max_entries)				\
@@ -138,12 +139,13 @@ static __always_inline typeof(name(0)) ____##name(struct pt_regs *ctx, ##args)
 		.max_entries = _max_entries,				\
 	}
 #else
-#define BPF_MAP_DEF(_name, _type, _key, _value, _max_entries)		\
+#define BPF_MAP_DEF(_name, _type, _key, _value, _max_entries, _flags)	\
         struct {							\
 		__uint(type, _type);					\
 		__type(key, _key);					\
 		__type(value, _value);					\
 		__uint(max_entries, _max_entries);			\
+		__uint(map_flags, _flags);				\
         } _name SEC(".maps")
 
 #define BPF_RINGBUF(_name, _max_entries)				\
@@ -191,10 +193,11 @@ unsigned short bpftune_learning_rate;
 
 #include <bpftune/bpftune.h>
 #include <bpftune/corr.h>
+#include <bpftune/rl.h>
 
 BPF_RINGBUF(ring_buffer_map, 128 * 1024);
 
-BPF_MAP_DEF(netns_map, BPF_MAP_TYPE_HASH, __u64, __u64, 65536);
+BPF_MAP_DEF(netns_map, BPF_MAP_TYPE_HASH, __u64, __u64, 65536, 0);
 
 unsigned int tuner_id;
 unsigned int strategy_id;
@@ -267,6 +270,8 @@ unsigned long bpftune_init_net;
 #define EINVAL		22
 
 bool debug;
+
+#define __barrier asm volatile("" ::: "memory")
 
 #define bpftune_log(...)	__bpf_printk(__VA_ARGS__)
 #define bpftune_debug(...)	if (debug) __bpf_printk(__VA_ARGS__)

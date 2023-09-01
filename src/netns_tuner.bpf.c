@@ -26,7 +26,7 @@ struct setup_net {
 	struct net *net;
 };
 
-BPF_MAP_DEF(setup_net_map, BPF_MAP_TYPE_HASH, __u64, __u64, 65536);
+BPF_MAP_DEF(setup_net_map, BPF_MAP_TYPE_HASH, __u64, __u64, 65536, 0);
 
 SEC("kprobe/setup_net")
 int BPF_KPROBE(bpftune_setup_net, struct net *net, struct user_namespace *user_ns)

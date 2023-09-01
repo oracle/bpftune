@@ -22,7 +22,7 @@
 #include "tcp_conn_tuner.h"
 
 /* probe hash map */
-BPF_MAP_DEF(probe_hash_map, BPF_MAP_TYPE_HASH, __u64, __u64, 65536);
+BPF_MAP_DEF(probe_hash_map, BPF_MAP_TYPE_HASH, __u64, __u64, 65536, 0);
 
 /* probe kprobe/fentry */
 BPF_FENTRY(setup_net, struct net *net, struct user_namespace *user_ns)

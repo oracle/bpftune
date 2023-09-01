@@ -20,7 +20,7 @@
 #include <bpftune/bpftune.bpf.h>
 #include "neigh_table_tuner.h"
 
-BPF_MAP_DEF(tbl_map, BPF_MAP_TYPE_HASH, __u64, struct tbl_stats, 1024);
+BPF_MAP_DEF(tbl_map, BPF_MAP_TYPE_HASH, __u64, struct tbl_stats, 1024, 0);
 
 #ifdef BPFTUNE_LEGACY
 SEC("raw_tracepoint/neigh_create")
