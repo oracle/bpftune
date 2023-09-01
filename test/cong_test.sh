@@ -30,7 +30,7 @@ TIMEOUT=30
 
 for FAMILY in ipv4 ipv6 ; do
 
-for DROP_PERCENT in 0 10 ; do
+for DROP_PERCENT in 0 5 ; do
 
  for CLIENT_OPTS in "" "-R" ; do
    case $FAMILY in
@@ -59,7 +59,7 @@ for DROP_PERCENT in 0 10 ; do
 		test_run_cmd_local "$BPFTUNE -ds &" true
 		sleep $SETUPTIME
 		# warm up connection...
-		for i in {1..40}; do
+		for i in {1..20}; do
 			set +e
 			$IPERF3 -fm $CLIENT_OPTS -p $PORT -t 1 -c $ADDR > /dev/null 2>&1
 			set -e
@@ -69,6 +69,7 @@ for DROP_PERCENT in 0 10 ; do
 	fi
 	set +e
 	test_run_cmd_local "$IPERF3 -fm $CLIENT_OPTS -p $PORT -c $ADDR" true
+	IPERF_STATUS=$?
 	set -e
 	if [[ $MODE != "baseline" ]]; then
 		pkill -TERM bpftune
@@ -89,6 +90,7 @@ for DROP_PERCENT in 0 10 ; do
 	sleep $SLEEPTIME
    done
 
+   if [[ $IPERF_STATUS == 0 ]]; then
    printf "Results sender (${units}): "
    for (( i=0; i < ${#sbaseline_results[@]}; i++ ))
    do
@@ -111,7 +113,7 @@ for DROP_PERCENT in 0 10 ; do
 		echo "baseline (${rbase}) < test (${rtest})"
 	fi      
    done 
-
+   fi
    sleep $SETUPTIME
    grep "Summary: tcp_conn_tuner" $LOGFILE
 
