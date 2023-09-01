@@ -51,6 +51,14 @@ if [[ $MAJ_KVER -gt 4 ]]; then
 			fi	
 		fi
 		;;
+	6)
+		expected_netns="supports per-netns policy"
+		if [[ "$ARCH" == "x86_64" ]]; then
+			expected="bpftune works fully"
+		elif [[ $MIN_KVER -gt 4 ]]; then
+			expected="bpftune works fully"
+		fi
+		;;
 	*)
 		expected_netns="supports per-netns policy"
 		if [[ "$ARCH" == "x86_64" ]]; then
