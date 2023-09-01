@@ -30,7 +30,7 @@ TIMEOUT=30
 
 for FAMILY in ipv4 ipv6 ; do
 
-for DROP_PERCENT in 2 0 ; do
+for DROP_PERCENT in 0 5 ; do
 
  for CLIENT_OPTS in "" "-R" ; do
    case $FAMILY in
@@ -69,9 +69,9 @@ for DROP_PERCENT in 2 0 ; do
 	fi
 	set +e
 	test_run_cmd_local "$IPERF3 -fm $CLIENT_OPTS -p $PORT -c $ADDR" true
+	IPERF_STATUS=$?
 	set -e
 	if [[ $MODE != "baseline" ]]; then
-		#ip netns exec $NETNS pkill -TERM iperf3
 		pkill -TERM bpftune
 		sleep $SETUPTIME
 	fi
@@ -90,6 +90,7 @@ for DROP_PERCENT in 2 0 ; do
 	sleep $SLEEPTIME
    done
 
+   if [[ $IPERF_STATUS == 0 ]]; then
    printf "Results sender (${units}): "
    for (( i=0; i < ${#sbaseline_results[@]}; i++ ))
    do
@@ -112,7 +113,7 @@ for DROP_PERCENT in 2 0 ; do
 		echo "baseline (${rbase}) < test (${rtest})"
 	fi      
    done 
-
+   fi
    sleep $SETUPTIME
    grep "Summary: tcp_conn_tuner" $LOGFILE
 
