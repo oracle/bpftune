@@ -77,7 +77,7 @@ int conn_tuner_sockops(struct bpf_sock_ops *ops)
 	switch (ops->op) {
 	case BPF_SOCK_OPS_ACTIVE_ESTABLISHED_CB:
 	case BPF_SOCK_OPS_PASSIVE_ESTABLISHED_CB:
-		/* enable retransmission events */
+		/* enable other needed events */
 		bpf_sock_ops_cb_flags_set(ops, cb_flags);
 		break;
 	case BPF_SOCK_OPS_STATE_CB:
@@ -128,7 +128,7 @@ int conn_tuner_sockops(struct bpf_sock_ops *ops)
 		__u8 i, ncands = 0, minindex = 0, s;
 		__u8 cands[NUM_TCP_CONN_METRICS];
 
-		/* find highest metric and use cong alg based on it. */
+		/* find best (minimum) metric and use cong alg based on it. */
 		for (i = 0; i < NUM_TCP_CONN_METRICS; i++) {
 			metric_value = remote_host->metrics[i].metric_value;
 			bpftune_debug("conn_tuner: addr 0x%x cong '%s' metric_value %lld\n",
@@ -148,9 +148,9 @@ int conn_tuner_sockops(struct bpf_sock_ops *ops)
 		if (ncands > 1) {
 			int choice = bpf_get_prandom_u32() % ncands;
 
-			/* verifier refused to believe the index used was valid, so
-			 * unroll the mapping from chice to cands[] index to keep
-			 * verification happy.
+			/* verifier refused to believe the index used was valid;
+			 * unroll the mapping from choice to cands[] index to
+			 * keep verification happy.
 			 */
 			switch (choice) {
 			case 0:
