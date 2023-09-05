@@ -132,9 +132,6 @@ int conn_tuner_sockops(struct bpf_sock_ops *ops)
 		for (i = 0; i < NUM_TCP_CONN_METRICS; i++) {
 			cands[i] = 0;
 			metric_value = remote_host->metrics[i].metric_value;
-			bpftune_debug("conn_tuner: addr 0x%x cong '%s' metric_value %lld\n",
-				      ops->remote_ip4, congs[i], metric_value);
-
 			if (metric_value > metric_min)
 				continue;
 			else if (metric_value < metric_min) {
@@ -171,15 +168,8 @@ int conn_tuner_sockops(struct bpf_sock_ops *ops)
 		minindex &= (NUM_TCP_CONN_METRICS - 1);
 		/* choose random alg 5% of the time (1/20) */
 		s = epsilon_greedy(minindex, NUM_TCP_CONN_METRICS, 20);
-		if (s != minindex) {
-			bpftune_debug("conn_tuner: choose state %d instead of greedy state %d\n",
-			      s, minindex);
-			metric_min = 0;
-		}
 		s &= 0x3;
 
-		bpftune_debug("conn_tuner: setting cong alg '%s' for 0x%x, metric_min %ld\n",
-			      congs[s], ops->remote_ip4, metric_min);
 		set_cong(ops, remote_host, s);
 
 		return 1;
