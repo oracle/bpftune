@@ -89,7 +89,6 @@ static void summarize_conn_choices(struct bpftuner *tuner)
 	struct bpf_map *map = bpftuner_bpf_map_get(tcp_conn, tuner, remote_host_map);
 	struct in6_addr key, *prev_key = NULL;
 	int map_fd = bpf_map__fd(map);
-	bool first = false;
 
 	while (!bpf_map_get_next_key(map_fd, prev_key, &key)) {
 		char buf[INET6_ADDRSTRLEN];
@@ -101,11 +100,8 @@ static void summarize_conn_choices(struct bpftuner *tuner)
 		if (bpf_map_lookup_elem(map_fd, &key, &r))
 			continue;
 
-		if (!first) {
-			bpftune_log(LOG_DEBUG, "Summary: tcp_conn_tuner: %48s %8s %20s %8s %8s %8s %8s\n",
-				    "IPAddress", "CongAlg", "Metric", "Count", "Greedy", "MinRtt", "MaxRtDlvr");
-			first = false;
-		}
+		bpftune_log(LOG_DEBUG, "Summary: tcp_conn_tuner: %48s %8s %20s %8s %8s %8s %8s\n",
+			    "IPAddress", "CongAlg", "Metric", "Count", "Greedy", "MinRtt", "MaxDlvr");
 		inet_ntop(AF_INET6, &key, buf, sizeof(buf));
 
 		for (i = 0; i < NUM_TCP_CONN_METRICS; i++) {
