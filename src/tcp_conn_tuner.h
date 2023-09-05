@@ -24,8 +24,7 @@ enum tcp_cong_tunables {
 };
 
 enum tcp_cong_scenarios {
-	TCP_CONG_BBR,
-	TCP_CONG_HTCP,
+	TCP_CONG_SET
 };
 
 #define CONG_MAXNAME	16
