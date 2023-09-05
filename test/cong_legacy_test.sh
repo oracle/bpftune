@@ -56,7 +56,7 @@ for DROP_PERCENT in 0 5 ; do
 	echo "Running ${MODE}..."
 	test_run_cmd_local "ip netns exec $NETNS $IPERF3 -p $PORT -s &"
 	if [[ $MODE != "baseline" ]]; then
-		test_run_cmd_local "$BPFTUNE -dsL &" true
+		test_run_cmd_local "$BPFTUNE -dsL -a tcp_conn_tuner.so &" true
 		sleep $SETUPTIME
 		# warm up connection...
 		for i in {1..20}; do
