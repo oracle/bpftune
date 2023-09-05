@@ -38,8 +38,8 @@ static struct bpftunable_desc descs[] = {
 };
 
 static struct bpftunable_scenario scenarios[] = {
-{ TCP_CONG_BBR,		"specify bbr congestion control",
-  "Because loss rate has exceeded 1 percent for a connection, use bbr congestion control algorithm instead of default" },
+{ TCP_CONG_SET,		"specify TCP congestion control algorithm",
+  "To optimize TCP performance, a TCP congestion control algorithm was chosen to mimimize round-trip time and maximize delivery rate." },
 };
 
 struct tcp_conn_tuner_bpf *skel;
@@ -89,6 +89,7 @@ static void summarize_conn_choices(struct bpftuner *tuner)
 	struct bpf_map *map = bpftuner_bpf_map_get(tcp_conn, tuner, remote_host_map);
 	struct in6_addr key, *prev_key = NULL;
 	int map_fd = bpf_map__fd(map);
+	unsigned long greedy_count = 0;
 
 	while (!bpf_map_get_next_key(map_fd, prev_key, &key)) {
 		char buf[INET6_ADDRSTRLEN];
@@ -113,6 +114,10 @@ static void summarize_conn_choices(struct bpftuner *tuner)
 				    r.metrics[i].greedy_count,
 				    r.metrics[i].min_rtt,
 				    r.metrics[i].max_rate_delivered);
+			bpftuner_tunable_stats_update(tuner, TCP_CONG,
+						      TCP_CONG_SET, true,
+						      r.metrics[i].metric_count);
+			greedy_count += r.metrics[i].greedy_count;
 		}
 	}
 }
@@ -135,7 +140,8 @@ void event_handler(struct bpftuner *tuner, struct bpftune_event *event,
 	inet_ntop(AF_INET6, &event_data->raddr, buf, sizeof(buf));
 
 	bpftune_log(LOG_DEBUG,
-"%s: cong alg '%s': got rate_delivered %lld, rtt %lld, metric %lld\n",
+"%s: %s: cong alg '%s': got rate_delivered %lld, rtt %lld, metric %lld\n",
+				tuner->name,
 				buf, congs[state],
 				event_data->rate_delivered,
 				event_data->min_rtt,

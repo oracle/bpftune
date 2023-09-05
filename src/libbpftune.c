@@ -701,12 +701,12 @@ struct bpftuner *bpftuner_init(const char *path)
 	return tuner;
 }
 
+static unsigned long global_netns_cookie;
+
 static void bpftuner_scenario_log(struct bpftuner *tuner, unsigned int tunable,
 				  unsigned int scenario, int netns_fd,
 				  bool summary,
 				  const char *fmt, va_list args);
-
-static unsigned long global_netns_cookie;
 
 void bpftuner_fini(struct bpftuner *tuner, enum bpftune_state state)
 {
@@ -717,6 +717,8 @@ void bpftuner_fini(struct bpftuner *tuner, enum bpftune_state state)
 
 	bpftune_log(LOG_DEBUG, "cleaning up tuner %s with %d tunables, %d scenarios\n",
 		    tuner->name, tuner->num_tunables, tuner->num_scenarios);
+	if (tuner->fini)
+		tuner->fini(tuner);
 	/* report summary of events for tuner */
 	for (i = 0; i < tuner->num_tunables; i++) {
 		for (j = 0; j < tuner->num_scenarios; j++) {
@@ -727,9 +729,6 @@ void bpftuner_fini(struct bpftuner *tuner, enum bpftune_state state)
 			bpftuner_scenario_log(tuner, i, j, 1, true, NULL, args);
 		}
 	}
-	if (tuner->fini)
-		tuner->fini(tuner);
-
 	tuner->state = state;
 }
 
@@ -1008,18 +1007,31 @@ struct bpftunable *bpftuner_tunable(struct bpftuner *tuner, unsigned int index)
 	return NULL;
 }
 
-static void bpftuner_tunable_stats_update(struct bpftunable *tunable,
-					  unsigned int scenario, bool global_ns)
+static void __bpftuner_tunable_stats_update(struct bpftunable *tunable,
+				   unsigned int scenario, bool global_ns,
+				   unsigned long val)
 {
 	if (global_ns)
-		(tunable->stats.global_ns[scenario])++;
+		(tunable->stats.global_ns[scenario]) += val;
 	else
-		(tunable->stats.nonglobal_ns[scenario])++;
+		(tunable->stats.nonglobal_ns[scenario]) += val;
 	bpftune_log(LOG_DEBUG," updated stat for tunable %s, scenario %d: %lu\n",
 		    tunable->desc.name, scenario,
 		    global_ns ? tunable->stats.global_ns[scenario] :
 				tunable->stats.nonglobal_ns[scenario]);
 
+}
+
+void bpftuner_tunable_stats_update(struct bpftuner *tuner,
+				   unsigned int tunable,
+				   unsigned int scenario, bool global_ns,
+				   unsigned long val)
+{
+	struct bpftunable *t = bpftuner_tunable(tuner, tunable);
+
+	if (!t)
+		return;
+	__bpftuner_tunable_stats_update(t, scenario, global_ns, val);
 }
 
 static void bpftuner_scenario_log(struct bpftuner *tuner, unsigned int tunable,
@@ -1078,7 +1090,7 @@ static void bpftuner_scenario_log(struct bpftuner *tuner, unsigned int tunable,
 			    global_ns ? "" : "non-",
 			    tuner->scenarios[scenario].description);
 		__bpftune_log(BPFTUNE_LOG_LEVEL, fmt, args);
-		bpftuner_tunable_stats_update(t, scenario, global_ns);
+		__bpftuner_tunable_stats_update(t, scenario, global_ns, 1);
 	}
 }
 

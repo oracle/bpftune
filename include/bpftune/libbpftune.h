@@ -127,6 +127,11 @@ int bpftuner_tunable_update(struct bpftuner *tuner,
 			    int netns_fd,
 			    const char *fmt, ...);
 
+void bpftuner_tunable_stats_update(struct bpftuner *tuner,
+				   unsigned int tunable,
+				   unsigned int scenario, bool global_ns,
+				   unsigned long val);
+
 struct bpftuner *bpftune_tuner(unsigned int index);
 unsigned int bpftune_tuner_num(void);
 #define bpftune_for_each_tuner(tuner)					     \
