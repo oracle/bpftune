@@ -130,41 +130,36 @@ int conn_tuner_sockops(struct bpf_sock_ops *ops)
 
 		/* find best (minimum) metric and use cong alg based on it. */
 		for (i = 0; i < NUM_TCP_CONN_METRICS; i++) {
+			cands[i] = 0;
 			metric_value = remote_host->metrics[i].metric_value;
 			bpftune_debug("conn_tuner: addr 0x%x cong '%s' metric_value %lld\n",
 				      ops->remote_ip4, congs[i], metric_value);
 
 			if (metric_value > metric_min)
 				continue;
-			if (metric_value < metric_min) {
+			else if (metric_value < metric_min) {
 				cands[0] = i;
 				ncands = 1;
 			} else if (metric_value == metric_min) {
-				cands[ncands++] = i;
+				cands[ncands] = i;
+				ncands++;
 			}
 			metric_min = metric_value;
 		}
 		/* if multiple min values, choose randomly. */
-		if (ncands > 1) {
-			int choice = bpf_get_prandom_u32() % ncands;
+		if (ncands > 1 && ncands <= NUM_TCP_CONN_METRICS) {
+			__u32 choice = bpf_get_prandom_u32() % ncands;
 
-			/* verifier refused to believe the index used was valid;
-			 * unroll the mapping from choice to cands[] index to
-			 * keep verification happy.
-			 */
+			/* verifier complains about variable stack offset */
 			switch (choice) {
 			case 0:
-				minindex = cands[0];
-				break;
+				minindex = cands[0]; break;
 			case 1:
-				minindex = cands[1];
-				break;
+				minindex = cands[1]; break;
 			case 2:
-				minindex = cands[2];
-				break;
+				minindex = cands[2]; break;
 			case 3:
-				minindex = cands[3];
-				break;
+				minindex = cands[3]; break;
 			default:
 				return 1;
 			}
@@ -173,7 +168,7 @@ int conn_tuner_sockops(struct bpf_sock_ops *ops)
 		} else {
 			return 1;
 		}
-		minindex &= 0x3;
+		minindex &= (NUM_TCP_CONN_METRICS - 1);
 		/* choose random alg 5% of the time (1/20) */
 		s = epsilon_greedy(minindex, NUM_TCP_CONN_METRICS, 20);
 		if (s != minindex) {
