@@ -225,10 +225,10 @@ test_setup_local()
 		ip netns exec $NETNS ip link set $VETH1 up
 		ip netns exec $NETNS sysctl -qw net.ipv4.conf.lo.rp_filter=0
 		if [[ -n "$DROP" ]] || [[ -n "$LATENCY" ]]; then
-		 D=$DROP
-		 if [[ -n "$DROP" ]]; then
-		  D="${DROP}%"
+	         if [[ -z "$DROP" ]]; then
+		     DROP=0
 		 fi
+		 D="${DROP}%"
 		 tc qdisc add dev $VETH2 root netem loss ${D} ${LATENCY}
 		 ethtool -K $VETH2 gso off
 		fi

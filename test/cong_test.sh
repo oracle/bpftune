@@ -30,8 +30,8 @@ TIMEOUT=30
 
 for FAMILY in ipv4 ipv6 ; do
 
-for DROP_PERCENT in 0 5 ; do
-
+for DROP_PERCENT in 0 10; do
+ for LATENCY in "delay 100" ""; do
  for CLIENT_OPTS in "" "-R" ; do
    case $FAMILY in
    ipv4)
@@ -56,10 +56,10 @@ for DROP_PERCENT in 0 5 ; do
 	echo "Running ${MODE}..."
 	test_run_cmd_local "ip netns exec $NETNS $IPERF3 -p $PORT -s &"
 	if [[ $MODE != "baseline" ]]; then
-		test_run_cmd_local "$BPFTUNE -ds -a tcp_conn_tuner.so &" true
+		test_run_cmd_local "$BPFTUNE -ds &" true
 		sleep $SETUPTIME
 		# warm up connection...
-		for i in {1..20}; do
+		for i in {1..40}; do
 			set +e
 			$IPERF3 -fm $CLIENT_OPTS -p $PORT -t 1 -c $ADDR > /dev/null 2>&1
 			set -e
@@ -120,6 +120,7 @@ for DROP_PERCENT in 0 5 ; do
    test_pass
 
    test_cleanup
+ done
  done
 done
 done
