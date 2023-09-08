@@ -20,11 +20,8 @@
 #include <bpftune/bpftune.bpf.h>
 #include "ip_frag_tuner.h"
 
-/* ratio of failure to success is > 1/2 */
-#define REASM_FAIL_THRESHOLD(success, fail)	((success >= 2) && (fail > (success >> 1)))
-
 static __always_inline int defrag(struct net *net, struct fqdir *fqdir,
-				  struct ipstats_mib *ip_stats, int tunable)
+				  int tunable)
 {
 	long mem = BPFTUNE_CORE_READ(fqdir, mem.counter);
 	long high_thresh = BPFTUNE_CORE_READ(fqdir, high_thresh);
@@ -39,20 +36,10 @@ static __always_inline int defrag(struct net *net, struct fqdir *fqdir,
 	 * number of fragmentation reassembly failures versus successes.
 	 */
 	if (NEARLY_FULL(mem, high_thresh)) {
-		__u64 reasm_success = BPFTUNE_CORE_READ(ip_stats,
-							mibs[IPSTATS_MIB_REASMOKS]);
-		__u64 reasm_fails = BPFTUNE_CORE_READ(ip_stats,
-						      mibs[IPSTATS_MIB_REASMFAILS]);
 		struct bpftune_event event = { 0 };
 		long old[3] = {};
 		long new[3] = {};	
 
-		bpftune_debug("nearly full, reasm success %ld reasm fail %ld\n",
-				reasm_success, reasm_fails);
-
-		/* too many fragmentation reassembly fails? */
-		if (REASM_FAIL_THRESHOLD(reasm_success, reasm_fails))
-			return 0;
 		old[0] = high_thresh;
 		new[0] = BPFTUNE_GROW_BY_DELTA(high_thresh);
 		send_net_sysctl_event(net, IP_FRAG_THRESHOLD_INCREASE,
@@ -65,15 +52,10 @@ static __always_inline int defrag(struct net *net, struct fqdir *fqdir,
 BPF_FENTRY(ip_defrag, struct net *net, struct sk_buff *skb, u32 user)
 {
         struct fqdir *fqdir = BPFTUNE_CORE_READ(net, ipv4.fqdir);
-	struct ipstats_mib *ip_stats;
 
 	if (!fqdir)
 		return 0;
-	ip_stats = BPFTUNE_CORE_READ(net, mib.ip_statistics);
-
-	if (!ip_stats)
-		return 0;
-	return defrag(net, fqdir, ip_stats, IP_FRAG_MAX_THRESHOLD);
+	return defrag(net, fqdir, IP_FRAG_MAX_THRESHOLD);
 }
 
 #define SKB_DST_NOREF	1UL
@@ -82,7 +64,6 @@ BPF_FENTRY(ipv6_frag_rcv, struct sk_buff *skb)
 {
 	long unsigned int refdst = BPFTUNE_CORE_READ(skb, _skb_refdst);
 	struct dst_entry *dst = (struct dst_entry *)(refdst & SKB_DST_PTRMASK);
-	struct ipstats_mib *ipv6_stats;
 	struct net_device *dev;
 	struct fqdir *fqdir;
 	struct net *net;
@@ -98,8 +79,5 @@ BPF_FENTRY(ipv6_frag_rcv, struct sk_buff *skb)
 	fqdir = BPFTUNE_CORE_READ(net, ipv6.fqdir);
 	if (!fqdir)
 		return 0;
-	ipv6_stats = BPFTUNE_CORE_READ(net, mib.ipv6_statistics);
-	if (!ipv6_stats)
-		return 0;
-	return defrag(net, fqdir, ipv6_stats, IP6_FRAG_MAX_THRESHOLD);
+	return defrag(net, fqdir, IP6_FRAG_MAX_THRESHOLD);
 }
