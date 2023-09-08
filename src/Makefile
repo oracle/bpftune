@@ -84,7 +84,7 @@ submake_extras := feature_display=0
 endif
 
 TUNERS = tcp_buffer_tuner route_table_tuner neigh_table_tuner sysctl_tuner \
-	 tcp_conn_tuner netns_tuner net_buffer_tuner
+	 tcp_conn_tuner netns_tuner net_buffer_tuner ip_frag_tuner
 
 TUNER_OBJS = $(patsubst %,%.o,$(TUNERS))
 TUNER_SRCS = $(patsubst %,%.c,$(TUNERS))

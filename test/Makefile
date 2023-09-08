@@ -27,6 +27,7 @@ TUNER_TESTS =	support_test log_test service_test inotify_test cap_test \
 		sysctl_test sysctl_legacy_test sysctl_netns_test \
 		netns_test netns_legacy_test \
 		backlog_test backlog_legacy_test \
+		frag_test frag_legacy_test \
 		neigh_table_test neigh_table_v4only_test \
 		neigh_table_legacy_test \
 		mem_pressure_test mem_pressure_legacy_test \

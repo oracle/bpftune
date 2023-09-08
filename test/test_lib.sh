@@ -320,7 +320,14 @@ test_cleanup()
 {
 	trap - EXIT
 
-	test_cleanup_local $EXITCODE
+	if [[ $SKIP_CLEANUP -ne 0 ]]; then
+		echo "skipping cleanup as requested"
+                if [ $EXITCODE -ne 0 ]; then
+                        test_log_result
+                fi
+        else
+		test_cleanup_local $EXITCODE
+	fi
 	if [ $EXITCODE -ne 0 ]; then
 		test_log_result
 		exit 1
@@ -333,14 +340,7 @@ test_cleanup_exit()
 	if [[ -n "$BC" ]]; then
 		echo "Last command executed: '$BC'"
 	fi
-	if [[ $SKIP_CLEANUP -ne 0 ]]; then
-		echo "skipping cleanup as requested"
-		if [ $EXITCODE -ne 0 ]; then
-			test_log_result
-		fi
-	else
-		test_cleanup
-	fi
+	test_cleanup
 	test_exit
 }
 
