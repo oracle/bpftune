@@ -77,6 +77,7 @@ for FAMILY in ipv4 ipv6 ; do
                 read -r -a stest_results <<< $sresults
 		read -r -a rtest_results <<< $rresults
 		pkill -TERM bpftune
+		sleep $SETUPTIME
         fi
 	sleep $SLEEPTIME
    done

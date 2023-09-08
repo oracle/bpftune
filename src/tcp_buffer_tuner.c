@@ -15,12 +15,14 @@
 struct tcp_buffer_tuner_bpf *skel;
 
 static struct bpftunable_desc descs[] = {
-{ TCP_BUFFER_TCP_WMEM,	BPFTUNABLE_SYSCTL, "net.ipv4.tcp_wmem",	true, 3 },
-{ TCP_BUFFER_TCP_RMEM,	BPFTUNABLE_SYSCTL, "net.ipv4.tcp_rmem",	true, 3 },
-{ TCP_BUFFER_TCP_MEM,	BPFTUNABLE_SYSCTL, "net.ipv4.tcp_mem",	false, 3 },
-{ TCP_BUFFER_TCP_MAX_ORPHANS,
-			BPFTUNABLE_SYSCTL, "net.ipv4.tcp_max_orphans",
-								false, 1 },
+{ TCP_BUFFER_TCP_WMEM,	BPFTUNABLE_SYSCTL, "net.ipv4.tcp_wmem",
+	BPFTUNABLE_NAMESPACED, 3 },
+{ TCP_BUFFER_TCP_RMEM,	BPFTUNABLE_SYSCTL, "net.ipv4.tcp_rmem",
+	BPFTUNABLE_NAMESPACED, 3 },
+{ TCP_BUFFER_TCP_MEM,	BPFTUNABLE_SYSCTL, "net.ipv4.tcp_mem",
+	0, 3 },
+{ TCP_BUFFER_TCP_MAX_ORPHANS, BPFTUNABLE_SYSCTL, "net.ipv4.tcp_max_orphans",
+	0, 1 },
 };
 
 static struct bpftunable_scenario scenarios[] = {
