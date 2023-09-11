@@ -142,14 +142,14 @@ retry:
 int init(struct bpftuner *tuner)
 {
 	/* on some platforms, this function is inlined */
-	const char *optionals[] = { "tcp_sndbuf_expand", NULL };
+	const char *optionals[] = { "entry__tcp_sndbuf_expand", NULL };
 	int pagesize;
 	int err;
 
 	err = bpftuner_bpf_open(tcp_buffer, tuner);
 	if (err)
 		return err;
-	err = bpftuner_bpf_load(tcp_buffer, tuner);
+	err = bpftuner_bpf_load(tcp_buffer, tuner, optionals);
 	if (err)
 		return err;
 
@@ -164,7 +164,7 @@ int init(struct bpftuner *tuner)
 			     ilog2(SK_MEM_QUANTUM));
 	bpftuner_bpf_var_set(tcp_buffer, tuner, nr_free_buffer_pages,
 			     nr_free_buffer_pages(true));
-	err = bpftuner_bpf_attach(tcp_buffer, tuner, optionals);
+	err = bpftuner_bpf_attach(tcp_buffer, tuner);
 	if (err)
 		return err;
 	return bpftuner_tunables_init(tuner, TCP_BUFFER_NUM_TUNABLES, descs,

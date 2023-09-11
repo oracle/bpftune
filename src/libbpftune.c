@@ -575,6 +575,8 @@ int __bpftuner_bpf_load(struct bpftuner *tuner, const char **optionals)
 		for (i = 0; optionals[i] != NULL; i++) {
 			struct bpf_program *prog;
 
+			bpftune_log(LOG_DEBUG, "looking for optional prog '%s'\n",
+				    optionals[i]);
 			prog = bpf_object__find_program_by_name(tuner->obj,
 								optionals[i]);
 			if (prog) {

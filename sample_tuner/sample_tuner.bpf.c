@@ -36,3 +36,8 @@ BPF_FENTRY(proc_dostring_coredump, struct ctl_table *table, int write,
 		      tuner_id, scenario_id, ret);
 	return 0;
 }
+
+BPF_FENTRY(this_function_does_not_exist, void *arg)
+{
+	return 0;
+}

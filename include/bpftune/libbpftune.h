@@ -205,29 +205,23 @@ void bpftuner_tunables_fini(struct bpftuner *tuner);
 		}							     \
 	} while (0)
 
-#define _bpftuner_bpf_load(tuner_name, tuner, optionals) ({		     \
+#define bpftuner_bpf_load(tuner_name, tuner, optionals) ({		     \
 	int __err;							     \
 									     \
-	__err = __bpftuner_bpf_load(tuner, optionals);			     \
+	__err = __bpftuner_bpf_load(tuner, NULL);			     \
+	if (__err && optionals != NULL) {				     \
+		bpftuner_bpf_fini(tuner);				     \
+		__err = bpftuner_bpf_open(tuner_name, tuner);		     \
+		if (!__err)						     \
+			__err = __bpftuner_bpf_load(tuner, optionals);	     \
+	}								     \
 	if (__err)							     \
 		bpftuner_bpf_destroy(tuner_name, tuner);		     \
 	__err;								     \
 })
 
-#define bpftuner_bpf_load(tuner_name, tuner)				     \
-	_bpftuner_bpf_load(tuner_name, tuner, NULL)
-
-#define bpftuner_bpf_attach(tuner_name, tuner, optionals) ({		     \
+#define bpftuner_bpf_attach(tuner_name, tuner) ({		     	     \
 	int __err = __bpftuner_bpf_attach(tuner);			     \
-                                                                             \
-	if (__err && optionals != NULL) {				     \
-		bpftuner_bpf_fini(tuner);			 	     \
-		__err = bpftuner_bpf_open(tuner_name, tuner);	 	     \
-		if (!__err)						     \
-			__err = _bpftuner_bpf_load(tuner_name, tuner, optionals); \
-		if (!__err)						     \
-			__err = __bpftuner_bpf_attach(tuner);		     \
-	}								     \
 	__err;								     \
 })
 
@@ -235,9 +229,9 @@ void bpftuner_tunables_fini(struct bpftuner *tuner);
 	int __err = bpftuner_bpf_open(tuner_name, tuner);		     \
 									     \
 	if (!__err)							     \
-		__err = bpftuner_bpf_load(tuner_name, tuner);		     \
+		__err = bpftuner_bpf_load(tuner_name, tuner, optionals);		     \
 	if (!__err)							     \
-		bpftuner_bpf_attach(tuner_name, tuner, optionals);	     \
+		bpftuner_bpf_attach(tuner_name, tuner);			     \
 	__err;								     \
 })
 
