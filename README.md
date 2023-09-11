@@ -22,6 +22,8 @@ is quite daunting.  On a 6.2 kernel we see
 1624
 ```
 
+[See here for an excellent writeup on network-related tunables.](https://github.com/leandromoreira/linux-network-performance-parameters).
+
 At the same time, individual systems get a lot less care
 and adminstrator attention than they used to; phrases like
 "cattle not pets" exemplify this.  Given the modern cloud
