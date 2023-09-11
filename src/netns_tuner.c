@@ -48,10 +48,10 @@ int init(struct bpftuner *tuner)
 	err = bpftuner_bpf_open(netns, tuner);
 	if (err)
 		return err;
-	err = bpftuner_bpf_load(netns, tuner);
+	err = bpftuner_bpf_load(netns, tuner, optionals);
 	if (err)
 		return err;
-	err = bpftuner_bpf_attach(netns, tuner, optionals);
+	err = bpftuner_bpf_attach(netns, tuner);
 	if (err)
 		return err;
 

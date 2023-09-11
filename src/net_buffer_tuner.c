@@ -36,12 +36,12 @@ int init(struct bpftuner *tuner)
 	err = bpftuner_bpf_open(net_buffer, tuner);
 	if (err)
 		return err;
-	err = bpftuner_bpf_load(net_buffer, tuner);
+	err = bpftuner_bpf_load(net_buffer, tuner, NULL);
 	if (err)
 		return err;
 	bpftuner_bpf_var_set(net_buffer, tuner, flow_limit_cpu_bitmap,
 			     cpu_bitmap);
-	err = bpftuner_bpf_attach(net_buffer, tuner, NULL);
+	err = bpftuner_bpf_attach(net_buffer, tuner);
 	if (err)
 		return err;
 

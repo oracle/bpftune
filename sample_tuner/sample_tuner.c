@@ -25,7 +25,10 @@
 
 int init(struct bpftuner *tuner)
 {
-	return bpftuner_bpf_init(sample, tuner, NULL);
+	const char *optionals[] = { "entry__this_function_does_not_exist",
+				    NULL };
+
+	return bpftuner_bpf_init(sample, tuner, optionals);
 }
 
 void fini(struct bpftuner *tuner)
