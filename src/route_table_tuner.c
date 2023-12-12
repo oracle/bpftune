@@ -39,7 +39,9 @@ static struct bpftunable_scenario scenarios[] = {
 
 int init(struct bpftuner *tuner)
 {
-	int err = bpftuner_bpf_init(route_table, tuner, NULL);
+	const char *optionals[] = { "entry__fib6_age", NULL };
+
+	int err = bpftuner_bpf_init(route_table, tuner, optionals);
 
 	if (err)
 		return err;
