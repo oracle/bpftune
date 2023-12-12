@@ -100,9 +100,9 @@ void event_handler(__attribute__((unused))struct bpftuner *tuner,
 	default:
 		return;
 	}
-	bpftuner_tunable_update(tuner, NETNS, event->scenario_id, netns_fd,
-				"netns %s (cookie %ld)\n",
-				event->scenario_id == NETNS_SCENARIO_CREATE ?
-				"created" : "destroyed",
-				event->netns_cookie);
+	/* use debug logging as these events are very frequent. */
+	bpftune_log(LOG_DEBUG, "netns %s (cookie %ld)\n",
+		    event->scenario_id == NETNS_SCENARIO_CREATE ?
+			"created" : "destroyed",
+			event->netns_cookie);
 }
