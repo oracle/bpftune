@@ -29,10 +29,11 @@ static struct bpftunable_scenario scenarios[] = {
 int init(struct bpftuner *tuner)
 {
 	long cpu_bitmap = 0;
+	long max_backlog = 0;
 	int err;
 
 	bpftune_sysctl_read(0, "net.core.flow_limit_cpu_bitmap", &cpu_bitmap);
-
+	bpftune_sysctl_read(0, "net.core.netdev_max_backlog", &max_backlog);
 	err = bpftuner_bpf_open(net_buffer, tuner);
 	if (err)
 		return err;
@@ -41,6 +42,8 @@ int init(struct bpftuner *tuner)
 		return err;
 	bpftuner_bpf_var_set(net_buffer, tuner, flow_limit_cpu_bitmap,
 			     cpu_bitmap);
+	bpftuner_bpf_var_set(net_buffer, tuner, netdev_max_backlog,
+			     max_backlog);
 	err = bpftuner_bpf_attach(net_buffer, tuner);
 	if (err)
 		return err;
@@ -82,6 +85,9 @@ void event_handler(struct bpftuner *tuner,
 					     tunable,
 					     event->update[0].old[0],
 					     event->update[0].new[0]);
+		/* update value of netdev_max_backlog for BPF program */
+		bpftuner_bpf_var_set(net_buffer, tuner, netdev_max_backlog,
+				     event->update[0].new[0]);
 		break;
 	case FLOW_LIMIT_CPU_BITMAP:
 		bpftuner_tunable_sysctl_write(tuner, id, scenario, 

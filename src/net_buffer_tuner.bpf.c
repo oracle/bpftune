@@ -20,8 +20,6 @@
 #include <bpftune/bpftune.bpf.h>
 #include "net_buffer_tuner.h"
 
-extern const void netdev_max_backlog __ksym;
-
 #ifndef NET_RX_DROP
 #define NET_RX_DROP	1
 #endif
@@ -30,6 +28,8 @@ __u64 drop_count = 0;
 __u64 drop_interval_start = 0;
 
 __u64 flow_limit_cpu_bitmap = 0;
+
+int netdev_max_backlog = 0;
 
 #ifdef BPFTUNE_LEGACY
 SEC("kretprobe/enqueue_to_backlog")
@@ -40,9 +40,9 @@ int BPF_PROG(bpftune_enqueue_to_backlog, struct sk_buff *skb, int cpu,
 	     unsigned int *qtail, int ret)
 #endif
 {
+	int max_backlog = netdev_max_backlog;
 	struct bpftune_event event =  { 0 };
 	long old[3], new[3];
-	int max_backlog, *max_backlogp = (int *)&netdev_max_backlog;
 	__u64 time, cpubit;
 
 	/* a high-frequency event so bail early if we can... */
@@ -54,10 +54,7 @@ int BPF_PROG(bpftune_enqueue_to_backlog, struct sk_buff *skb, int cpu,
 	/* only sample subset of drops to reduce overhead. */
 	if ((drop_count % 4) != 0)
 		return 0;
-	if (bpf_probe_read_kernel(&max_backlog, sizeof(max_backlog),
-				  max_backlogp))
-		return 0;
-
+	
 	/* if we drop more than 1/16 of the backlog queue size/min,
 	 * increase backlog queue size.  This means as the queue size
 	 * increases, the likliehood of hitting that limit decreases.
