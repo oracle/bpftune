@@ -242,8 +242,11 @@ BPF_FENTRY(tcp_rcv_space_adjust, struct sock *sk)
 		return 0;
 
 #ifndef BPFTUNE_LEGACY
-	/* CO-RE does not support bitfields... */
-	sk_userlocks = sk->sk_userlocks;
+	/* sk_userlocks is a bitfield prior to 6.9 */
+	if (LINUX_KERNEL_VERSION < KERNEL_VERSION(6, 9, 0)) {
+		/* CO-RE does not support bitfields... */
+		sk_userlocks = sk->sk_userlocks;
+	}
 #endif
 	if ((sk_userlocks & SOCK_RCVBUF_LOCK) || near_memory_pressure ||
 	    near_memory_exhaustion)
