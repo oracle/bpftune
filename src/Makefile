@@ -22,6 +22,7 @@ SRCARCH := $(shell uname -m | sed -e s/i.86/x86/ -e s/x86_64/x86/ \
 				  -e s/aarch64.*/arm64/ )
 
 CLANG ?= clang
+GCC_BPF ?=
 LLC ?= llc
 LLVM_STRIP ?= llvm-strip
 BPFTOOL ?= bpftool
@@ -29,7 +30,6 @@ BPF_INCLUDE := /usr/include
 BPF_CFLAGS := -g -fno-stack-protector -Wall
 NL_INCLUDE := /usr/include/libnl3
 INCLUDES := -I../include -I$(BPF_INCLUDE) -I$(NL_INCLUDE) -I../include/uapi
-
 INSTALL ?= install
 
 DESTDIR ?= /
@@ -104,11 +104,15 @@ NOBTF_BPF_SKELS = $(patsubst %.skel.h,%.skel.nobtf.h,$(BPF_SKELS))
 
 .PHONY: clean
 
+ifeq ($(GCC_BPF),)
 all: analyze $(OPATH) $(OPATH)bpftune $(TUNER_LIBS)
+else
+all: $(OPATH) $(OPATH)bpftune $(TUNER_LIBS)
+endif
 
 $(OPATH):
 	mkdir $(OPATH)
-	
+
 analyze: $(BPF_SKELS) $(LEGACY_BPF_SKELS) $(NOBTF_BPF_SKELS)
 	$(CLANG) --analyze $(INCLUDES) libbpftune.c bpftune.c $(TUNER_SRCS)
 clean:
@@ -163,6 +167,8 @@ $(OPATH)bpftune.o: $(OPATH)libbpftune.so
 %.skel.h: %.bpf.o
 	$(QUIET_GEN)$(BPFTOOL) gen skeleton $< > $@
 
+# check if GCC_BPF flag is set, otherwise use CLANG
+ifeq ($(GCC_BPF),)
 $(BPF_OBJS): $(patsubst %.o,%.c,$(BPF_OBJS)) ../include/bpftune/bpftune.bpf.h
 	$(CLANG) $(BPF_CFLAGS) -D__TARGET_ARCH_$(SRCARCH) -O2 -target bpf \
 		$(INCLUDES) -c $(patsubst %.o,%.c,$(@)) -o $(@)
@@ -176,6 +182,26 @@ $(NOBTF_BPF_OBJS): $(patsubst %.nobtf.o,%.c,$(NOBTF_BPF_OBJS)) ../include/bpftun
 	$(CLANG) $(BPF_CFLAGS) -D__TARGET_ARCH_$(SRCARCH) -DBPFTUNE_NOBTF -O2 -target bpf \
 		$(INCLUDES) -c $(patsubst %.nobtf.o,%.c,$(@)) \
 		-o $(@)
+else
+GCC_BPF_FLAGS := -g -O2 \
+	$(BPF_CFLAGS) -D__TARGET_ARCH_$(SRCARCH) \
+	-gbtf -mcpu=v3 -Wno-error=attributes \
+	-Wno-error=address-of-packed-member \
+	-Wno-compare-distinct-pointer-types \
+	$(INCLUDES)
+
+$(BPF_OBJS): $(patsubst %.o,%.c,$(BPF_OBJS)) ../include/bpftune/bpftune.bpf.h
+	$(GCC_BPF) $(GCC_BPF_FLAGS) -c $(patsubst %.o,%.c,$(@)) \
+		-o $(@)
+
+$(LEGACY_BPF_OBJS): $(patsubst %.legacy.o,%.c,$(LEGACY_BPF_OBJS)) ../include/bpftune/bpftune.bpf.h
+	$(GCC_BPF) $(GCC_BPF_FLAGS) -DBPFTUNE_LEGACY -c $(patsubst %.legacy.o,%.c,$(@)) \
+		-o $(@)
+
+$(NOBTF_BPF_OBJS): $(patsubst %.nobtf.o,%.c,$(NOBTF_BPF_OBJS)) ../include/bpftune/bpftune.bpf.h
+	$(GCC_BPF) $(GCC_BPF_FLAGS) -DBPFTUNE_NOBTF -c $(patsubst %.nobtf.o,%.c,$(@)) \
+		-o $(@)
+endif
 
 $(BPF_SKELS): $(BPF_OBJS)
 	$(BPFTOOL) gen skeleton $(subst .skel.h,.bpf.o,$@) > $@
@@ -185,4 +211,3 @@ $(LEGACY_BPF_SKELS): $(LEGACY_BPF_OBJS)
 
 $(NOBTF_BPF_SKELS): $(NOBTF_BPF_OBJS)
 	$(BPFTOOL) gen skeleton $(subst .skel.nobtf.h,.bpf.nobtf.o,$@) > $(subst .skel.h,.skel.nobtf.h,$@)
-
