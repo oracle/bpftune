@@ -25,10 +25,11 @@ CLANG ?= clang
 LLC ?= llc
 LLVM_STRIP ?= llvm-strip
 BPFTOOL ?= bpftool
-BPF_INCLUDE := ../../include
+GCC_BPF ?=
+BPF_INCLUDE := /usr/include
 BPF_CFLAGS := -g -fno-stack-protector -Wall
 NL_INCLUDE := /usr/include/libnl3
-INCLUDES := -I$(BPF_INCLUDE) -I$(NL_INCLUDE) -I/usr/include/uapi
+INCLUDES := -I../../include -I$(BPF_INCLUDE) -I$(NL_INCLUDE) -I/usr/include/uapi
 
 INSTALL ?= install
 
@@ -74,7 +75,7 @@ NOBTF_BPF_SKELS = $(patsubst %.skel.h,%.skel.nobtf.h,$(BPF_SKELS))
 .PHONY: clean
 
 all: $(TUNER_LIBS)
-	
+
 clean:
 	$(Q)$(RM) *.o *.d *.so*
 	$(Q)$(RM) *.skel*.h
@@ -86,6 +87,9 @@ $(TUNER_LIBS): $(BPF_SKELS) $(TUNER_OBJS)
 
 $(TUNER_OBJS): $(BPF_SKELS) $(LEGACY_BPF_SKELS) $(NOBTF_BPF_SKELS)
 
+
+# check if GCC_BPF flag is set, otherwise use CLANG
+ifeq ($(GCC_BPF),)
 $(BPF_OBJS): $(patsubst %.o,%.c,$(BPF_OBJS)) ../../include/bpftune/bpftune.bpf.h
 	$(CLANG) $(BPF_CFLAGS) -D__TARGET_ARCH_$(SRCARCH) -O2 -target bpf \
 		$(INCLUDES) -c $(patsubst %.o,%.c,$(@)) -o $(@)
@@ -100,6 +104,28 @@ $(NOBTF_BPF_OBJS): $(patsubst %.nobtf.o,%.c,$(NOBTF_BPF_OBJS)) ../../include/bpf
 		$(INCLUDES) -c $(patsubst %.nobtf.o,%.c,$(@)) \
 		-o $(@)
 
+else
+GCC_BPF_FLAGS := -g -O2 \
+	$(BPF_CFLAGS) -D__TARGET_ARCH_$(SRCARCH) \
+	-gbtf -mcpu=v3 -Wno-error=attributes \
+	-Wno-error=address-of-packed-member \
+	-Wno-compare-distinct-pointer-types \
+	$(INCLUDES)
+
+$(BPF_OBJS): $(patsubst %.o,%.c,$(BPF_OBJS)) ../../include/bpftune/bpftune.bpf.h
+	$(GCC_BPF) $(GCC_BPF_FLAGS) -c $(patsubst %.o,%.c,$(@)) \
+		-o $(@)
+
+$(LEGACY_BPF_OBJS): $(patsubst %.legacy.o,%.c,$(LEGACY_BPF_OBJS)) ../../include/bpftune/bpftune.bpf.h
+	$(GCC_BPF) $(GCC_BPF_FLAGS) -DBPFTUNE_LEGACY -c $(patsubst %.legacy.o,%.c,$(@)) \
+		-o $(@)
+
+$(NOBTF_BPF_OBJS): $(patsubst %.nobtf.o,%.c,$(NOBTF_BPF_OBJS)) ../../include/bpftune/bpftune.bpf.h
+	$(GCC_BPF) $(GCC_BPF_FLAGS) -DBPFTUNE_NOBTF -c $(patsubst %.nobtf.o,%.c,$(@)) \
+		-o $(@)
+
+endif
+
 $(BPF_SKELS): $(BPF_OBJS)
 	$(BPFTOOL) gen skeleton $(subst .skel.h,.bpf.o,$@) > $@
 
@@ -108,4 +134,3 @@ $(LEGACY_BPF_SKELS): $(LEGACY_BPF_OBJS)
 
 $(NOBTF_BPF_SKELS): $(NOBTF_BPF_OBJS)
 	$(BPFTOOL) gen skeleton $(subst .skel.nobtf.h,.bpf.nobtf.o,$@) > $(subst .skel.h,.skel.nobtf.h,$@)
-
