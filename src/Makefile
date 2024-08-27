@@ -34,6 +34,7 @@ INSTALL ?= install
 
 DESTDIR ?= /
 prefix ?= /usr
+libdir ?= lib64
 installprefix = $(DESTDIR)/$(prefix)
 
 INSTALLPATH = $(installprefix)
@@ -57,11 +58,14 @@ VERSION_SCRIPT  := libbpftune.map
 
 CFLAGS = -fPIC -Wall -Wextra -march=native -g -I../include -std=c99
 
-CFLAGS += -DBPFTUNE_VERSION='"$(BPFTUNE_VERSION)"' $(INCLUDES)
+CFLAGS += -DBPFTUNE_VERSION='"$(BPFTUNE_VERSION)"' \
+	  -DBPFTUNER_PREFIX_DIR='"$(prefix)"' \
+	  -DLIB_DIR='"$(libdir)"' \
+	  $(INCLUDES)
 
 LDLIBS = -lbpf -ldl -lm -lrt -lcap -lnl-3 -lpthread -lnl-route-3
 
-LDFLAGS += -L. -L/usr/local/lib64
+LDFLAGS += -L. -L$(prefix)/$(libdir)
 
 # Try to detect best kernel BTF source
 KERNEL_REL := $(shell uname -r)
@@ -128,15 +132,15 @@ distclean: clean
 install: $(OPATH)libbpftune.so $(OPATH)bpftune bpftune.service
 	$(INSTALL) -m 0755 -d $(INSTALLPATH)/sbin
 	$(INSTALL) $(OPATH)bpftune $(INSTALLPATH)/sbin/bpftune
-	$(INSTALL) -m 0755 -d $(INSTALLPATH)/lib64
-	$(INSTALL) $(OPATH)libbpftune.so* $(INSTALLPATH)/lib64
+	$(INSTALL) -m 0755 -d $(INSTALLPATH)/$(libdir)
+	$(INSTALL) $(OPATH)libbpftune.so* $(INSTALLPATH)/$(libdir)
 	$(INSTALL) -m 0755 -d $(installprefix)/lib/systemd/system
 	$(INSTALL) -m 644 bpftune.service $(installprefix)/lib/systemd/system
-	$(INSTALL) -m 0755 -d $(INSTALLPATH)/lib64/bpftune
-	$(INSTALL) $(TUNER_LIBS) $(INSTALLPATH)/lib64/bpftune
+	$(INSTALL) -m 0755 -d $(INSTALLPATH)/$(libdir)/bpftune
+	$(INSTALL) $(TUNER_LIBS) $(INSTALLPATH)/$(libdir)/bpftune
 	$(INSTALL) -m 0755 -d $(CONF)
 	$(INSTALL) -m 0755 -d $(CONFPATH)
-	echo $(prefix)/lib64 > $(CONFPATH)/libbpftune.conf
+	echo $(prefix)/$(libdir) > $(CONFPATH)/libbpftune.conf
 	if [ $(DESTDIR) =  / ]; then ldconfig; fi
 
 $(OPATH)bpftune: bpftune.c $(OPATH)bpftune.o $(OPATH)libbpftune.so
