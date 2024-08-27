@@ -51,9 +51,9 @@
 #define LIB_DIR				"lib64"
 #endif
 /* default /usr/lib64/bpftune */
-#define BPFTUNER_LIB_DIR		BPFTUNER_PREFIX_DIR LIB_DIR "/bpftune/"
+#define BPFTUNER_LIB_DIR		BPFTUNER_PREFIX_DIR "/" LIB_DIR "/bpftune/"
 /* default /usr/local/lib64/bpftune */
-#define BPFTUNER_LOCAL_LIB_DIR		BPFTUNER_PREFIX_DIR "local/" LIB_DIR "/bpftune/"
+#define BPFTUNER_LOCAL_LIB_DIR		BPFTUNER_PREFIX_DIR "/local/" LIB_DIR "/bpftune/"
 #define BPFTUNER_LIB_SUFFIX		"_tuner.so"
 
 #define BPFTUNE_PROC_SYS		"/proc/sys/"

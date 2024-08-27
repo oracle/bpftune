@@ -191,6 +191,15 @@ $ make pkg
 
 target, which will make a bpftune RPM.  See ./buildrpm/bpftune.spec
 
+We can also build with non-standard libdir for distros which do not
+use /usr/lib64 like CachyOS; in this case to install to /usr/lib
+instead
+
+```
+$ make libdir=lib
+$ sudo make install libdir=lib
+```
+
 To build the following packages are needed (names may vary by distro);
 
 - libbpf, libbpf-devel >= 0.6
