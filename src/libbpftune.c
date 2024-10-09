@@ -588,8 +588,16 @@ int __bpftuner_bpf_load(struct bpftuner *tuner, const char **optionals)
 	}
 	err = bpf_object__load_skeleton(tuner->skeleton);
 	if (err) {
-		bpftune_log_bpf_err(err, "could not load skeleton: %s\n");
-		goto out;
+		switch (err) {
+		case -ESRCH:
+			bpftune_log(LOG_ERR, "tuner '%s' failed to load, tracing target was not found; this can occur for unstable tracing targets like kernel functions.\n",
+				    tuner->name);
+			goto out;
+		default:
+			bpftune_log(LOG_ERR, "BPF load for tuner '%s; failed: '%s': %s\n",
+				    tuner->name, strerror(-err));
+			goto out;
+		}
 	}
 
 	bpftuner_map_init(tuner, "ring_buffer_map", &tuner->ring_buffer_map,
