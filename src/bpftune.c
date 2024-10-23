@@ -261,7 +261,7 @@ void print_support_level(enum bpftune_support_level support_level)
 		bpftune_log(BPFTUNE_LOG_LEVEL, "bpftune is not supported\n");
 		break;
 	case BPFTUNE_SUPPORT_NOBTF:
-		bpftune_log(BPFTUNE_LOG_LEVEL, "bpftune works, but no BPF Type Format information (BTF) is available.  This means kernel data structure offsets may not match those at compile-time, and tuners may not operate as expected. This mode of operation is unsupported, and failures are expected, so be warned.\n");
+		bpftune_log(BPFTUNE_LOG_LEVEL, "bpftune works, but no BPF Type Format information (BTF) is available.  This means kernel data structure offsets may not match those at compile-time, and tuners may not operate as expected. This mode of operation is unsupported, and failures are expected, so be warned. Note that in some cases, BTF _is_ present but is not usable since the version of libbpf used to build bpftune is too old relative to the version of libbpf used to generate the BTF in the kernel.  If kernel BTF _is_ present, consider updating libbpf to a more recent version to allow bpftune to use it. \n");
 		break;
 	case BPFTUNE_SUPPORT_LEGACY:
 		bpftune_log(BPFTUNE_LOG_LEVEL, "bpftune works in legacy mode\n");
