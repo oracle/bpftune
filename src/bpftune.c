@@ -399,9 +399,10 @@ int main(int argc, char *argv[])
 
 	bpftune_cap_drop();
 
-	if (init(BPFTUNER_LIB_DIR)) {
-		bpftune_log(LOG_ERR, "could not initialize tuners in '%s'\n",
-			    BPFTUNER_LIB_DIR);
+	err = init(BPFTUNER_LIB_DIR);
+	if (err) {
+		bpftune_log(LOG_ERR, "could not initialize tuners in '%s': %s\n",
+			    BPFTUNER_LIB_DIR, strerror(-err));
 		exit(EXIT_FAILURE);
 	}
 	/* optional dir absence will not trigger failure */
