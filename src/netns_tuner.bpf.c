@@ -20,8 +20,6 @@
 #include <bpftune/bpftune.bpf.h>
 #include "netns_tuner.h"
 
-#ifdef BPFTUNE_LEGACY
-
 struct setup_net {
 	struct net *net;
 };
@@ -29,7 +27,7 @@ struct setup_net {
 BPF_MAP_DEF(setup_net_map, BPF_MAP_TYPE_HASH, __u64, __u64, 65536, 0);
 
 SEC("kprobe/setup_net")
-int BPF_KPROBE(bpftune_setup_net, struct net *net, struct user_namespace *user_ns)
+int BPF_KPROBE(bpftune_setup_net, struct net *net)
 {
 	save_entry_data(setup_net_map, setup_net, net, net);
 	return 0;
@@ -57,40 +55,3 @@ int BPF_KRETPROBE(bpftune_setup_net_return, int ret)
 
 	return 0;
 }
-
-#else
-SEC("fexit/setup_net")
-int BPF_PROG(bpftune_setup_net, struct net *net, struct user_namespace *user_ns,
-	     int ret)
-{
-	struct bpftune_event event = {};
-
-	if (ret != 0 || net == NULL || net == &init_net)
-		return 0;
-
-	event.tuner_id = tuner_id;
-	event.pid = bpf_get_current_pid_tgid() >> 32;
-	event.scenario_id = NETNS_SCENARIO_CREATE;
-	event.netns_cookie = get_netns_cookie(net);
-	if (event.netns_cookie >= 0)
-		bpf_ringbuf_output(&ring_buffer_map, &event, sizeof(event), 0);
-
-	return 0;
-}
-#endif
-
-/*BPF_FENTRY(net_free, struct net *net)
-{
-	struct bpftune_event event = {};
-
-	if (!net)
-		return 0;
-
-	event.tuner_id = tuner_id;
-	event.scenario_id = NETNS_SCENARIO_DESTROY;
-	event.netns_cookie = get_netns_cookie(net);
-	if (event.netns_cookie >= 0)
-		bpf_ringbuf_output(&ring_buffer_map, &event, sizeof(event), 0);
-
-	return 0;
-} */
