@@ -17,7 +17,7 @@
 # Boston, MA 021110-1307, USA.
 #
 
-SRCARCH := $(shell uname -m | sed -e s/i.86/x86/ -e s/x86_64/x86/ \
+SRCARCH ?= $(shell uname -m | sed -e s/i.86/x86/ -e s/x86_64/x86/ \
 				  -e /arm64/!s/arm.*/arm/ -e s/sa110/arm/ \
 				  -e s/aarch64.*/arm64/ )
 
@@ -56,7 +56,7 @@ endif
 VERSION = 0.1.3
 VERSION_SCRIPT  := libbpftune.map
 
-CFLAGS = -fPIC -Wall -Wextra -march=native -g -I../include -std=c99
+CFLAGS = -fPIC -Wall -Wextra -g -I../include -std=c99
 
 CFLAGS += -DBPFTUNE_VERSION='"$(BPFTUNE_VERSION)"' \
 	  -DBPFTUNER_PREFIX_DIR='"$(prefix)"' \
