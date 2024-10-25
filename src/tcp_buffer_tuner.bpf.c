@@ -21,6 +21,8 @@
 #include "tcp_buffer_tuner.h"
 #include <bpftune/corr.h>
 
+#define TCP_BUFFER_MAX 2147483647
+
 BPF_MAP_DEF(corr_map, BPF_MAP_TYPE_HASH, struct corr_key, struct corr, 1024, 0);
 
 bool under_memory_pressure = false;
@@ -211,6 +213,8 @@ BPF_FENTRY(tcp_sndbuf_expand, struct sock *sk)
 		wmem[1] = wmem_new[1] = BPFTUNE_CORE_READ(net, ipv4.sysctl_tcp_wmem[1]);
 		wmem_new[2] = BPFTUNE_GROW_BY_DELTA(wmem[2]);
 
+		if (wmem_new[2] >= TCP_BUFFER_MAX)
+			return 0;
 		if (send_sk_sysctl_event(sk, TCP_BUFFER_INCREASE,
 					 TCP_BUFFER_TCP_WMEM,
 					 wmem, wmem_new, &event) < 0)
@@ -262,6 +266,9 @@ BPF_FENTRY(tcp_rcv_space_adjust, struct sock *sk)
 		rmem[0] = rmem_new[0] = BPFTUNE_CORE_READ(net, ipv4.sysctl_tcp_rmem[0]);
 		rmem[1] = rmem_new[1] = BPFTUNE_CORE_READ(net, ipv4.sysctl_tcp_rmem[1]);
 		rmem_new[2] = BPFTUNE_GROW_BY_DELTA(rmem[2]);
+		if (rmem_new[2] >= TCP_BUFFER_MAX)
+			return 0;
+
 		if (send_sk_sysctl_event(sk, TCP_BUFFER_INCREASE, TCP_BUFFER_TCP_RMEM,
 					 rmem, rmem_new, &event) < 0)
 			return 0;
