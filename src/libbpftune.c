@@ -1151,6 +1151,13 @@ int bpftuner_tunable_sysctl_write(struct bpftuner *tuner, unsigned int tunable,
 
 		for (i = 0; i < t->desc.num_values; i++)
 			t->current_values[i] = values[i];
+	} else if (ret < 0) {
+		/* If sysctl update failed, mark non-global netns as gone to
+		 * avoid repeated attempts to update it.
+		 */
+                if (netns && netns->netns_cookie &&
+		    netns->netns_cookie != global_netns_cookie)
+			netns->state = BPFTUNE_GONE;
 	}
 
 	if (fd > 0)
@@ -1409,13 +1416,17 @@ int bpftuner_netns_fd_from_cookie(struct bpftuner *tuner, unsigned long cookie)
 {
 	struct bpftuner_netns *netns = bpftuner_netns_from_cookie(tuner->id,
 								  cookie);
+	int fd;
 
 	if (netns && netns->state >= BPFTUNE_MANUAL) {
 		bpftune_log(LOG_DEBUG, "netns (cookie %ld} manually disabled\n",
 			    cookie);
 		return -ENOENT;
 	}
-	return bpftune_netns_find(cookie);
+	fd = bpftune_netns_find(cookie);
+	if (fd > 0 && !netns)
+		bpftuner_netns_init(tuner, cookie);
+	return fd;
 }
 
 int bpftune_netns_init_all(void)
