@@ -867,7 +867,7 @@ int bpftune_sysctl_read(int netns_fd, const char *name, long *values)
 
 	bpftune_sysctl_name_to_path(name, path, sizeof(path));
 
-	err = bpftune_netns_set(netns_fd, &orig_netns_fd);
+	err = bpftune_netns_set(netns_fd, &orig_netns_fd, false);
 	if (err < 0)
 		goto out_unset;
 
@@ -898,7 +898,7 @@ int bpftune_sysctl_read(int netns_fd, const char *name, long *values)
 	}
 
 out:
-	bpftune_netns_set(orig_netns_fd, NULL);
+	bpftune_netns_set(orig_netns_fd, NULL, true);
 out_unset:
 	bpftune_cap_drop();
 	return err ? err : num_values;
@@ -920,7 +920,7 @@ int bpftune_sysctl_write(int netns_fd, const char *name, __u8 num_values, long *
 	err = bpftune_cap_add();
 	if (err)
 		return err;
-	err = bpftune_netns_set(netns_fd, &orig_netns_fd);
+	err = bpftune_netns_set(netns_fd, &orig_netns_fd, false);
 	if (err < 0)
 		goto out_unset;
 
@@ -955,7 +955,7 @@ int bpftune_sysctl_write(int netns_fd, const char *name, __u8 num_values, long *
 			    name, i, values[i]);
 	}
 out:
-	bpftune_netns_set(orig_netns_fd, NULL);
+	bpftune_netns_set(orig_netns_fd, NULL, true);
 out_unset:
 	bpftune_cap_drop();
         return err;
@@ -1217,7 +1217,7 @@ static int bpftune_netns_fd(int netns_pid)
 }
 
 /* sets original netns fd if orig_fd is non-NULL */
-int bpftune_netns_set(int new_fd, int *orig_fd)
+int bpftune_netns_set(int new_fd, int *orig_fd, bool quiet)
 {
 	int fd = 0, err = 0;
 
@@ -1241,7 +1241,8 @@ int bpftune_netns_set(int new_fd, int *orig_fd)
 	err = setns(new_fd, CLONE_NEWNET);
 	if (err < 0) {
 		err = -errno;
-		bpftune_log(LOG_ERR, "could not %s ns(%d): %s\n",
+		bpftune_log(quiet ? LOG_DEBUG : LOG_ERR,
+			    "could not %s ns(%d): %s\n",
 			    orig_fd ? "set" : "restore",
 			    new_fd, strerror(-err));
 	}
@@ -1276,7 +1277,7 @@ int bpftune_netns_info(int pid, int *fd, unsigned long *cookie)
 			return netns_fd;
 	}
 
-	err = bpftune_netns_set(netns_fd, &orig_netns_fd);
+	err = bpftune_netns_set(netns_fd, &orig_netns_fd, true);
 	if (!err) {
 		int s = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -1299,7 +1300,7 @@ int bpftune_netns_info(int pid, int *fd, unsigned long *cookie)
 			
 			close(s);
 		}
-		bpftune_netns_set(orig_netns_fd, NULL);
+		bpftune_netns_set(orig_netns_fd, NULL, true);
 
 		if (ret == 0) {
 			if (fdnew && fd)
