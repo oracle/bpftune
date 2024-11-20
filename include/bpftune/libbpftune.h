@@ -291,7 +291,7 @@ int bpftune_sysctl_read(int netns_fd, const char *name, long *values);
 int bpftune_sysctl_write(int netns_fd, const char *name, __u8 num_values, long *values);
 
 bool bpftune_netns_cookie_supported(void);
-int bpftune_netns_set(int fd, int *orig_fd);
+int bpftune_netns_set(int fd, int *orig_fd, bool quiet);
 int bpftune_netns_info(int pid, int *fd, unsigned long *cookie);
 int bpftune_netns_init_all(void);
 void bpftuner_netns_init(struct bpftuner *tuner, unsigned long cookie);
