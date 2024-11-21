@@ -900,6 +900,8 @@ int bpftune_sysctl_read(int netns_fd, const char *name, long *values)
 out:
 	bpftune_netns_set(orig_netns_fd, NULL, true);
 out_unset:
+	if (orig_netns_fd)
+		close(orig_netns_fd);
 	bpftune_cap_drop();
 	return err ? err : num_values;
 }
@@ -957,6 +959,8 @@ int bpftune_sysctl_write(int netns_fd, const char *name, __u8 num_values, long *
 out:
 	bpftune_netns_set(orig_netns_fd, NULL, true);
 out_unset:
+	if (orig_netns_fd)
+		close(orig_netns_fd);
 	bpftune_cap_drop();
         return err;
 }
@@ -1311,10 +1315,12 @@ int bpftune_netns_info(int pid, int *fd, unsigned long *cookie)
 	} else {
 		bpftune_log(LOG_DEBUG, "setns failed for for fd %d\n",
 			    netns_fd);
-		ret = -errno;
+		ret = err;
 	}
-	if (fdnew && !fd)
-		close(netns_fd);
+	if (fdnew) {
+		if (ret || !fd)
+			close(netns_fd);
+	}
 	if (orig_netns_fd > 0)
 		close(orig_netns_fd);
 	return ret;
@@ -1382,7 +1388,7 @@ static int bpftune_netns_find(unsigned long cookie)
 	}
 	while ((dirent = readdir(dir)) != NULL) {
 		char *endptr;
-		int netns_fd;
+		int netns_fd = 0;
 		long pid;
 
 		pid = strtol(dirent->d_name, &endptr, 10);
