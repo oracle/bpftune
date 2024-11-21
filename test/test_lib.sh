@@ -215,7 +215,7 @@ test_setup_local()
 	sysctl -qw net.ipv6.conf.all.disable_ipv6=0
 	if [[ $FOUND -ne 0 ]]; then
 		ip netns pids $NETNS 2>/dev/null| xargs -r kill
-		ip netns del $NETNS 2>/dev/null|true
+		ip --all netns del ${NETNS_PREFIX}\* 2>/dev/null|true
 		sleep 0.2
 		ip netns add $NETNS
 		ip link add dev $VETH1 mtu $MTU netns $NETNS type veth \
