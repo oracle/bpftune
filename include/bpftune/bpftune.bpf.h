@@ -199,6 +199,8 @@ BPF_RINGBUF(ring_buffer_map, 128 * 1024);
 
 BPF_MAP_DEF(netns_map, BPF_MAP_TYPE_HASH, __u64, __u64, 65536, 0);
 
+BPF_MAP_DEF(corr_map, BPF_MAP_TYPE_HASH, struct corr_key, struct corr, 1024, 0);
+
 unsigned int tuner_id;
 unsigned int strategy_id;
 unsigned int bpftune_pid;

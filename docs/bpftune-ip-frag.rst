@@ -18,8 +18,10 @@ DESCRIPTION
         Fragmentation reassembly can fail if this value is set too low;
         monitor for fragmentation reassembly and bump value if needed.
 
-        Avoid bumping it if assembly faiures constitute too high a
-        proportion of reassembly events; this may signify a DoS.
+        Avoid bumping it if assembly failures are correlated with
+        increases in frag_high_thresh; this suggests that increasing
+        available memory does not help.  While correlation is high,
+        tune down the frag_high_thresh value.
 
         Tunables:
 

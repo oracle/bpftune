@@ -23,7 +23,8 @@
 #define CORR_MIN_SAMPLES	10
 
 /* threshold at which we determine correlation is significant */
-#define CORR_THRESHOLD		((long double)0.7)
+#define CORR_THRESHOLD		((long double)0.75)
+#define CORR_HIGH_THRESHOLD	((long double)0.9)
 
 /* correlate tunables via id + netns cookie */
 struct corr_key {
@@ -114,6 +115,19 @@ static inline long double corr_compute(struct corr *c)
 		return 0;
 	return cov/(sqrtl(var_x)*sqrtl(var_y));
 }
+
+static inline int corr_update_user(int map, __u64 id,
+				   __u64 netns_cookie,
+				   __u64 x, __u64 y)
+{
+	struct corr_key key = { .id = id, .netns_cookie = netns_cookie };
+	struct corr corr = {};
+
+	bpf_map_lookup_elem(map, &key, &corr);
+	corr_update(&corr, x, y);
+	return bpf_map_update_elem(map, &key, &corr, 0);
+}
+
 #endif /* __KERNEL__ */
 
 #endif /* _CORR_H */

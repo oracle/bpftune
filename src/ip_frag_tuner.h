@@ -28,4 +28,5 @@ enum ip_frag_tunables {
 
 enum ip_frag_scenarios {
 	IP_FRAG_THRESHOLD_INCREASE,
+	IP_FRAG_THRESHOLD_DECREASE,
 };
