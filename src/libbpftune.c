@@ -783,7 +783,9 @@ static int bpftune_ringbuf_event_read(void *ctx, void *data, size_t size)
 		    event->netns_cookie,
 		    event->netns_cookie && event->netns_cookie != global_netns_cookie ?
 		    "non-global netns" : "global netns");
-	tuner->event_handler(tuner, event, ctx);
+	/* only send events to active tuners */
+	if (tuner->state == BPFTUNE_ACTIVE)
+		tuner->event_handler(tuner, event, ctx);
 
 	return 0;
 }
