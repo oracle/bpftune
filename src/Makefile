@@ -48,9 +48,10 @@ CONF	 = $(DESTDIR)/$(confprefix)
 CONFPATH  = $(CONF)/ld.so.conf.d
 
 KERNEL_REL := $(shell uname -r)
+GIT_SHA := $(shell git rev-parse HEAD)
 
 ifeq ($(BPFTUNE_VERSION),)
-BPFTUNE_VERSION := $(KERNEL_REL)
+BPFTUNE_VERSION := $(KERNEL_REL)-$(GIT_SHA)
 endif
 
 VERSION = 0.1.3
@@ -104,6 +105,9 @@ BPF_SKELS = $(patsubst %,%.skel.h,$(TUNERS)) probe.skel.h
 LEGACY_BPF_SKELS = $(patsubst %.skel.h,%.skel.legacy.h,$(BPF_SKELS))
 NOBTF_BPF_SKELS = $(patsubst %.skel.h,%.skel.nobtf.h,$(BPF_SKELS))
 
+BPFTUNE_HDRS = ../include/bpftune/libbpftune.h \
+	       ../include/bpftune/bpftune.h
+
 .DELETE_ON_ERROR:
 
 .PHONY: clean
@@ -147,7 +151,7 @@ $(OPATH)bpftune: bpftune.c $(OPATH)bpftune.o $(OPATH)libbpftune.so
 	$(QUIET_LINK)$(CC) $(CFLAGS) $(OPATH)bpftune.o -o $@ \
 	$(LDFLAGS) $(LDLIBS) -lbpftune
 
-$(OPATH)libbpftune.so: libbpftune.c ../include/bpftune/libbpftune.h $(OPATH)libbpftune.o
+$(OPATH)libbpftune.so: libbpftune.c $(BPFTUNE_HDRS) $(OPATH)libbpftune.o
 	$(CC) $(CFLAGS) -Wl,--version-script=$(VERSION_SCRIPT) \
 			-Wl,--soname,$(notdir $@).$(VERSION) \
 			-shared -o $(@).$(VERSION) \
