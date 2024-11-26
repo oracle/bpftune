@@ -646,6 +646,21 @@ void bpftuner_bpf_fini(struct bpftuner *tuner)
 
 static struct bpftuner *bpftune_tuners[BPFTUNE_MAX_TUNERS];
 
+static unsigned long global_netns_cookie;
+
+static void bpftune_global_netns_init(void)
+{
+	unsigned long cookie = 0;
+
+	if (global_netns_cookie || !netns_cookie_supported)
+		return;
+	if (!bpftune_netns_info(getpid(), NULL, &cookie)) {
+		global_netns_cookie = cookie;
+		bpftune_log(LOG_DEBUG, "global netns cookie is %ld\n",
+			    global_netns_cookie);
+	}
+}
+
 /* add a tuner to the list of tuners, or replace existing inactive tuner.
  * If successful, call init().
  */
@@ -703,6 +718,12 @@ struct bpftuner *bpftuner_init(const char *path)
 		free(tuner);
 		return NULL;
 	}
+	if (!global_netns_cookie)
+		bpftune_global_netns_init();
+	if (global_netns_cookie) {
+		tuner->netns.netns_cookie = global_netns_cookie;
+		tuner->netns.state = BPFTUNE_ACTIVE;
+	}
 	tuner->id = bpftune_num_tuners;
 	tuner->state = BPFTUNE_ACTIVE;
 	bpftune_tuners[bpftune_num_tuners++] = tuner;
@@ -710,8 +731,6 @@ struct bpftuner *bpftuner_init(const char *path)
 		    tuner->name, tuner->id);
 	return tuner;
 }
-
-static unsigned long global_netns_cookie;
 
 static void bpftuner_scenario_log(struct bpftuner *tuner, unsigned int tunable,
 				  unsigned int scenario, int netns_fd,
@@ -761,6 +780,7 @@ void bpftune_set_learning_rate(unsigned short rate)
 
 static int bpftune_ringbuf_event_read(void *ctx, void *data, size_t size)
 {
+	const char *status = "skipped due to inactive tuner/netns";
 	struct bpftune_event *event = data;
 	struct bpftuner *tuner;
 
@@ -777,16 +797,22 @@ static int bpftune_ringbuf_event_read(void *ctx, void *data, size_t size)
 		bpftune_log(LOG_ERR, "no tuner for id %d\n", event->tuner_id);
 		return 0;
 	}
+	/* only send events to active tuners/netns */
+	if (tuner->state == BPFTUNE_ACTIVE) {
+		struct bpftuner_netns *netns = bpftuner_netns_from_cookie(event->tuner_id, event->netns_cookie);
+
+		if (!netns || netns->state != BPFTUNE_MANUAL) {
+			tuner->event_handler(tuner, event, ctx);
+			status = "sent";
+		}
+	}
 	bpftune_log(LOG_DEBUG,
-		    "event scenario [%d] for tuner %s[%d] netns %ld (%s)\n",
+		    "event scenario [%d] for tuner %s[%d] netns %lu (%s) %s\n",
 		    event->scenario_id, tuner->name, tuner->id,
 		    event->netns_cookie,
 		    event->netns_cookie && event->netns_cookie != global_netns_cookie ?
-		    "non-global netns" : "global netns");
-	/* only send events to active tuners */
-	if (tuner->state == BPFTUNE_ACTIVE)
-		tuner->event_handler(tuner, event, ctx);
-
+		    "non-global netns" : "global netns",
+		    status);
 	return 0;
 }
 
@@ -1330,7 +1356,7 @@ int bpftune_netns_info(int pid, int *fd, unsigned long *cookie)
 
 static int bpftune_netns_find(unsigned long cookie)
 {
-	unsigned long netns_cookie;
+	unsigned long netns_cookie = 0;
 	struct bpftuner *t;
 	struct mntent *ent;
         FILE *mounts;
@@ -1446,11 +1472,8 @@ int bpftune_netns_init_all(void)
 	if (!netns_cookie_supported)
 		return 0;
 
-	if (!bpftune_netns_info(getpid(), NULL, &cookie)) {
-		global_netns_cookie = cookie;
-		bpftune_log(LOG_DEBUG, "global netns cookie is %ld\n",
-			    global_netns_cookie);
-	}
+	bpftune_global_netns_init();
+
 	return bpftune_netns_find(0);
 }
 
@@ -1480,7 +1503,7 @@ void bpftuner_netns_fini(struct bpftuner *tuner, unsigned long cookie, enum bpft
 {
 	struct bpftuner_netns *netns, *prev = NULL;
 
-	if (cookie == 0 || cookie == global_netns_cookie) {
+	if (cookie == 0 || (cookie == global_netns_cookie && !netns_cookie_supported)) {
 		bpftuner_fini(tuner, state);
 		return;
 	}

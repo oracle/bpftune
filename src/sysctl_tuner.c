@@ -52,6 +52,22 @@ void fini(struct bpftuner *tuner)
 	bpftuner_bpf_fini(tuner);
 }
 
+static const char *pid2cmd(int pid, char *cmd, size_t cmdsize)
+{
+	char cmdline[64];
+	FILE *fp;
+
+	snprintf(cmdline, sizeof(cmdline) - 1, "/proc/%d/cmdline", pid);
+	fp = fopen(cmdline, "r");
+	if (fp) {
+		fgets(cmd, cmdsize - 1, fp);
+		fclose(fp);
+	}
+	if (strlen(cmd) == 0)
+		strncpy(cmd, "?", 2);
+	return cmd;
+}
+
 void event_handler(struct bpftuner *tuner, struct bpftune_event *event,
 		   __attribute__((unused))void *ctx)
 {
@@ -80,9 +96,13 @@ void event_handler(struct bpftuner *tuner, struct bpftune_event *event,
 			 * gc_thresh3 in neigh table tuner for example.
 			 */
 			if (strstr(path, event->str)) {
+				char cmd[1024] = {};
+
 				bpftune_log(BPFTUNE_LOG_LEVEL,
-					    "user (pid %ld) modified sysctl '%s' that tuner '%s' uses; disabling '%s' for namespace cookie %ld\n",
-					    event->pid, event->str, t->name, t->name,
+					    "pid %ld, cmd '%s' modified sysctl '%s' that tuner '%s' uses; disabling '%s' for namespace cookie %ld\n",
+					    event->pid,
+					    pid2cmd(event->pid, cmd, sizeof(cmd)),
+					    event->str, t->name, t->name,
 					    event->netns_cookie);
 				bpftuner_netns_fini(t, event->netns_cookie, BPFTUNE_MANUAL);
 				break;
