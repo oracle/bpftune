@@ -166,7 +166,7 @@ $(TUNER_LIBS): $(OPATH)libbpftune.so $(TUNER_OBJS)
 	$(CC) $(CFLAGS) -shared -o $(@) $(patsubst $(OPATH)%.so,%.c,$(@)) \
 		$(LDLIBS) -lbpftune $(LDFLAGS)
 
-$(OPATH)libbpftune.o: probe.skel.h probe.skel.legacy.h probe.skel.nobtf.h
+$(OPATH)libbpftune.o: probe.skel.h probe.skel.legacy.h probe.skel.nobtf.h libbpftune.c
 	$(QUIET_CC)$(CC) $(CFLAGS) -c libbpftune.c -o $@
 
 $(OPATH)bpftune.o: $(OPATH)libbpftune.so
