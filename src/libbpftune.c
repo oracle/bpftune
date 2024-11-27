@@ -69,6 +69,7 @@ int bpftune_loglevel = BPFTUNE_LOG_LEVEL;
 struct ring_buffer *ring_buffer;
 int ring_buffer_map_fd;
 int netns_map_fd;
+int corr_map_fd;
 
 int bpftune_log_level(void)
 {
@@ -564,7 +565,10 @@ int __bpftuner_bpf_load(struct bpftuner *tuner, const char **optionals)
 	if (bpftuner_map_reuse("ring_buffer", tuner->ring_buffer_map,
 			       ring_buffer_map_fd, &tuner->ring_buffer_map_fd) ||
 	    bpftuner_map_reuse("netns_map", tuner->netns_map,
-			       netns_map_fd, &tuner->netns_map_fd)) {
+			       netns_map_fd, &tuner->netns_map_fd) ||
+	    bpftuner_map_reuse("corr_map", tuner->corr_map,
+			       corr_map_fd, &tuner->corr_map_fd)) {
+		bpftune_log(LOG_DEBUG, "got here!!\n");
 		err = -1;
 		goto out;
 	}
@@ -604,6 +608,8 @@ int __bpftuner_bpf_load(struct bpftuner *tuner, const char **optionals)
 			  &ring_buffer_map_fd, &tuner->ring_buffer_map_fd);
 	bpftuner_map_init(tuner, "netns_map", &tuner->netns_map,
 			  &netns_map_fd, &tuner->netns_map_fd);
+	bpftuner_map_init(tuner, "corr_map", &tuner->corr_map,
+			  &corr_map_fd, &tuner->corr_map_fd);
 out:
 	bpftune_cap_drop();
 	return err;
@@ -621,6 +627,7 @@ int __bpftuner_bpf_attach(struct bpftuner *tuner)
 		bpftune_log_bpf_err(err, "could not attach skeleton: %s\n");
 	} else {
 		tuner->ring_buffer_map_fd = bpf_map__fd(tuner->ring_buffer_map);
+		tuner->corr_map_fd = bpf_map__fd(tuner->corr_map);
 	}
 	bpftune_cap_drop();
 	return err;
@@ -639,7 +646,9 @@ void bpftuner_bpf_fini(struct bpftuner *tuner)
 			close(ring_buffer_map_fd);
 		if (netns_map_fd > 0)
 			close(netns_map_fd);
-		ring_buffer_map_fd = netns_map_fd = 0;
+		if (corr_map_fd > 0)
+			close(corr_map_fd);
+		ring_buffer_map_fd = netns_map_fd = corr_map_fd = 0;
 	}
 	bpftune_cap_drop();
 }
@@ -1001,6 +1010,89 @@ out_unset:
 		close(orig_netns_fd);
 	bpftune_cap_drop();
         return err;
+}
+
+int bpftune_snmpstat_read(unsigned long netns_cookie, int family,
+			  const char *name, long *value)
+{
+	int err, netns_fd = 0, orig_netns_fd = 0, stat_index = 0;
+	const char *file;
+	char line[1024];
+	FILE *fp = NULL;
+
+	switch (family) {
+	case AF_INET:
+		file = "/proc/net/snmp";
+		break;
+	case AF_INET6:
+		file = "/proc/net/snmp6";
+		break;
+	default:
+		return -EINVAL;
+	}
+	err = bpftune_cap_add();
+	if (err)
+		return err;
+	netns_fd = bpftuner_netns_fd_from_cookie(NULL, netns_cookie);
+	if (netns_fd < 0) {
+		bpftune_log(LOG_DEBUG, "could not get netns fd for cookie %ld\n",
+			    netns_cookie);
+		return -EINVAL;
+	}
+	err = bpftune_netns_set(netns_fd, &orig_netns_fd, false);
+	if (err < 0)
+		goto out_unset;
+	fp = fopen(file, "r");
+	if (!fp) {
+		err = -errno;
+		goto out;
+	}
+	while (fgets(line, sizeof(line) - 1, fp) != NULL) {
+		char *next, *s, *saveptr = NULL;
+		int index = 0;
+
+		/* for IPv6 it is a "key value" format per line; for
+		 * IPv4 it is a set of parameter names on one line
+		 * followed by the values on the next.
+		 */
+		if (family == AF_INET6) {
+			char nextname[128];
+
+			sscanf(line, "%s %ld", nextname, value);
+			/* names are ip6<Name> etc */
+			if (strstr(nextname, name))
+				break;
+			continue;
+		}
+		for (s = line;
+		     (next = strtok_r(s, " ", &saveptr)) != NULL;
+		     s = NULL, index++) {
+			/* found the stat value at index; set it in value */
+			if (stat_index && index == stat_index) {
+				if (sscanf(next, "%ld", value) != 1)
+					err = -ENOENT;
+				goto out;
+			}
+			/* find index of stat in stat string; value will
+			 * have same index on the next line.
+			 */
+			if (strcmp(next, name) == 0) {
+				stat_index = index;
+				break;
+			}
+		}
+	}
+out:
+	if (fp)
+		fclose(fp);
+	bpftune_netns_set(orig_netns_fd, NULL, true);
+out_unset:
+	if (netns_fd)
+		close(netns_fd);
+	if (orig_netns_fd)
+		close(orig_netns_fd);
+	bpftune_cap_drop();
+	return err;
 }
 
 int bpftuner_tunables_init(struct bpftuner *tuner, unsigned int num_descs,
@@ -1455,18 +1547,21 @@ out:
 
 int bpftuner_netns_fd_from_cookie(struct bpftuner *tuner, unsigned long cookie)
 {
-	struct bpftuner_netns *netns = bpftuner_netns_from_cookie(tuner->id,
-								  cookie);
+	struct bpftuner_netns *netns = NULL;
 	int fd;
 
+	if (tuner)
+		netns = bpftuner_netns_from_cookie(tuner->id, cookie);
 	if (netns && netns->state >= BPFTUNE_MANUAL) {
 		bpftune_log(LOG_DEBUG, "netns (cookie %ld} manually disabled\n",
 			    cookie);
 		return -ENOENT;
 	}
 	fd = bpftune_netns_find(cookie);
-	if (fd > 0 && !netns)
-		bpftuner_netns_init(tuner, cookie);
+	if (fd > 0 && !netns) {
+		if (tuner)
+			bpftuner_netns_init(tuner, cookie);
+	}
 	return fd;
 }
 

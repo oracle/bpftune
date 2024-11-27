@@ -30,6 +30,7 @@
 #include <string.h>
 #include <syslog.h>
 #include <unistd.h>
+#include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -165,6 +166,7 @@ void bpftuner_tunables_fini(struct bpftuner *tuner);
 		tuner->obj = __skel->obj;				     \
 		tuner->ring_buffer_map = __skel->maps.ring_buffer_map;	     \
 		tuner->netns_map = __skel->maps.netns_map;		     \
+		tuner->corr_map = __skel->maps.corr_map;		     \
 	} while (0)
 
 #define bpftuner_bpf_open(tuner_name, tuner) ({				     \
@@ -289,7 +291,7 @@ void bpftune_ring_buffer_fini(void *ring_buffer);
 void bpftune_sysctl_name_to_path(const char *name, char *path, size_t path_sz);
 int bpftune_sysctl_read(int netns_fd, const char *name, long *values);
 int bpftune_sysctl_write(int netns_fd, const char *name, __u8 num_values, long *values);
-
+int bpftune_snmpstat_read(unsigned long netns_cookie, int family, const char *name, long *value);
 bool bpftune_netns_cookie_supported(void);
 int bpftune_netns_set(int fd, int *orig_fd, bool quiet);
 int bpftune_netns_info(int pid, int *fd, unsigned long *cookie);

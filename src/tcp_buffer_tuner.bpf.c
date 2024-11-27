@@ -23,8 +23,6 @@
 
 #define TCP_BUFFER_MAX 2147483647
 
-BPF_MAP_DEF(corr_map, BPF_MAP_TYPE_HASH, struct corr_key, struct corr, 1024, 0);
-
 bool under_memory_pressure = false;
 bool near_memory_pressure = false;
 bool near_memory_exhaustion = false;

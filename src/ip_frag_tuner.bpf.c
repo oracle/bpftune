@@ -19,9 +19,10 @@
 
 #include <bpftune/bpftune.bpf.h>
 #include "ip_frag_tuner.h"
+#include <bpftune/corr.h>
 
 static __always_inline int defrag(struct net *net, struct fqdir *fqdir,
-				  int tunable)
+				  struct ipstats_mib *mib, int tunable)
 {
 	long mem = BPFTUNE_CORE_READ(fqdir, mem.counter);
 	long high_thresh = BPFTUNE_CORE_READ(fqdir, high_thresh);
@@ -31,9 +32,8 @@ static __always_inline int defrag(struct net *net, struct fqdir *fqdir,
 	if (!fqdir || !mem || !high_thresh)
 		return 0;
 
-	/* FragmentSmack DoS relied on small packets overwhelming defragmentation;
-	 * do not raise limits when we see small fragments and a significant
-	 * number of fragmentation reassembly failures versus successes.
+	/* do not raise limits when we see a correlation between raised fragment
+	 * threshold and fragmentation failures; this suggests DoS
 	 */
 	if (NEARLY_FULL(mem, high_thresh)) {
 		struct bpftune_event event = { 0 };
@@ -52,10 +52,11 @@ static __always_inline int defrag(struct net *net, struct fqdir *fqdir,
 BPF_FENTRY(ip_defrag, struct net *net, struct sk_buff *skb, u32 user)
 {
         struct fqdir *fqdir = BPFTUNE_CORE_READ(net, ipv4.fqdir);
+	struct ipstats_mib *mib = BPFTUNE_CORE_READ(net, mib.ip_statistics);
 
 	if (!fqdir)
 		return 0;
-	return defrag(net, fqdir, IP_FRAG_MAX_THRESHOLD);
+	return defrag(net, fqdir, mib, IP_FRAG_MAX_THRESHOLD);
 }
 
 #define SKB_DST_NOREF	1UL
@@ -64,6 +65,7 @@ BPF_FENTRY(ipv6_frag_rcv, struct sk_buff *skb)
 {
 	long unsigned int refdst = BPFTUNE_CORE_READ(skb, _skb_refdst);
 	struct dst_entry *dst = (struct dst_entry *)(refdst & SKB_DST_PTRMASK);
+	struct ipstats_mib *mib;
 	struct net_device *dev;
 	struct fqdir *fqdir;
 	struct net *net;
@@ -79,5 +81,8 @@ BPF_FENTRY(ipv6_frag_rcv, struct sk_buff *skb)
 	fqdir = BPFTUNE_CORE_READ(net, ipv6.fqdir);
 	if (!fqdir)
 		return 0;
-	return defrag(net, fqdir, IP6_FRAG_MAX_THRESHOLD);
+	mib = BPFTUNE_CORE_READ(net, mib.ipv6_statistics);
+	if (!mib)
+		return 0;
+	return defrag(net, fqdir, mib, IP6_FRAG_MAX_THRESHOLD);
 }
