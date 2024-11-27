@@ -744,13 +744,13 @@ struct bpftuner *bpftuner_init(const char *path)
 static void __bpftuner_scenario_log(struct bpftuner *tuner, unsigned int tunable,
 				  unsigned int scenario, int netns_fd,
 				  bool summary,
-				  const char *fmt, va_list args);
+				  const char *fmt, va_list *args);
 
 #define bpftuner_scenario_log_fmt(tuner, tunable, scenario, netns_fd, summary, fmt)\
 {									\
 	va_list __args;							\
 	if (fmt) va_start(__args, fmt);					\
-	__bpftuner_scenario_log(tuner, tunable, scenario, netns_fd, summary, fmt, __args);\
+	__bpftuner_scenario_log(tuner, tunable, scenario, netns_fd, summary, fmt, &__args);\
 	if (fmt) va_end(__args);					\
 }
 
@@ -1181,7 +1181,7 @@ void bpftuner_tunable_stats_update(struct bpftuner *tuner,
 static void __bpftuner_scenario_log(struct bpftuner *tuner, unsigned int tunable,
 				    unsigned int scenario, int netns_fd,
 				    bool summary,
-				    const char *fmt, va_list args)
+				    const char *fmt, va_list *args)
 {
 	struct bpftunable *t = bpftuner_tunable(tuner, tunable);
 	bool global_ns = netns_fd == 0;
@@ -1233,7 +1233,8 @@ static void __bpftuner_scenario_log(struct bpftuner *tuner, unsigned int tunable
 			    t->desc.name,
 			    global_ns ? "" : "non-",
 			    tuner->scenarios[scenario].description);
-		__bpftune_log(BPFTUNE_LOG_LEVEL, fmt, args);
+		if (args)
+			__bpftune_log(BPFTUNE_LOG_LEVEL, fmt, *args);
 		__bpftuner_tunable_stats_update(t, scenario, global_ns, 1);
 	}
 }
