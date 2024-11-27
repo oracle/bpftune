@@ -164,8 +164,10 @@ test_run_cmd_local()
 	fi
 
 	if [[ "$DO_REDIRECT" == "true" ]]; then
-		rm -f $TESTLOG_LAST
 		touch $CMDLOG
+		if [[ -f $TESTLOG_LAST ]]; then
+			rm -f $TESTLOG_LAST
+		fi
 		ln -s $CMDLOG $TESTLOG_LAST
 		if [[ $VERBOSE -gt 0 ]]; then
 			echo "For output see ${CMDLOG}"
@@ -194,6 +196,7 @@ test_run_cmd_local()
 test_setup_local()
 {
 	CMD=$1
+	CMDLOG="${TESTDIR}/testlog.$$"
 	TIMEOUT=$2
 
 	BPFTUNE_SUPPORT="$(${BPFTUNE} -S 2>&1)"
@@ -260,6 +263,8 @@ test_setup_local()
 		$AUDIT_CMD -e 0 >/dev/null 2>&1
 	fi
 	sysctl -qw net.ipv4.tcp_fin_timeout=5
+	# Clear log for next test
+	echo "" > $CMDLOG
 	test_run_cmd_local "$CMD" true
 }
 
@@ -289,7 +294,7 @@ test_cleanup_local()
 	fi
 	if [[ $EXIT -ne 0 ]]; then
 		if [[ -f $TESTLOG_LAST ]]; then
-			echo "Output of last command:"
+			echo "Output of commands:"
 			cat $TESTLOG_LAST
 		fi
 	else

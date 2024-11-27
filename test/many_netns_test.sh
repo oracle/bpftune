@@ -69,7 +69,7 @@ for FAMILY in ipv4 ipv6 ; do
 	echo "Running ${MODE}..."
 	test_run_cmd_local "ip netns exec $NETNS $IPERF3 -s -p $PORT -1 &"
 	if [[ $MODE != "baseline" ]]; then
-		test_run_cmd_local "$BPFTUNE &"
+		test_run_cmd_local "$BPFTUNE -s &" true
 		sleep $SETUPTIME
 		fds_orig=$($LSOF -p $(pgrep bpftune) 2>/dev/null|wc -l)
 	else
