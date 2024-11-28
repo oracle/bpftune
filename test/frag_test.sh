@@ -70,12 +70,12 @@ for FAMILY in ipv6 ipv4 ; do
 
    $CLIENT_PREFIX ethtool --offload $CLIENT_VETH rx off tx off gso off gro off lro off tso off
    $SERVER_PREFIX ethtool --offload $SERVER_VETH rx off tx off gso off gro off lro off tso off
-   frag_orig=($($SERVER_PREFIX sysctl -n $SYSCTL_NAME))
-   low_orig=($($SERVER_PREFIX sysctl -n ${SYSCTL_PREFIX}low_thresh))
-   $SERVER_PREFIX sysctl -w ${SYSCTL_PREFIX}low_thresh=8192
-   $SERVER_PREFIX sysctl -w $SYSCTL_NAME="8192"
+   frag_orig=($(sysctl -n $SYSCTL_NAME))
+   low_orig=($(sysctl -n ${SYSCTL_PREFIX}low_thresh))
+   sysctl -w ${SYSCTL_PREFIX}low_thresh=8192
+   sysctl -w $SYSCTL_NAME="8192"
 
-   frag_pre=($($SERVER_PREFIX sysctl -n $SYSCTL_NAME))
+   frag_pre=($(sysctl -n $SYSCTL_NAME))
 
    # prevent firewall from reassembling packets.
    set +e
@@ -88,7 +88,7 @@ for FAMILY in ipv6 ipv4 ; do
 
 	echo "Running ${MODE}..."
 	if [[ $MODE != "baseline" ]]; then
-		test_run_cmd_local "$BPFTUNE -ds &" true
+		test_run_cmd_local "$BPFTUNE -s &" true
 		sleep $SETUPTIME
 	else
 		LOGSZ=$(wc -l $LOGFILE | awk '{print $1}')
@@ -109,7 +109,7 @@ for FAMILY in ipv6 ipv4 ; do
    if [[ -n "$FIREWALLD_PID" ]]; then
       service firewalld start
    fi
-   frag_post=($($SERVER_PREFIX sysctl -n $SYSCTL_NAME))
+   frag_post=($(sysctl -n $SYSCTL_NAME))
    if [[ -n $SERVER_PREFIX ]]; then
 	   sysctl -w ${SYSCTL_NAME}=$frag_orig
 	   sysctl -w ${SYSCTL_PREFIX}low_thresh=$low_orig
