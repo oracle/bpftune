@@ -121,15 +121,21 @@ export PODMAN=$(which podman 2>/dev/null)
 export PODMAN_SEARCH="$PODMAN search oraclelinux"
 export PROXYT_SERVICE=${PROXYT_SERVICE:-"proxyt"}
 
-# only use podman if it can access images
-if [[ -n $PODMAN ]]; then
-	set +e
-	timeout 5 $PODMAN_SEARCH > /dev/null 2>&1
-	if [[ $? -ne 0 ]]; then
-		PODMAN=""
+check_podman()
+{
+	# only use podman if it can access images
+	if [[ -n $PODMAN ]]; then
+		set +e
+		if [[ -n "$PROXYT_SERVICE" ]]; then
+			service proxyt start
+		fi
+		timeout $TIMEOUT $PODMAN_SEARCH > /dev/null 2>&1
+		if [[ $? -ne 0 ]]; then
+			PODMAN=""
+		fi
+		set -e
 	fi
-	set -e
-fi
+}
 
 export PODMAN_CONTAINER=${PODMAN_CONTAINER:-"container-registry.oracle.com/os/oraclelinux:8-slim"}
 export PODMAN_CMD="${PODMAN} run --rm $PODMAN_CONTAINER"
