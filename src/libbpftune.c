@@ -1487,7 +1487,8 @@ static int bpftune_netns_find(unsigned long cookie)
 		mntfd = open(ent->mnt_dir, O_RDONLY);
 		if (mntfd < 0)
 			continue;
-		if (bpftune_netns_info(0, &mntfd, &netns_cookie)) {
+		if (bpftune_netns_info(0, &mntfd, &netns_cookie) ||
+		    (cookie && netns_cookie != cookie)) {
 			close(mntfd);
 			continue;
 		}
