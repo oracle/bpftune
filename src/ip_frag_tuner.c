@@ -16,9 +16,9 @@ struct tcp_buffer_tuner_bpf *skel;
 
 static struct bpftunable_desc descs[] = {
 { IP_FRAG_MAX_THRESHOLD, BPFTUNABLE_SYSCTL, "net.ipv4.ipfrag_high_thresh",
-	BPFTUNABLE_NAMESPACED, 1 },
+	0, 1 },
 { IP6_FRAG_MAX_THRESHOLD, BPFTUNABLE_SYSCTL, "net.ipv6.ip6frag_high_thresh",
-	BPFTUNABLE_NAMESPACED | BPFTUNABLE_OPTIONAL, 1 },
+	BPFTUNABLE_OPTIONAL, 1 },
 };
 
 static struct bpftunable_scenario scenarios[] = {
