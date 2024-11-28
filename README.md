@@ -150,22 +150,24 @@ The key components are
 ## Supported tuners
 
 - TCP connection tuner: auto-tune choice of congestion control algorithm.
-  See bpftune-tcp-conn (8).
+  See [bpftune-tcp-conn (8)](./docs/bpftune-tcp-conn.rst)
+- IP fragmentation tuner: auto-tune IP fragmentation memory limits
+  to support fragment reassembly.  See [bpftune-ip-frag (8)](./docs/bpftune-ip-frag.rst)
 - neighbour table tuner: auto-tune neighbour table sizes by growing
-  tables when approaching full. See bpftune-neigh (8).
+  tables when approaching full. See [bpftune-neigh (8)](./docs/bpftune-neigh.rst)
 - route table tuner: auto-tune route table size by growing tables
-  when approaching full.  See bpftune-route (8).
+  when approaching full.  See [bpftune-route (8)](./docs/bpftune-route.rst)
 - sysctl tuner: monitor sysctl setting and if it collides with an
   auto-tuned sysctl value, disable the associated tuner.  See
-  bpftune-sysctl (8).
+  [bpftune-sysctl (8)](./docs/bpftune-sysctl.rst)
 - TCP buffer tuner: auto-tune max and initial buffer sizes.  See
-  bpftune-tcp-buffer (8).
+  [bpftune-tcp-buffer (8)](./docs/bpftune-tcp-buffer.rst)
 - net buffer tuner: auto-tune tunables related to core networking.
-  See bpftune-net-buffer (8).
+  See [bpftune-net-buffer (8)](./docs/bpftune-net-buffer.rst)
 - netns tuner: notices addition and removal of network namespaces,
   which helps power namespace awareness for bpftune as a whole.
   Namespace awareness is important as we want to be able to auto-tune
-  containers also.  See bpftune-netns (8).
+  containers also.  See [bpftune-netns (8)](./docs/bpftune-netns.rst)
 
 ## Code organization
 
