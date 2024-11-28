@@ -155,8 +155,6 @@ The key components are
   to support fragment reassembly.  See [bpftune-ip-frag (8)](./docs/bpftune-ip-frag.rst)
 - neighbour table tuner: auto-tune neighbour table sizes by growing
   tables when approaching full. See [bpftune-neigh (8)](./docs/bpftune-neigh.rst)
-- route table tuner: auto-tune route table size by growing tables
-  when approaching full.  See [bpftune-route (8)](./docs/bpftune-route.rst)
 - sysctl tuner: monitor sysctl setting and if it collides with an
   auto-tuned sysctl value, disable the associated tuner.  See
   [bpftune-sysctl (8)](./docs/bpftune-sysctl.rst)
