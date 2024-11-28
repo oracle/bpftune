@@ -23,6 +23,7 @@
 
 . ./test_lib.sh
 
+check_podman
 
 SLEEPTIME=2
 
