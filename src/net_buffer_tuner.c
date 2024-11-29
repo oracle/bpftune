@@ -17,23 +17,29 @@ static struct bpftunable_desc descs[] = {
 { FLOW_LIMIT_CPU_BITMAP,
 			BPFTUNABLE_SYSCTL, "net.core.flow_limit_cpu_bitmap",
 								0, 1 },
+{ NETDEV_BUDGET,	BPFTUNABLE_SYSCTL, "net.core.netdev_budget",
+								0, 1 },
 };
 
 static struct bpftunable_scenario scenarios[] = {
 { NETDEV_MAX_BACKLOG_INCREASE,	"need to increase max backlog size",
 	"Need to increase backlog size to prevent drops for faster connection" },
 { FLOW_LIMIT_CPU_SET,		"need to set per-cpu bitmap value",
-	"Need to set flow limit per-cpu to prioritize small flows" }
+	"Need to set flow limit per-cpu to prioritize small flows" },
+{ NETDEV_BUDGET_INCREASE,	"need to increase # of packets processed per NAPI poll",
+	"Need to increase number of packets processed across network devices during NAPI poll to use all of net.core.netdev_budget_usecs" }
 };
 
 int init(struct bpftuner *tuner)
 {
 	long cpu_bitmap = 0;
 	long max_backlog = 0;
+	long budget = 0;
 	int err;
 
 	bpftune_sysctl_read(0, "net.core.flow_limit_cpu_bitmap", &cpu_bitmap);
 	bpftune_sysctl_read(0, "net.core.netdev_max_backlog", &max_backlog);
+	bpftune_sysctl_read(0, "net.core.netdev_budget", &budget);
 	err = bpftuner_bpf_open(net_buffer, tuner);
 	if (err)
 		return err;
@@ -44,6 +50,8 @@ int init(struct bpftuner *tuner)
 			     cpu_bitmap);
 	bpftuner_bpf_var_set(net_buffer, tuner, netdev_max_backlog,
 			     max_backlog);
+	bpftuner_bpf_var_set(net_buffer, tuner, netdev_budget,
+			     budget);
 	err = bpftuner_bpf_attach(net_buffer, tuner);
 	if (err)
 		return err;
@@ -64,7 +72,7 @@ void event_handler(struct bpftuner *tuner,
 {
 	int scenario = event->scenario_id;
 	const char *tunable;
-	int id;
+	int id, ret;
 
 	/* netns cookie not supported; ignore */
 	if (event->netns_cookie == (unsigned long)-1)
@@ -73,21 +81,23 @@ void event_handler(struct bpftuner *tuner,
 	id = event->update[0].id;
 	tunable = bpftuner_tunable_name(tuner, id);
 	if (!tunable) {
-		bpftune_log(LOG_DEBUG, "unknown tunable [%d] for tcp_buffer_tuner\n", id);
+		bpftune_log(LOG_DEBUG, "unknown tunable [%d] for net_buffer_tuner\n", id);
 		return;
 	}
 	switch (id) {
 	case NETDEV_MAX_BACKLOG:
-		bpftuner_tunable_sysctl_write(tuner, id, scenario,
-					      event->netns_cookie, 1,
-					      (long int *)event->update[0].new,
+		ret = bpftuner_tunable_sysctl_write(tuner, id, scenario,
+						    event->netns_cookie, 1,
+					            (long int *)event->update[0].new,
 "Due to excessive drops, change %s from (%ld) -> (%ld)\n",
-					     tunable,
-					     event->update[0].old[0],
+					            tunable,
+					            event->update[0].old[0],
+					            event->update[0].new[0]);
+		if (!ret) {
+			/* update value of netdev_max_backlog for BPF program */
+			bpftuner_bpf_var_set(net_buffer, tuner, netdev_max_backlog,
 					     event->update[0].new[0]);
-		/* update value of netdev_max_backlog for BPF program */
-		bpftuner_bpf_var_set(net_buffer, tuner, netdev_max_backlog,
-				     event->update[0].new[0]);
+		}
 		break;
 	case FLOW_LIMIT_CPU_BITMAP:
 		bpftuner_tunable_sysctl_write(tuner, id, scenario, 
@@ -97,6 +107,20 @@ void event_handler(struct bpftuner *tuner,
 					      tunable,
 					      event->update[0].old[0],
 					      event->update[0].new[0]);
-
+		break;
+	case NETDEV_BUDGET:
+		ret = bpftuner_tunable_sysctl_write(tuner, id, scenario,
+						    event->netns_cookie, 1,
+						    (long int *)event->update[0].new,
+"To maximize # packets processed per NAPI cycle, change %s from (%ld) -> (%ld)\n",
+						    tunable,
+						    event->update[0].old[0],
+						    event->update[0].new[0]);
+		if (!ret) {
+			/* update value of netdev_budget for BPF program */
+			bpftuner_bpf_var_set(net_buffer, tuner, netdev_budget,
+					     event->update[0].new[0]);
+		}
+		break;
 	}
 }
