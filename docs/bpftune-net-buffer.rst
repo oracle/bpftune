@@ -22,9 +22,18 @@ DESCRIPTION
         appropriate bit is set in the CPU bitmask to prioritize small
         flows for drop avoidance.
 
+        When NAPI polls to handle multiple packets, the number of packets
+        is limited by net.core.netdev_budget while the time is limited
+        by net.core.netdev_budget_usecs.  If we hit the limit of number
+        of packets processed without using the usecs budget the time_squeezed
+        softnet stat is bumped; if we see increases in time_squeezed, bump
+        netdev_budget to use all budget usecs.
+
         Tunables:
 
         - net.core.netdev_max_backlog: maximum per-cpu backlog queue length;
           default 1024.
         - net.core.flow_limit_cpu_bitmap: avoid drops for small flows on
           a per-cpu basis; default 0.
+        - net.core.netdev_budget: maximum number of packets processed in
+          a NAPI cycle
