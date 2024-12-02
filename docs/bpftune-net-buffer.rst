@@ -27,7 +27,7 @@ DESCRIPTION
         by net.core.netdev_budget_usecs.  If we hit the limit of number
         of packets processed without using the usecs budget the time_squeezed
         softnet stat is bumped; if we see increases in time_squeezed, bump
-        netdev_budget to use all budget usecs.
+        netdev_budget/netdev_budget_usecs.
 
         Tunables:
 
@@ -37,3 +37,5 @@ DESCRIPTION
           a per-cpu basis; default 0.
         - net.core.netdev_budget: maximum number of packets processed in
           a NAPI cycle
+        - net.core.netdev_budget_usecs: maximum amount of time in microseconds
+          for a NAPI cycle

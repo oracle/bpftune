@@ -7,6 +7,7 @@
 #include "net_buffer_tuner.skel.legacy.h"
 #include "net_buffer_tuner.skel.nobtf.h"
 
+#include <limits.h>
 #include <unistd.h>
 
 struct tcp_buffer_tuner_bpf *skel;
@@ -18,6 +19,8 @@ static struct bpftunable_desc descs[] = {
 			BPFTUNABLE_SYSCTL, "net.core.flow_limit_cpu_bitmap",
 								0, 1 },
 { NETDEV_BUDGET,	BPFTUNABLE_SYSCTL, "net.core.netdev_budget",
+								0, 1 },
+{ NETDEV_BUDGET_USECS,	BPFTUNABLE_SYSCTL, "net.core.netdev_budget_usecs",
 								0, 1 },
 };
 
@@ -35,11 +38,13 @@ int init(struct bpftuner *tuner)
 	long cpu_bitmap = 0;
 	long max_backlog = 0;
 	long budget = 0;
+	long budget_usecs = 0;
 	int err;
 
 	bpftune_sysctl_read(0, "net.core.flow_limit_cpu_bitmap", &cpu_bitmap);
 	bpftune_sysctl_read(0, "net.core.netdev_max_backlog", &max_backlog);
 	bpftune_sysctl_read(0, "net.core.netdev_budget", &budget);
+	bpftune_sysctl_read(0, "net.core.netdev_budget_usecs", &budget_usecs);
 	err = bpftuner_bpf_open(net_buffer, tuner);
 	if (err)
 		return err;
@@ -52,6 +57,8 @@ int init(struct bpftuner *tuner)
 			     max_backlog);
 	bpftuner_bpf_var_set(net_buffer, tuner, netdev_budget,
 			     budget);
+	bpftuner_bpf_var_set(net_buffer, tuner, netdev_budget_usecs,
+			     budget_usecs);
 	err = bpftuner_bpf_attach(net_buffer, tuner);
 	if (err)
 		return err;
@@ -109,6 +116,8 @@ void event_handler(struct bpftuner *tuner,
 					      event->update[0].new[0]);
 		break;
 	case NETDEV_BUDGET:
+		if (event->update[0].new[0] > INT_MAX)
+			break;
 		ret = bpftuner_tunable_sysctl_write(tuner, id, scenario,
 						    event->netns_cookie, 1,
 						    (long int *)event->update[0].new,
@@ -117,9 +126,31 @@ void event_handler(struct bpftuner *tuner,
 						    event->update[0].old[0],
 						    event->update[0].new[0]);
 		if (!ret) {
+			long budget_usecs, budget_usecs_new;
+
 			/* update value of netdev_budget for BPF program */
 			bpftuner_bpf_var_set(net_buffer, tuner, netdev_budget,
 					     event->update[0].new[0]);
+			/* need to also update budget_usecs since both
+			 * limit netdev budget and reaching either limit
+			 * triggers time_squeeze.
+			 */
+			budget_usecs = bpftuner_bpf_var_get(net_buffer, tuner,
+							    netdev_budget_usecs);
+			budget_usecs_new = BPFTUNE_GROW_BY_DELTA(budget_usecs);
+			ret = bpftuner_tunable_sysctl_write(tuner,
+							    NETDEV_BUDGET_USECS,
+							    scenario,
+							    event->netns_cookie,
+							    1,
+							    &budget_usecs_new,
+"To maximize # packets processed per NAPI cycle, change netdev_budget_usecs from (%ld) -> (%ld)\n",
+							    budget_usecs,
+							    budget_usecs_new);
+			if (!ret)
+				bpftuner_bpf_var_set(net_buffer, tuner,
+						     netdev_budget_usecs,
+						     budget_usecs_new);
 		}
 		break;
 	}
