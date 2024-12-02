@@ -333,7 +333,7 @@ bpftune: sysctl 'net.ipv4.tcp_rmem' changed from (4096 131072 1310720 ) -> (4096
 See the docs/ subdirectory for manual pages covering bpftune
 and associated tuners.
 
-bpftune was presented at the eBPF summit; [video here](https://www.youtube.com/watch?v=X0TvfH8hrQE&t=420s).
+bpftune was presented at the eBPF summit; [video here](https://www.youtube.com/watch?v=X0TvfH8hrQE).
 
 bpftune [was also discussed on Liz Rice's excellent eCHO eBPF podcast](https://www.youtube.com/watch?v=3ylmGE6sW8w), specifically in the context of using reinforcement learning in BPF 
 ## Contributing
