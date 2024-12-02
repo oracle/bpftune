@@ -118,9 +118,13 @@ void *inotify_thread(void *arg)
 
 		for (i = 0; i < len; i += sizeof(struct inotify_event)) {
 			struct inotify_event *event = (struct inotify_event *)&buf[i];
+			char *suffix;
 
-			if (event->mask & IN_ISDIR ||
-			    !strstr(event->name, ".so"))
+			if (event->mask & IN_ISDIR)
+				continue;
+			/* ensure suffix is ".so" with no additional chars following */
+			suffix = strstr(event->name, ".so");
+			if (!suffix || strlen(suffix) != strlen(".so"))
 				continue;
 			snprintf(library_path, sizeof(library_path), "%s/%s",
 				 library_dir, event->name);
