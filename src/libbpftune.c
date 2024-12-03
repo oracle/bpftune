@@ -1095,6 +1095,44 @@ out_unset:
 	return err;
 }
 
+/* return % of overall wait/run time on all cpus gathered from
+ * /proc/schedstat ; see https://docs.kernel.org/scheduler/sched-stats.html
+ * Usually > 100%.
+ */
+int bpftune_sched_wait_run_percent_read(void)
+{
+	long running = 0, waiting = 0;
+	FILE *fp = NULL;
+	char line[1024];
+	int err = 0;
+
+	err = bpftune_cap_add();
+        if (err)
+                return err;
+	fp = fopen("/proc/schedstat", "r");	
+	if (!fp) {
+		err = -errno;
+		goto out;
+	}
+	while (fgets(line, sizeof(line) - 1, fp) != NULL) {
+		long cpurunning = 0, cpuwaiting = 0, cputimeslices;
+
+		if (sscanf(line, "cpu%*d %*d %*d %*d %*d %*d %*d %ld %ld %ld",
+			   &cpurunning, &cpuwaiting, &cputimeslices) == 3) {
+			running += cpurunning;
+			waiting += cpuwaiting;
+		}
+	}
+	bpftune_log(LOG_DEBUG, "sched waiting %ld, running %ld\n", waiting, running);
+	if (running > 0)
+		err = (int)((waiting*100)/running);
+out:
+	if (fp)
+		fclose(fp);
+	bpftune_cap_drop();
+	return err;
+}
+
 int bpftuner_tunables_init(struct bpftuner *tuner, unsigned int num_descs,
 			   struct bpftunable_desc *descs,
 			   unsigned int num_scenarios,

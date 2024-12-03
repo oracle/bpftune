@@ -92,7 +92,7 @@ void event_handler(struct bpftuner *tuner,
 		corr = corr_compute(&c);
 		bpftune_log(LOG_DEBUG, "covar for '%s' netns %ld (new %ld): %LF ; corr %LF\n",
 			    tunable, key.netns_cookie, new, covar_compute(&c), corr);
-		if (corr > CORR_HIGH_THRESHOLD && scenario == IP_FRAG_THRESHOLD_INCREASE) {
+		if (corr > CORR_THRESHOLD && scenario == IP_FRAG_THRESHOLD_INCREASE) {
 			scenario = IP_FRAG_THRESHOLD_DECREASE;
 			new = BPFTUNE_SHRINK_BY_DELTA(old);
 		}

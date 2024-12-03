@@ -273,6 +273,10 @@ unsigned long bpftune_init_net;
 
 bool debug;
 
+unsigned int bpftune_sample_rate = 4;
+
+#define bpftune_skip_sample(count)	((++count % bpftune_sample_rate) != 0)
+
 #define __barrier asm volatile("" ::: "memory")
 
 #define bpftune_log(...)	__bpf_printk(__VA_ARGS__)
