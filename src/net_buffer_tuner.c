@@ -2,6 +2,7 @@
 /* Copyright (c) 2023, Oracle and/or its affiliates. */
 
 #include <bpftune/libbpftune.h>
+#include <bpftune/corr.h>
 #include "net_buffer_tuner.h"
 #include "net_buffer_tuner.skel.h"
 #include "net_buffer_tuner.skel.legacy.h"
@@ -30,7 +31,9 @@ static struct bpftunable_scenario scenarios[] = {
 { FLOW_LIMIT_CPU_SET,		"need to set per-cpu bitmap value",
 	"Need to set flow limit per-cpu to prioritize small flows" },
 { NETDEV_BUDGET_INCREASE,	"need to increase # of packets processed per NAPI poll",
-	"Need to increase number of packets processed across network devices during NAPI poll to use all of net.core.netdev_budget_usecs" }
+	"Need to increase number of packets processed across network devices during NAPI poll to use all of net.core.netdev_budget_usecs" },
+{ NETDEV_BUDGET_DECREASE,	"need to decrease # of packets processed per NAPI poll",
+	"Need to decrease netdev_budget[_usecs] since the ratio of time spent waiting to run versus time spent running for tasks has increased as we have increased netdev budget.  This indicates either our budget increases directly let to increased wait times for other tasks, or that general load has increased; either way spending too much time in NAPI processing will hurt system performance." }
 };
 
 int init(struct bpftuner *tuner)
@@ -77,8 +80,12 @@ void event_handler(struct bpftuner *tuner,
 		   struct bpftune_event *event,
 		   __attribute__((unused))void *ctx)
 {
+	long new, budget_usecs, budget_usecs_new;
 	int scenario = event->scenario_id;
+	struct corr c = { 0 };
+	long double corr = 0;
 	const char *tunable;
+	struct corr_key key;
 	int id, ret;
 
 	/* netns cookie not supported; ignore */
@@ -116,28 +123,50 @@ void event_handler(struct bpftuner *tuner,
 					      event->update[0].new[0]);
 		break;
 	case NETDEV_BUDGET:
-		if (event->update[0].new[0] > INT_MAX)
+		new = event->update[0].new[0];
+		if (new > INT_MAX)
 			break;
+		budget_usecs = bpftuner_bpf_var_get(net_buffer, tuner,
+						    netdev_budget_usecs);
+		budget_usecs_new = BPFTUNE_GROW_BY_DELTA(budget_usecs);
+
+		ret = bpftune_sched_wait_run_percent_read();
+		bpftune_log(LOG_DEBUG, "sched wait-run percent : %d\n", ret);
+		if (ret > 0) {
+			key.id = (__u64)id;
+			key.netns_cookie = event->netns_cookie;
+			if (corr_update_user(tuner->corr_map_fd, key.id,
+					     key.netns_cookie,
+					     (__u64)new, (__u64)ret))
+				bpftune_log(LOG_DEBUG, "corr map fd %d update failed %d\n",
+					    tuner->corr_map_fd, errno);
+		}
+		if (!bpf_map_lookup_elem(tuner->corr_map_fd, &key, &c)) {
+			corr = corr_compute(&c);
+			bpftune_log(LOG_DEBUG, "covar for '%s' netns %ld (new %ld): %LF; corr %LF\n",
+				    tunable, key.netns_cookie, new,
+				    covar_compute(&c), corr);
+			if (corr > CORR_THRESHOLD) {
+				new = BPFTUNE_SHRINK_BY_DELTA(event->update[0].old[0]);
+				budget_usecs_new = BPFTUNE_SHRINK_BY_DELTA(budget_usecs);
+				scenario = NETDEV_BUDGET_DECREASE;
+			}
+		}
 		ret = bpftuner_tunable_sysctl_write(tuner, id, scenario,
 						    event->netns_cookie, 1,
-						    (long int *)event->update[0].new,
+						    (long int *)&new,
 "To maximize # packets processed per NAPI cycle, change %s from (%ld) -> (%ld)\n",
 						    tunable,
 						    event->update[0].old[0],
-						    event->update[0].new[0]);
+						    new);
 		if (!ret) {
-			long budget_usecs, budget_usecs_new;
-
 			/* update value of netdev_budget for BPF program */
 			bpftuner_bpf_var_set(net_buffer, tuner, netdev_budget,
-					     event->update[0].new[0]);
+					     new);
 			/* need to also update budget_usecs since both
 			 * limit netdev budget and reaching either limit
 			 * triggers time_squeeze.
 			 */
-			budget_usecs = bpftuner_bpf_var_get(net_buffer, tuner,
-							    netdev_budget_usecs);
-			budget_usecs_new = BPFTUNE_GROW_BY_DELTA(budget_usecs);
 			ret = bpftuner_tunable_sysctl_write(tuner,
 							    NETDEV_BUDGET_USECS,
 							    scenario,

@@ -29,6 +29,12 @@ DESCRIPTION
         softnet stat is bumped; if we see increases in time_squeezed, bump
         netdev_budget/netdev_budget_usecs.
 
+        However, we want to limit such increases if they lead to longer
+        task scheduling wait times, so we monitor the ratio of time tasks
+        spend waiting versus running across all processors, and if we see
+        correlations between increases in netdev budget and wait/run ratio
+        increases, netdev budget is tuned down.
+
         Tunables:
 
         - net.core.netdev_max_backlog: maximum per-cpu backlog queue length;
