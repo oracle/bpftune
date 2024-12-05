@@ -205,7 +205,7 @@ To build the following packages are needed (names may vary by distro);
 - libbpf, libbpf-devel >= 0.6
 - libcap-devel
 - bpftool >= 4.18
-- libnl3-devel
+- libnl3-devel (on some distros like Debian libnl-route-3-dev is needed)
 - clang >= 11
 - llvm >= 11
 - python3-docutils
