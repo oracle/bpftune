@@ -21,32 +21,44 @@
 
 #include "tcp_conn_tuner.h"
 
+__u64 tcp_cong_choices[NUM_TCP_CONG_ALGS];
+
 BPF_MAP_DEF(remote_host_map, BPF_MAP_TYPE_HASH, struct in6_addr, struct remote_host, 1024, 0);
 
 BPF_MAP_DEF(sk_storage_map, BPF_MAP_TYPE_SK_STORAGE, int, __u64, 0, BPF_F_NO_PREALLOC);
 
-static __always_inline struct remote_host *get_remote_host(struct in6_addr *key)
+/* if we have not looked up the host >= REMOTE_HOST_MIN_INSTANCES, return NULL. 
+ * This ensures we only apply RL to hosts with which we have multiple
+ * interactions.
+ */
+static __always_inline struct remote_host *get_remote_host(struct in6_addr *key,
+							   bool initial)
 {
 	struct remote_host *remote_host = NULL;
 
 	remote_host = bpf_map_lookup_elem(&remote_host_map, key);
-        if (!remote_host) {
-		struct remote_host new_remote_host = {};
+	if (!remote_host) {
+		struct remote_host new_remote_host = { .instances = 1};
 
 		bpf_map_update_elem(&remote_host_map, key, &new_remote_host,
 				    BPF_ANY);
-		remote_host = bpf_map_lookup_elem(&remote_host_map, key);
-        }
+		return NULL;
+	}
+	/* bump for initial conn established */
+	if (initial)
+		remote_host->instances++;
+	if (remote_host->instances < REMOTE_HOST_MIN_INSTANCES)
+		return NULL;
 	return remote_host;
 }
 
-static __always_inline void set_cong(struct bpf_sock_ops *ops, struct remote_host *remote_host,
-				     __u8 i)
+static __always_inline void set_cong(struct bpf_sock_ops *ops, __u8 i)
 {
 	int ret;
 
 	ret = bpf_setsockopt(ops, SOL_TCP, TCP_CONGESTION, (void *)congs[i],
 			     sizeof(congs[i]));
+	tcp_cong_choices[i & (NUM_TCP_CONG_ALGS - 1)]++;
 	/* update state */
 	if (!ret) {
 		struct bpf_sock *sk = ops->sk;
@@ -64,14 +76,14 @@ static __always_inline void set_cong(struct bpf_sock_ops *ops, struct remote_hos
 SEC("sockops")
 int conn_tuner_sockops(struct bpf_sock_ops *ops)
 {
-	int cb_flags = BPF_SOCK_OPS_STATE_CB_FLAG;
+	int cb_flags = BPF_SOCK_OPS_STATE_CB_FLAG|BPF_SOCK_OPS_RETRANS_CB_FLAG;
 	struct remote_host *remote_host;
 	struct bpftune_event event = {};
 	struct tcp_conn_event_data *event_data = (struct tcp_conn_event_data *)&event.raw_data;
 	struct in6_addr *key = &event_data->raddr;
 	struct bpf_sock *sk = ops->sk;
-	struct tcp_sock *tp = NULL;
 	__u64 *statep = NULL;
+	bool initial = false;
 	int state;
 
 	switch (ops->op) {
@@ -79,7 +91,24 @@ int conn_tuner_sockops(struct bpf_sock_ops *ops)
 	case BPF_SOCK_OPS_PASSIVE_ESTABLISHED_CB:
 		/* enable other needed events */
 		bpf_sock_ops_cb_flags_set(ops, cb_flags);
+		initial = true;
 		break;
+	case BPF_SOCK_OPS_RETRANS_CB:
+		/* set individual cong algorithm to BBR if retransmit rate
+		 * is > 1/32 of packets out.
+		 */
+		if (ops->total_retrans > (ops->segs_out >> DROP_SHIFT)) {
+			if (sk) {
+				statep = bpf_sk_storage_get(&sk_storage_map, sk,
+							    0, 0);
+			}
+			if (!statep || *statep != TCP_STATE_CONG_BBR) {
+				set_cong(ops, TCP_STATE_CONG_BBR);
+				/* no more need for retrans events... */
+				bpf_sock_ops_cb_flags_set(ops, BPF_SOCK_OPS_STATE_CB_FLAG);
+			}
+		}
+		return 1;
 	case BPF_SOCK_OPS_STATE_CB:
 		state = ops->args[1];
 		switch (state) {
@@ -91,14 +120,6 @@ int conn_tuner_sockops(struct bpf_sock_ops *ops)
 		default:
 			return 1;
 		}
-		tp = bpf_skc_to_tcp_sock(sk);
-		if (!tp)
-			return 1;
-
-		/* retrieve state indicating which cong alg was set */
-		statep = bpf_sk_storage_get(&sk_storage_map, sk, 0, 0);
-		if (!statep)
-			return 1;
 		break;
 	default:
 		return 1;
@@ -117,7 +138,8 @@ int conn_tuner_sockops(struct bpf_sock_ops *ops)
 	default:
 		return 1;
 	}
-	remote_host = get_remote_host(key);
+	remote_host = get_remote_host(key, initial);
+	/* no RL unless seen a number of times... */
 	if (!remote_host)
 		return 1;
 
@@ -170,7 +192,7 @@ int conn_tuner_sockops(struct bpf_sock_ops *ops)
 		s = epsilon_greedy(minindex, NUM_TCP_CONN_METRICS, 20);
 		s &= 0x3;
 
-		set_cong(ops, remote_host, s);
+		set_cong(ops, s);
 
 		return 1;
 	}
@@ -178,12 +200,22 @@ int conn_tuner_sockops(struct bpf_sock_ops *ops)
 		/* update metric/send metric event on connection close. */
 		__u64 metric, metric_old, min_rtt, rate_interval_us, rate_delivered, mss;
 		struct tcp_conn_metric *m;
-		__u8 i, s = *statep & 0x3;
+		struct tcp_sock *tp;
 		bool greedy = true;
+		__u8 i, s;
 
+		if (!sk)
+			return 1;
+		if (!remote_host)
+			return 1;
+		/* retrieve state indicating which cong alg was set */
+		statep = bpf_sk_storage_get(&sk_storage_map, sk, 0, 0);
+		if (!statep)
+			return 1;
+		s = *statep & 0x3;
+		tp = bpf_skc_to_tcp_sock(sk);
 		if (!tp)
 			return 1;
-
 		min_rtt = (__u64)tp->rtt_min.s[0].v;
 		rate_interval_us = (__u64)tp->rate_interval_us;
 		rate_delivered = (__u64)tp->rate_delivered;
