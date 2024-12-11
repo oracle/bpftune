@@ -28,6 +28,7 @@ TUNER_TESTS =	support_test log_test service_test inotify_test cap_test \
 		podman_globalonly_test podman_globalonly_legacy_test \
 		sysctl_test sysctl_legacy_test sysctl_netns_test \
 		netns_test netns_legacy_test \
+		file_download_test file_download_legacy_test \
 		budget_test \
 		backlog_test backlog_legacy_test \
 		frag_test frag_legacy_test \

@@ -24,7 +24,7 @@ enum tcp_cong_tunables {
 };
 
 enum tcp_cong_scenarios {
-	TCP_CONG_SET
+	TCP_CONG_SET,
 };
 
 #define CONG_MAXNAME	16
@@ -67,8 +67,17 @@ struct tcp_conn_event_data {
 struct remote_host {
 	__u64 min_rtt;
 	__u64 max_rate_delivered;
+	__u64 instances;
 	struct tcp_conn_metric metrics[NUM_TCP_CONN_METRICS];
 };
+
+/* collect per-conn data once we see > REMOTE_HOST_MIN_INSTANCES */
+#define REMOTE_HOST_MIN_INSTANCES	4
+
+/* if total retrans/segs_out > 1(2^DROP_SHIFT) (1/32 by default)
+ * apply BBR congestion control.
+ */
+#define DROP_SHIFT	5
 
 #define RTT_SCALE       1000000
 #define DELIVERY_SCALE  1000000

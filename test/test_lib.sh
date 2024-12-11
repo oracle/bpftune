@@ -70,6 +70,10 @@ export LOGFILE=$SYSLOGFILE
 export BPFTUNE_LEGACY=${BPFTUNE_LEGACY:-0}
 export BPFTUNE_NETNS=${BPFTUNE_NETNS:-1}
 
+export SERVERDIR=${TESTDIR}/https
+export SERVERFILE=${SERVERDIR}/file
+export SERVERFILE_SIZE=500M
+
 export B=$(tput -Tvt100 bold)
 export N=$(tput -Tvt100 sgr0)
 
@@ -293,8 +297,8 @@ test_cleanup_local()
 	ip link del $VETH2 2>/dev/null
 	ip link del bpftunelocal 2>/dev/null
 	sysctl -w net.ipv6.conf.all.disable_ipv6=0
+	rm -fr $SERVERDIR
 	set -e
-
 	if [[ ! -f /usr/lib64/bpftune/tcp_buffer_tuner.so ]]; then
 		mv /tmp/tcp_buffer_tuner.so /usr/lib64/bpftune
 	fi

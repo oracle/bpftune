@@ -33,8 +33,8 @@
 #include "tcp_conn_tuner.skel.nobtf.h"
 
 static struct bpftunable_desc descs[] = {
-{ 
- TCP_CONG, BPFTUNABLE_OTHER, "TCP congestion control", 0, 0 },
+ 
+{ TCP_CONG, BPFTUNABLE_OTHER, "TCP congestion control", 0, 0 },
 };
 
 static struct bpftunable_scenario scenarios[] = {
@@ -90,11 +90,23 @@ static void summarize_conn_choices(struct bpftuner *tuner)
 	struct in6_addr key, *prev_key = NULL;
 	int map_fd = bpf_map__fd(map);
 	unsigned long greedy_count = 0;
+	__u64 *cong_choices;
+	int i;
 
+	cong_choices = bpftuner_bpf_var_get(tcp_conn, tuner, tcp_cong_choices);
+	if (cong_choices) {
+		bpftune_log(BPFTUNE_LOG_LEVEL,
+			    "Summary: tcp_conn_tuner: %20s %20s\n",
+			    "CongAlg", "Count");
+		for (i = 0; i < NUM_TCP_CONG_ALGS; i++) {
+			bpftune_log(BPFTUNE_LOG_LEVEL,
+				    "Summary: tcp_conn_tuner: %20s %20lu\n",
+				    congs[i], cong_choices[i]);
+		}
+	}
 	while (!bpf_map_get_next_key(map_fd, prev_key, &key)) {
 		char buf[INET6_ADDRSTRLEN];
 		struct remote_host r;
-		int i;
 
 		prev_key = &key;
 
