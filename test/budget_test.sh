@@ -46,7 +46,7 @@ for FAMILY in ipv4 ipv6 ; do
    budget_orig=($(sysctl -n net.core.netdev_max_backlog))
    test_setup true
 
-   sysctl -w net.core.netdev_budget=5
+   sysctl -w net.core.netdev_budget=10
    budget_pre=($(sysctl -n net.core.netdev_budget))
    declare -A results
    for MODE in baseline test ; do
