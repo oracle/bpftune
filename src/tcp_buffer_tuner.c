@@ -89,7 +89,7 @@ int get_from_file(FILE *fp, const char *fmt, ...)
 	return ret;
 }
 
-long nr_free_buffer_pages(bool initial)
+long long nr_free_buffer_pages(bool initial)
 {
 	unsigned long nr_pages = 0;
 	char *mzone = "Normal";

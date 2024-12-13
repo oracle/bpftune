@@ -37,7 +37,7 @@ int kernel_page_size;
 int kernel_page_shift;
 int sk_mem_quantum;
 int sk_mem_quantum_shift;
-unsigned long nr_free_buffer_pages;
+unsigned long long nr_free_buffer_pages;
 
 #define tcp_tunable_corr(__id, __cookie, __newval, __tp, __field_type, __field)\
 	{								\
