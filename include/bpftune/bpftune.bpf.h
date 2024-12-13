@@ -205,7 +205,7 @@ unsigned int tuner_id;
 unsigned int strategy_id;
 unsigned int bpftune_pid;
 /* init_net value used for older kernels since __ksym does not work */
-unsigned long bpftune_init_net;
+unsigned long long bpftune_init_net;
 
 /* TCP buffer tuning */
 #ifndef SO_SNDBUF
