@@ -30,9 +30,9 @@ static struct bpftunable_scenario scenarios[] = {
 	"Need to increase buffer size(s) to maximize throughput" },
 { TCP_BUFFER_DECREASE,	"need to decrease TCP buffer size(s)",
 	"Need to decrease buffer size(s) to reduce memory utilization" },
-{ TCP_BUFFER_NOCHANGE_LATENCY,
-			"need to retain TCP buffer size due to latency",
-	"Latency is starting to correlate with buffer size increases, so do not make buffer size increase to avoid this effect" },
+{ TCP_BUFFER_DECREASE_LATENCY,
+			"need to decrease TCP buffer size due to latency",
+	"Latency is starting to correlate with buffer size increases, so decrease buffer size to avoid this effect" },
 { TCP_MEM_PRESSURE,	"approaching TCP memory pressure",
 	"Since memory pressure/exhaustion are unstable system states, adjust tcp memory-related tunables" },
 { TCP_MEM_EXHAUSTION,	"approaching TCP memory exhaustion",
@@ -228,7 +228,7 @@ void event_handler(struct bpftuner *tuner,
 			    tunable, key.netns_cookie, new[0], new[1], new[2],
 			    covar_compute(&c), corr);
 		if (corr > CORR_THRESHOLD && scenario == TCP_BUFFER_INCREASE)
-			scenario = TCP_BUFFER_NOCHANGE_LATENCY;
+			scenario = TCP_BUFFER_DECREASE_LATENCY;
 	}
 	switch (id) {
 	case TCP_BUFFER_TCP_MEM:
@@ -248,9 +248,12 @@ void event_handler(struct bpftuner *tuner,
 		case TCP_BUFFER_DECREASE:
 			reason = lowmem;
 			break;
-		case TCP_BUFFER_NOCHANGE_LATENCY:
+		case TCP_BUFFER_DECREASE_LATENCY:
 			reason = "correlation between buffer size increase and latency";
-			new[2] = old[2];
+			new[2] = BPFTUNE_SHRINK_BY_DELTA(old[2]);
+			/* ensure we do not shrink too far */
+			if (new[2] <= new[1])
+				return;
 			break;
 		}
 		bpftuner_tunable_sysctl_write(tuner, id, scenario,
