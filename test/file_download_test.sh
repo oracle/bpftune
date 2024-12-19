@@ -20,7 +20,7 @@
 #
 
 # download file via wget with various drop/latencies; bbr should
-# be used when drops >= 2%
+# be used when drops >= 1.5%
 
 . ./test_lib.sh
 
@@ -30,8 +30,8 @@ SLEEPTIME=1
 TIMEOUT=30
 MAX_CONN=50
 
-for DROP_PERCENT in 2 0; do
-for LATENCY in "" "delay 100" ; do
+for DROP_PERCENT in 2 4 0; do
+for LATENCY in "" "delay 10" "delay 100"; do
 for NS in nonglobal global; do
  for FAMILY in ipv4 ipv6 ; do
    

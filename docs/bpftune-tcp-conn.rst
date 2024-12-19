@@ -22,13 +22,14 @@ DESCRIPTION
         When we have limited information about a remote host - i.e. we have
         not had > REMOTE_HOST_MIN_INSTANCES connections involving it,
         the only auto-selection involved is to use BBR in cases where
-        loss rates exceed 1/32 of the packet sent rate - in such scenarions,
-        BBR performs much better than other congestion control algorithms.
+        loss rates exceed 1/(2^DROP_SHIFT) (1.5%) of the packet sent rate -
+        in such cases, BBR performs better than other congestion control
+        algorithms.
 
         For cases where we connect multiple times we can try different
         algorithms to select the best.
 
-        In selecting the appropriate congestion control algorithm, a reinforcement
+        In selecting the appropriate congestion control algorithm, a
         reinforcement learning-based method is used whereby we choose the
         congestion control algorithm that best fits the optimal bandwidth
         delay product (BDP)::

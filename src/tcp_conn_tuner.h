@@ -74,10 +74,10 @@ struct remote_host {
 /* collect per-conn data once we see > REMOTE_HOST_MIN_INSTANCES */
 #define REMOTE_HOST_MIN_INSTANCES	4
 
-/* if total retrans/segs_out > 1(2^DROP_SHIFT) (1/32 by default)
+/* if total retrans/segs_out > 1(2^DROP_SHIFT) (1/64 by default)
  * apply BBR congestion control.
  */
-#define DROP_SHIFT	5
+#define DROP_SHIFT	6
 
 #define RTT_SCALE       1000000
 #define DELIVERY_SCALE  1000000
