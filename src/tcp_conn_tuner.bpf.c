@@ -95,7 +95,7 @@ int conn_tuner_sockops(struct bpf_sock_ops *ops)
 		break;
 	case BPF_SOCK_OPS_RETRANS_CB:
 		/* set individual cong algorithm to BBR if retransmit rate
-		 * is > 1/32 of packets out.
+		 * is > 1/(2^DROP_SHIFT) of packets out.
 		 */
 		if (ops->total_retrans > (ops->segs_out >> DROP_SHIFT)) {
 			if (sk) {
