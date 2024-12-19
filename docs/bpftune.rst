@@ -18,6 +18,8 @@ SYNOPSIS
         { [**-r** | **--learning_rate** ] learning_rate}
         { [**-R** | **--rollback** ]}
         { [**-S** | **--support** ]}
+        { [**-p** | **--port** ] port}
+        { [**-q** | **--query**] query}
 
 DESCRIPTION
 ===========
@@ -85,3 +87,17 @@ OPTIONS
                 to the system.  On exit, bpftune summarizes the changes made
                 and rolls back to the sysctl values that were set prior to
                 bpftune running.
+
+         -p, --port
+
+                TCP port to listen on for queries.  If not specified, use an
+                ephemeral localhost port.
+
+         -q, --query
+
+                Query bpftune.  Supported queries include
+
+                help        - show supported queries
+                summary     - show summary of changes made by tuners
+                tuners      - show loaded tuners and their state
+                tunables    - show supported tunables for loaded tuners

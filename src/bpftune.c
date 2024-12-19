@@ -36,11 +36,13 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/resource.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
 #include <dirent.h>
 #include <libgen.h>
 #include <linux/types.h>
 #include <linux/limits.h>
+#include <netinet/in.h>
 #include <pthread.h>
 #include <sys/inotify.h>
 #include <ftw.h>
@@ -75,6 +77,7 @@ static void cleanup(int sig)
 {
 	exiting = true;
 	bpftune_log(LOG_DEBUG, "cleaning up, got signal %d\n", sig);
+	bpftune_server_stop();
 	bpftune_ring_buffer_fini(ring_buffer);
 	if (use_stderr)
 		fflush(stderr);
@@ -239,6 +242,8 @@ void do_help(void)
 		"		     { -L|--legacy}\n"
 		"		     { -h|--help}}\n"
 		"		     { -l|--library_path library_path}\n"
+		"		     { -p|--port port}\n"
+		"		     { -q|--query query}\n"
 		"		     { -r|--learning_rate learning_rate}\n"
 		"		     { -R|--rollback}\n"
 		"		     { -s|--stderr}\n"
@@ -292,6 +297,8 @@ int main(int argc, char *argv[])
 		{ "help",	no_argument,		NULL,	'h' },
 		{ "libdir",	required_argument,	NULL,	'l' },
 		{ "learning_rate", required_argument,	NULL,	'r' },
+		{ "port",	required_argument,	NULL,	'p' },
+		{ "query",	required_argument,	NULL,	'q' },
 		{ "rollback",	no_argument,		NULL,	'R' },
 		{ "stderr", 	no_argument,		NULL,	's' },
 		{ "support",	no_argument,		NULL,	'S' },
@@ -306,12 +313,15 @@ int main(int argc, char *argv[])
 	int log_level = BPFTUNE_LOG_LEVEL;
 	struct sigaction sa = {}, oldsa = {};
 	bool support_only = false;
+	bool client = false;
+	char *query = NULL;
 	int interval = 100;
+	unsigned short port = 0;
 	int err, opt;
 
 	bin_name = argv[0];
 
-	while ((opt = getopt_long(argc, argv, "a:c:dDhl:Lr:RsSV", options, NULL))
+	while ((opt = getopt_long(argc, argv, "a:c:dDhl:Lr:p:q:RsSV", options, NULL))
 		>= 0) {
 		switch (opt) {
 		case 'a':
@@ -347,6 +357,14 @@ int main(int argc, char *argv[])
 				return 1;
 			}
 			break;
+		case 'p':
+			port = (unsigned short)atoi(optarg);
+			break;
+		case 'q':
+			query = optarg;
+			client = true;
+			use_stderr = true;
+			break;
 		case 'R':
 			rollback = true;
 			break;
@@ -367,7 +385,24 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	bpftune_set_log(log_level, use_stderr ? bpftune_log_stderr : bpftune_log_syslog);
+	bpftune_set_log(log_level,
+			use_stderr ? bpftune_log_stderr : bpftune_log_syslog,
+			NULL);
+
+	if (client) {
+		char buf[BPFTUNE_SERVER_MSG_MAX];
+		struct sockaddr_in server;
+	
+		memset(&server, 0, sizeof(server));
+		server.sin_family = AF_INET;
+		server.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+		server.sin_port = htons(port);
+
+		err = bpftune_server_request(&server, query, buf, sizeof(buf));
+		if (err == 0)
+			fprintf(stdout, "%s\n", buf);
+		return err;
+	}
 
 	bpftune_set_learning_rate(rate);
 
@@ -382,7 +417,7 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 
 	/* need to setup cgroup prior to probe as probe program uses sysctl */
-	err = mkdir(BPFTUNE_RUN_DIR, 0700);
+	err = mkdir(BPFTUNE_RUN_DIR, 0755);
 	if (err && errno != EEXIST) {
 		bpftune_log(BPFTUNE_LOG_LEVEL, "could not create '%s': %s\n",
 			    BPFTUNE_RUN_DIR, strerror(errno));
@@ -400,6 +435,9 @@ int main(int argc, char *argv[])
 	}
 	if (support_only)
 		return 0;
+
+	if (bpftune_server_start(port) != 0)
+		exit(EXIT_FAILURE);
 
 	bpftune_cap_drop();
 
