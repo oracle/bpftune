@@ -120,10 +120,7 @@ int BPF_PROG(net_rx_action)
 	if (!last_time_squeezep)
 		return 0;
 	last_time_squeeze = *last_time_squeezep;
-	/* if time squeeze increased for every instance of
-	 * net_rx_action() since last sample, we increase.
-	 */
-	if (time_squeeze <= (last_time_squeeze + bpftune_sample_rate))
+	if (time_squeeze <= last_time_squeeze)
 		return 0;
 	*last_time_squeezep = time_squeeze;
 	/* did not have previous time_squeeze value for comparison, bail. */
