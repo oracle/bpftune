@@ -43,11 +43,14 @@ for FAMILY in ipv4 ipv6 ; do
 
    test_start "$0|budget test to $ADDR:$PORT $FAMILY opts $CLIENT_OPTS $LATENCY"
 
-   budget_orig=($(sysctl -n net.core.netdev_max_backlog))
+   budget_orig=($(sysctl -n net.core.netdev_budget))
+   usecs_orig=($(sysctl -n net.core.netdev_budget_usecs))
    test_setup true
 
    sysctl -w net.core.netdev_budget=10
+   sysctl -w net.core.netdev_budget_usecs=100
    budget_pre=($(sysctl -n net.core.netdev_budget))
+   usecs_pre=($(sysctl -n net.core.netdev_budget_usecs))
    declare -A results
    for MODE in baseline test ; do
 
@@ -60,7 +63,7 @@ for FAMILY in ipv4 ipv6 ; do
 		LOGSZ=$(wc -l $LOGFILE | awk '{print $1}')
 		LOGSZ=$(expr $LOGSZ + 1)
 	fi
-	test_run_cmd_local "ip netns exec $NETNS $IPERF3 -fm -t 20 $CLIENT_OPTS -c $PORT -c $ADDR" true
+	test_run_cmd_local "ip netns exec $NETNS $IPERF3 -fm -t 10 -P 20 $CLIENT_OPTS -c $PORT -c $ADDR" true
 	sleep $SLEEPTIME
 
 	sresults=$(grep -E "sender" ${CMDLOG} | awk '{print $7}')
@@ -80,10 +83,16 @@ for FAMILY in ipv4 ipv6 ; do
    done
 
    budget_post=($(sysctl -n net.core.netdev_budget))
+   usecs_post=($(sysctl -n net.core.netdev_budget_usecs))
+   sleep $SLEEPTIME
    sysctl -w net.core.netdev_budget="$budget_orig"
+   sysctl -w net.core.netdev_budget_usecs="$usecs_orig"
    echo "budget	${budget_pre}	->	${budget_post}"
+   echo "usecs	${usecs_pre}	->	${usecs_post}"
    if [[ "$budget_post" -gt "$budget_pre" ]]; then
-	test_pass
+	if [[ "$usecs_post" -gt "$usecs_pre" ]]; then
+	    test_pass
+	fi
    fi
    test_cleanup
  done
