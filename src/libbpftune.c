@@ -108,9 +108,9 @@ void bpftune_log_buf(void *ctx, int level, const char *fmt, va_list args)
 	struct bpftune_log_ctx_buf *c = ctx;
 	va_list nextargs;
 
-	va_copy(nextargs, args);
-	if (!c)
+	if (!c || level > bpftune_loglevel)
 		return;
+	va_copy(nextargs, args);
 	if (c->buf_thread == pthread_self() && c->buf_off <= c->buf_sz) {
 		c->buf_off += vsnprintf(c->buf + c->buf_off,
 					c->buf_sz - c->buf_off, fmt, args);
@@ -740,6 +740,9 @@ struct bpftuner *bpftuner_init(const char *path)
 		free(tuner);
 		return NULL;
 	}
+	/* optional summarize function */
+	tuner->summarize = dlsym(tuner->handle, "summarize");
+
 	bpftune_log(LOG_DEBUG, "calling init for '%s\n", path);
 	err = tuner->init(tuner);
 	if (err) {
@@ -2006,6 +2009,10 @@ static void bpftune_summary_handler(__attribute__((unused)) const char *req,
 	bpftune_for_each_tuner(t) {
 		unsigned int i, j;
 
+		if (t->summarize) {
+			t->summarize(t);
+			continue;
+		}
 		for (i = 0; i < t->num_tunables; i++) {
 			for (j = 0; j < t->num_scenarios; j++) {
 				bpftuner_scenario_log(t, i, j, 0, true);

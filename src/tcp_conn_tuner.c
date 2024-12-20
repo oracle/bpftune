@@ -84,7 +84,7 @@ error:
 	return 1;
 }
 
-static void summarize_conn_choices(struct bpftuner *tuner)
+void summarize(struct bpftuner *tuner)
 {
 	struct bpf_map *map = bpftuner_bpf_map_get(tcp_conn, tuner, remote_host_map);
 	struct in6_addr key, *prev_key = NULL;
@@ -138,7 +138,7 @@ void fini(struct bpftuner *tuner)
 {
 	bpftune_log(LOG_DEBUG, "calling fini for %s\n", tuner->name);
 	bpftuner_cgroup_detach(tuner, "conn_tuner_sockops", BPF_CGROUP_SOCK_OPS);
-	summarize_conn_choices(tuner);
+	summarize(tuner);
 	bpftuner_bpf_fini(tuner);
 }
 

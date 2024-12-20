@@ -184,6 +184,7 @@ struct bpftuner {
 	int netns_map_fd;
 	void (*event_handler)(struct bpftuner *tuner,
 			      struct bpftune_event *event, void *ctx);
+	void (*summarize)(struct bpftuner *tuner);
 	unsigned int num_tunables;
 	struct bpftunable *tunables;
 	unsigned int num_scenarios;
