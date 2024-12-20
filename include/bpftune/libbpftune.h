@@ -30,6 +30,8 @@
 #include <string.h>
 #include <syslog.h>
 #include <unistd.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -37,6 +39,7 @@
 #include <dirent.h>
 #include <libgen.h>
 #include <linux/types.h>
+#include <pthread.h>
 
 #include <bpftune/bpftune.h>
 
@@ -44,6 +47,7 @@
 #include <bpf/libbpf.h>
 
 #define BPFTUNE_RUN_DIR			"/var/run/bpftune"
+#define BPFTUNE_PORT_FILE		BPFTUNE_RUN_DIR	"/server-port"
 #define BPFTUNER_CGROUP_DIR		BPFTUNE_RUN_DIR "/cgroupv2"
 #ifndef BPFTUNER_PREFIX_DIR
 #define BPFTUNER_PREFIX_DIR		"/usr"
@@ -65,8 +69,26 @@
 #define ARRAY_SIZE(arr)			(sizeof(arr) / sizeof((arr)[0])) 
 #endif
 
+#define BPFTUNE_SERVER_MSG_MAX		65536
+
+char *bpftune_state_string[] = {
+	"inactive",
+	"active",
+	"manual",
+	"gone",
+};
+
 /* level for bpftune tunable updates */
 #define BPFTUNE_LOG_LEVEL		LOG_NOTICE
+
+/* write to buffer and log using nextlogfn */
+struct bpftune_log_ctx_buf {
+	void (*nextlogfn)(void *ctx, int level, const char *fmt, va_list args);
+	pthread_t buf_thread;
+	char *buf;
+	size_t buf_off;
+	size_t buf_sz;
+};
 
 int bpftune_log_level(void);
 
@@ -74,10 +96,12 @@ void bpftune_log(int level, const char *fmt, ...);
 
 void bpftune_log_stderr(void *ctx, int level, const char *fmt, va_list args);
 void bpftune_log_syslog(void *ctx, int level, const char *fmt, va_list args);
+void bpftune_log_buf(void *ctx, int level, const char *fmt, va_list args);
 
 void bpftune_set_log(int level,
 		     void (*logfn)(void *ctx, int level, const char *fmt,
-				   va_list args));
+				   va_list args),
+		     void *ctx);
 void bpftune_set_bpf_log(bool log);
 
 void bpftune_log_bpf_err(int err, const char *fmt);
@@ -93,6 +117,13 @@ int bpftune_cgroup_init(const char *cgroup_path);
 const char *bpftune_cgroup_name(void);
 int bpftune_cgroup_fd(void);
 void bpftune_cgroup_fini(void);
+
+int bpftune_server_start(unsigned short port);
+int bpftune_server_port(void);
+void bpftune_server_stop(void);
+int bpftune_server_request(struct sockaddr_in *server, const char *req,
+			   char *buf, size_t buf_sz);
+
 int bpftuner_cgroup_attach(struct bpftuner *tuner, const char *prog_name,
 			   enum bpf_attach_type attach_type);
 void bpftuner_cgroup_detach(struct bpftuner *tuner, const char *prog_name,

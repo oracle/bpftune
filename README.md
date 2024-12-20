@@ -240,6 +240,8 @@ $ sudo bpftune -s
 
 On exit, bpftune will summarize any tuning done.
 
+Queries of bpftune state can be done via `bpftune -q`.
+
 ## Tests
 
 Tests are supplied for each tuner in the tests/ subdirectory.

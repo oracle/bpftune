@@ -3,6 +3,7 @@ LIBBPFTUNE_0.1.1 {
 		bpftune_log_level;
 		bpftune_log_stderr;
 		bpftune_log_syslog;
+		bpftune_log_buf;
 		bpftune_log;
 		bpftune_set_log;
 		bpftune_set_bpf_log;
@@ -17,6 +18,10 @@ LIBBPFTUNE_0.1.1 {
 		bpftune_cgroup_fini;
 		bpftuner_cgroup_attach;
 		bpftuner_cgroup_detach;
+		bpftune_server_start;
+		bpftune_server_port;
+		bpftune_server_request;
+		bpftune_server_stop;
 		bpftune_tuner;
 		bpftune_tuner_num;
 		bpftune_bpf_support;

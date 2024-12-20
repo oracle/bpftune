@@ -39,6 +39,8 @@
 #include <linux/types.h>
 #include <sys/mount.h>
 #include <sys/socket.h>
+#include <netinet/tcp.h>
+#include <arpa/inet.h>
 #include <sys/utsname.h>
 #include <sched.h>
 #include <mntent.h>
@@ -46,6 +48,7 @@
 #include <pthread.h>
 #include <signal.h>
 #include <time.h>
+#include <pthread.h>
 
 unsigned short bpftune_learning_rate;
 
@@ -97,6 +100,23 @@ void bpftune_log_syslog(__attribute__((unused)) void *ctx, int level,
 	buflen = vsnprintf(buf, sizeof(buf), fmt, args);
 	if (buflen > 0)
 		syslog(level, buf, buflen + 1);
+}
+
+/* log to ctx buffer as well as usual log destination */
+void bpftune_log_buf(void *ctx, int level, const char *fmt, va_list args)
+{
+	struct bpftune_log_ctx_buf *c = ctx;
+	va_list nextargs;
+
+	va_copy(nextargs, args);
+	if (!c)
+		return;
+	if (c->buf_thread == pthread_self() && c->buf_off <= c->buf_sz) {
+		c->buf_off += vsnprintf(c->buf + c->buf_off,
+					c->buf_sz - c->buf_off, fmt, args);
+	}
+	c->nextlogfn(ctx, level, fmt, nextargs);
+	va_end(nextargs);
 }
 
 void (*bpftune_logfn)(void *ctx, int level, const char *fmt, va_list args) =
@@ -156,11 +176,13 @@ void bpftune_set_bpf_log(bool log)
 
 void bpftune_set_log(int level,
 		     void (*logfn)(void *ctx, int level, const char *fmt,
-				   va_list args))
+				   va_list args),
+		     void *ctx)
 {
 	if (logfn)
 		bpftune_logfn = logfn;
 	bpftune_loglevel = level;
+	bpftune_log_ctx = ctx;
 	if (logfn == bpftune_log_syslog) {
 		setlogmask(LOG_UPTO(level));
                 openlog("bpftune", LOG_NDELAY | LOG_PID, LOG_DAEMON);
@@ -1900,4 +1922,295 @@ void bpftuner_bpf_set_autoload(struct bpftuner *tuner)
 void bpftuner_rollback_set(struct bpftuner *tuner)
 {
 	tuner->rollback = true;
+}
+
+struct bpftune_req {
+	const char *name;
+	const char *description;
+	void (*handler)(const char *, char *, size_t);
+};
+
+static void bpftune_help_handler(const char *req, char *buf, size_t buf_sz);
+static void bpftune_tuners_handler(const char *req, char *buf, size_t buf_sz);
+static void bpftune_tunables_handler(const char *req, char *buf, size_t buf_sz);
+static void bpftune_summary_handler(const char *req, char *buf, size_t buf_sz);
+
+/* add bpftune server requests with handlers here */
+struct bpftune_req bpftune_reqs[] = {
+ { "help",	"list supported queries",	bpftune_help_handler },
+ { "tuners",	"show state of tuners",		bpftune_tuners_handler },
+ { "tunables",	"show list of tunables",	bpftune_tunables_handler },
+ { "summary",	"show summary of changes",	bpftune_summary_handler },
+};
+
+static void bpftune_help_handler(__attribute__((unused)) const char *req,
+				 char *buf, size_t buf_sz)
+{
+	unsigned long i;
+	int off = 0;
+
+	for (i = 0; i < ARRAY_SIZE(bpftune_reqs); i++) {
+		off += snprintf(buf + off, buf_sz - off, "%20s %40s\n",
+				bpftune_reqs[i].name, bpftune_reqs[i].description);
+	}
+}
+
+static void bpftune_tuners_handler(__attribute__((unused)) const char *req,
+				   char *buf, size_t buf_sz)
+{
+	struct bpftuner *t;
+	int off = 0;
+
+	bpftune_for_each_tuner(t) {
+		off += snprintf(buf + off, buf_sz - off, "%20s %20s\n",
+				t->name, bpftune_state_string[t->state]);
+	}
+}
+
+static void bpftune_tunables_handler(__attribute__((unused)) const char *req,
+				     char *buf, size_t buf_sz)
+{
+	struct bpftuner *t;
+	int off = 0;
+
+	bpftune_for_each_tuner(t) {
+		struct bpftunable *u;
+		unsigned int i;
+
+		for (i = 0; i < t->num_tunables; i++) {
+			u = bpftuner_tunable(t, i);
+			off += snprintf(buf + off, buf_sz - off, "%20s %50s\n",
+					t->name, u->desc.name);
+		}
+        }
+}
+
+static void bpftune_summary_handler(__attribute__((unused)) const char *req,
+				    char *buf, size_t buf_sz)
+{
+	struct bpftune_log_ctx_buf ctx_buf;
+	struct bpftuner *t;
+	int off = 0;
+
+	off = snprintf(buf, buf_sz,
+		       "Summary of changes made across all tuners:\n");
+	ctx_buf.nextlogfn = bpftune_logfn;
+	ctx_buf.buf = buf;
+	ctx_buf.buf_off = off;
+	ctx_buf.buf_sz = buf_sz;
+	ctx_buf.buf_thread = pthread_self();
+
+	/* have summary log to buffer + usual log destination */
+	bpftune_set_log(bpftune_loglevel, bpftune_log_buf, &ctx_buf);
+
+	bpftune_for_each_tuner(t) {
+		unsigned int i, j;
+
+		for (i = 0; i < t->num_tunables; i++) {
+			for (j = 0; j < t->num_scenarios; j++) {
+				bpftuner_scenario_log(t, i, j, 0, true);
+				bpftuner_scenario_log(t, i, j, 1, true);
+			}
+		}
+	}
+	bpftune_set_log(bpftune_loglevel, ctx_buf.nextlogfn, NULL);
+	bpftune_log(LOG_DEBUG, "got the following sz %d off %d, orig off %d '%s'\n",
+		    ctx_buf.buf_sz, ctx_buf.buf_off, off, buf);
+}
+
+static bool bpftune_server_running = false;
+
+void *bpftune_server_thread(void *arg)
+{
+	unsigned short port = *(unsigned short *)arg;
+	int fd = socket(AF_INET, SOCK_STREAM, 0);
+	struct sockaddr_in saddr;
+	socklen_t len;
+
+	if (fd < 0) {
+		bpftune_log(LOG_ERR, "could not create server socket: %s\n",
+			    strerror(errno));
+		return NULL;
+	}
+	memset(&saddr, 0, sizeof(saddr));
+	saddr.sin_family = AF_INET;
+	/* listen on loopback only if no port was specified */
+	saddr.sin_addr.s_addr = htonl(port ? INADDR_ANY : INADDR_LOOPBACK);
+	saddr.sin_port = htons(port);
+	if (bind(fd, (struct sockaddr *)&saddr, sizeof(saddr)) < 0) {
+		bpftune_log(LOG_ERR, "could not bind server port %d: %s\n",
+			    strerror(errno));
+		close(fd);
+		return NULL;
+	}
+	if (listen(fd, 10) < 0) {
+		bpftune_log(LOG_ERR, "could not listen on server port %d: %s\n",
+			    port, strerror(errno));
+		close(fd);
+		return NULL;
+	}
+	if (port == 0) {
+		len = sizeof(saddr);
+
+		if (!getsockname(fd, &saddr, &len))
+			port = ntohs(saddr.sin_port);
+	}
+	if (port != 0) {
+		FILE *fp = fopen(BPFTUNE_PORT_FILE, "w");
+
+		if (!fp) {
+			bpftune_log(LOG_ERR, "could not write server port %d to '%s'\n",
+				    port, BPFTUNE_PORT_FILE);
+			close(fd);
+			return NULL;
+		}
+		fprintf(fp, "%d\n", port);
+		fclose(fp);
+	}
+	bpftune_log(LOG_DEBUG, "server listening on port %d\n", port);
+	bpftune_server_running = true;
+	while (bpftune_server_running) {
+		char buf[BPFTUNE_SERVER_MSG_MAX];
+		char req[80];
+		struct sockaddr_in caddr;
+		int cfd = accept(fd, (struct sockaddr_in *)&caddr, &len);
+		unsigned long i;
+
+		if (cfd < 0) {
+			bpftune_log(LOG_DEBUG, "could not accept connection for port %d: %s\n",
+				    port, strerror(errno));
+			continue;
+		}
+		if (read(cfd, req, sizeof(req)) < 0) {
+			bpftune_log(LOG_DEBUG, "could not read request from client for port %d: %s\n",
+				    port, strerror(errno));
+			close(cfd);
+			continue;
+		}
+		bpftune_log(LOG_DEBUG, "request '%s' from client for port %d\n",
+			    req, port);
+		for (i = 0; i < ARRAY_SIZE(bpftune_reqs); i++) {
+			if (strncmp(req, bpftune_reqs[i].name,
+				    strlen(bpftune_reqs[i].name)) == 0) {
+				bpftune_reqs[i].handler(req, buf, sizeof(buf));
+				break;
+			}
+		}
+		if (i == ARRAY_SIZE(bpftune_reqs)) {
+			int off;
+
+			off = snprintf(buf, sizeof(buf), "unknown request '%s'; supported requests are:\n",
+				       req);
+			bpftune_help_handler(req, buf + off, sizeof(buf) - off);
+		}
+		if (write(cfd, buf, strlen(buf) + 1) < 0) {
+			bpftune_log(LOG_DEBUG, "could not write reply '%s' to client for port %d: %s\n",
+				    buf, port, strerror(errno)); 
+		}
+		close(cfd);
+	}
+	bpftune_log(LOG_DEBUG, "stopping server on port %d\n", port);
+	close(fd);
+	return NULL;
+}
+
+int bpftune_server_start(unsigned short port)
+{
+	pthread_attr_t attr = {};
+	pthread_t server_tid;
+
+	if (pthread_attr_init(&attr) ||
+	    pthread_create(&server_tid, &attr, bpftune_server_thread, &port)) {
+		bpftune_log(LOG_ERR, "could not create server thread: %s\n",
+			    strerror(errno));
+		return -1;
+	}
+	return 0;
+}
+
+int bpftuner_server_port(void)
+{
+	FILE *fp = fopen(BPFTUNE_PORT_FILE, "r");
+	int p, num_values;
+
+	if (!fp) {
+		bpftune_log(LOG_ERR, "could not open '%s': %s\n",
+			    BPFTUNE_PORT_FILE, strerror(errno));
+		return -errno;
+	}
+	num_values = fscanf(fp, "%d", &p);
+	fclose(fp);
+	if (num_values == 1) {
+		bpftune_log(LOG_DEBUG, "'%s' specifies port %d\n",
+			    BPFTUNE_PORT_FILE, p);
+		return p;
+	}
+	bpftune_log(LOG_ERR, "'%s' file is malformed; should contain port#\n",
+		    BPFTUNE_PORT_FILE);
+	return -ENOENT;
+}
+
+int bpftune_server_request(struct sockaddr_in *server, const char *req,
+			   char *buf, size_t buf_sz)
+{
+	unsigned short  port = server ? ntohs(server->sin_port) : 0;
+	struct sockaddr_in saddr;
+	int fd, err;
+
+	if (port == 0) {
+		int p = bpftuner_server_port();
+		if (p < 0) {
+			bpftune_log(LOG_ERR, "could not get bpftune port for request '%s'\n",
+				    req);
+			return -ENOENT;
+		}
+		port = p;
+		if (server)
+			server->sin_port = htons(port);
+	}
+
+	fd = socket(AF_INET, SOCK_STREAM, 0);
+        if (fd < 0) {
+		err = errno;
+                bpftune_log(LOG_ERR, "could not create server socket: %s\n",
+                            strerror(err));
+                return -err;
+        }
+	if (!server) {
+		memset(&saddr, 0, sizeof(saddr));
+		saddr.sin_family = AF_INET;
+		saddr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+		saddr.sin_port = htons(port);
+		server = &saddr;
+	}
+
+	if (connect(fd, (struct sockaddr *)server, sizeof(*server)) < 0) {
+		err = errno;
+		bpftune_log(LOG_ERR, "could not connect to server (port %d): %s\n",
+			    port, strerror(err));
+		close(fd);
+		return -err;
+	}
+	bpftune_log(LOG_DEBUG, "sending request '%s' to server...\n", req);
+	if (send(fd, req, strlen(req) + 1, 0) < 0) {
+		err = errno;
+		bpftune_log(LOG_ERR, "could not send req '%s'to server (port %d): %s\n",
+			    req, port, strerror(err));
+		close(fd);
+		return -err;
+	}
+	if (recv(fd, buf, buf_sz, 0) < 0) {
+		err = errno;
+		bpftune_log(LOG_ERR, "could not recv reply to req '%s' to server (port %d): %s\n",
+			    req, port, strerror(err));
+		close(fd);
+		return -err;
+	}
+	close(fd);
+	return 0;
+}
+
+void bpftune_server_stop(void)
+{
+	bpftune_server_running = false;
 }
