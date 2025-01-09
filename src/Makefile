@@ -27,9 +27,10 @@ LLC ?= llc
 LLVM_STRIP ?= llvm-strip
 BPFTOOL ?= bpftool
 BPF_INCLUDE := /usr/include
+BPF_LOCAL_INCLUDE := /usr/local/include
 BPF_CFLAGS := -g -fno-stack-protector -Wall
 NL_INCLUDE := /usr/include/libnl3
-INCLUDES := -I../include -I$(BPF_INCLUDE) -I$(NL_INCLUDE) -I../include/uapi
+INCLUDES := -I../include -I$(BPF_INCLUDE) -I$(BPF_LOCAL_INCLUDE) -I$(NL_INCLUDE) -I../include/uapi
 INSTALL ?= install
 
 DESTDIR ?= /
@@ -193,6 +194,7 @@ $(NOBTF_BPF_OBJS): $(patsubst %.nobtf.o,%.c,$(NOBTF_BPF_OBJS)) ../include/bpftun
 else
 GCC_BPF_FLAGS := -g -O2 \
 	$(BPF_CFLAGS) -D__TARGET_ARCH_$(SRCARCH) \
+	-DBPF_NO_PRESERVE_ACCESS_INDEX \
 	-gbtf -mcpu=v3 -Wno-error=attributes \
 	-Wno-error=address-of-packed-member \
 	-Wno-compare-distinct-pointer-types \
