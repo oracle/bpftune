@@ -284,17 +284,6 @@ unsigned int bpftune_sample_rate = 4;
 
 extern const void init_net __ksym;
 
-static __always_inline int __strncmp(char *s1, char *s2, size_t n)
-{
-	size_t i;
-#pragma clang loop unroll(full)
-	for (i = 0; i < n; i++) {
-		if (s1[i] != s2[i])
-			return s1[i] - s2[i];
-	}
-	return 0;
-}
-
 static __always_inline long get_netns_cookie(struct net *net)
 {
 #ifndef BPFTUNE_NOBTF
