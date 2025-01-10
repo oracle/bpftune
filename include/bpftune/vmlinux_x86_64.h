@@ -1,8 +1,34 @@
 #ifndef __VMLINUX_H__
 #define __VMLINUX_H__
 
+#ifdef __clang__
 #ifndef BPF_NO_PRESERVE_ACCESS_INDEX
 #pragma clang attribute push (__attribute__((preserve_access_index)), apply_to = record)
+#endif
+#else
+#if defined(__BPF__)
+#define ATTR_PRESERVE_ACCESS_INDEX __attribute__((preserve_access_index))
+#endif
+#endif
+
+#ifndef ATTR_PRESERVE_ACCESS_INDEX
+#define ATTR_PRESERVE_ACCESS_INDEX
+#endif
+
+#ifndef __ksym
+#define __ksym __attribute__((section(".ksyms")))
+#endif
+
+#ifndef __weak
+#define __weak __attribute__((weak))
+#endif
+
+#ifndef __bpf_fastcall
+#if __has_attribute(bpf_fastcall)
+#define __bpf_fastcall __attribute__((bpf_fastcall))
+#else
+#define __bpf_fastcall
+#endif
 #endif
 
 typedef signed char __s8;
@@ -121951,8 +121977,10 @@ enum reg_type {
 	REG_TYPE_BASE = 3,
 };
 
+#ifdef __clang__
 #ifndef BPF_NO_PRESERVE_ACCESS_INDEX
 #pragma clang attribute pop
+#endif
 #endif
 
 #endif /* __VMLINUX_H__ */

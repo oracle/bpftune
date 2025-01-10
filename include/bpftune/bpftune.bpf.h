@@ -282,7 +282,9 @@ unsigned int bpftune_sample_rate = 4;
 #define bpftune_log(...)	__bpf_printk(__VA_ARGS__)
 #define bpftune_debug(...)	if (debug) __bpf_printk(__VA_ARGS__)
 
+#ifdef __clang__
 extern const void init_net __ksym;
+#endif
 
 static __always_inline long get_netns_cookie(struct net *net)
 {
@@ -290,7 +292,11 @@ static __always_inline long get_netns_cookie(struct net *net)
 	if (bpf_core_field_exists(net->net_cookie))
 		return BPFTUNE_CORE_READ(net, net_cookie);
 #endif
-	if (net == &init_net || net == (void *)bpftune_init_net)
+#ifdef __clang__
+	if (net == &init_net)
+	       return 0;
+#endif
+	if (net == (void *)bpftune_init_net)
 		return 0;
 	/* not global ns, no cookie support. */
 	return -1;
