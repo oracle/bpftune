@@ -1037,6 +1037,39 @@ out_unset:
         return err;
 }
 
+long long bpftune_ksym_addr(char type, const char *name)
+{
+	long long ret = -ENOENT;
+	char line[1024];
+	FILE *fp;
+	int err;
+
+	err = bpftune_cap_add();
+	if (err)
+		return err;
+	fp = fopen("/proc/kallsyms", "r");
+	if (!fp) {
+		ret = -errno;
+		goto out;
+	}
+	while (fgets(line, sizeof(line) - 1, fp) != NULL) {
+		char symname[512];
+		char symtype = '\0';
+		long long symaddr;
+
+		if (sscanf(line, "%llx %c %s", &symaddr, &symtype, symname) != 3)
+			continue;
+		if (symtype != type || strcmp(name, symname) != 0)
+			continue;
+		ret = symaddr;
+		break;
+	}
+	fclose(fp);
+out:
+	bpftune_cap_drop();
+	return ret;
+}
+
 int bpftune_snmpstat_read(unsigned long netns_cookie, int family,
 			  const char *name, long *value)
 {
