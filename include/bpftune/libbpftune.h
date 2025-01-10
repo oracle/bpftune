@@ -192,6 +192,8 @@ void bpftuner_tunables_fini(struct bpftuner *tuner);
 		__skel->bss->bpftune_pid = getpid();			     \
 		__skel->bss->bpftune_learning_rate = bpftune_learning_rate;  \
 		__skel->bss->tuner_id = bpftune_tuner_num();		     \
+		__skel->bss->bpftune_init_net =				     \
+				bpftune_ksym_addr('B', "init_net");	     \
 		if (tuner->strategy)					     \
 			__skel->bss->strategy_id = tuner->strategy->id;	     \
 		tuner->obj = __skel->obj;				     \
@@ -322,6 +324,7 @@ void bpftune_ring_buffer_fini(void *ring_buffer);
 void bpftune_sysctl_name_to_path(const char *name, char *path, size_t path_sz);
 int bpftune_sysctl_read(int netns_fd, const char *name, long *values);
 int bpftune_sysctl_write(int netns_fd, const char *name, __u8 num_values, long *values);
+long long bpftune_ksym_addr(char type, const char *name);
 int bpftune_snmpstat_read(unsigned long netns_cookie, int family, const char *name, long *value);
 int bpftune_sched_wait_run_percent_read(void);
 bool bpftune_netns_cookie_supported(void);
