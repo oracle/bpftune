@@ -282,7 +282,7 @@ unsigned int bpftune_sample_rate = 4;
 #define bpftune_log(...)	__bpf_printk(__VA_ARGS__)
 #define bpftune_debug(...)	if (debug) __bpf_printk(__VA_ARGS__)
 
-extern const void init_net __ksym;
+extern const struct net init_net __ksym;
 
 static __always_inline long get_netns_cookie(struct net *net)
 {
