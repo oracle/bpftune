@@ -229,7 +229,7 @@ int conn_tuner_sockops(struct bpf_sock_ops *ops)
                 if (!m->max_rate_delivered || rate_delivered > m->max_rate_delivered)
                 	m->max_rate_delivered = rate_delivered;
 
-		metric = tcp_metric_calc(remote_host, min_rtt, m->max_rate_delivered);
+		metric = tcp_metric_calc(remote_host, min_rtt, rate_delivered);
 		event_data->state_flags = *statep;
 		event_data->min_rtt = min_rtt;
 		event_data->rate_delivered = rate_delivered;
