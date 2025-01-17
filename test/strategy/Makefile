@@ -106,7 +106,7 @@ $(NOBTF_BPF_OBJS): $(patsubst %.nobtf.o,%.c,$(NOBTF_BPF_OBJS)) ../../include/bpf
 
 else
 GCC_BPF_FLAGS := -g -O2 \
-	$(BPF_CFLAGS) -D__TARGET_ARCH_$(SRCARCH) \
+	$(BPF_CFLAGS) -std=gnu17 -D__TARGET_ARCH_$(SRCARCH) \
 	-gbtf -mcpu=v3 -Wno-error=attributes \
 	-Wno-error=address-of-packed-member \
 	-Wno-compare-distinct-pointer-types \

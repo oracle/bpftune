@@ -116,6 +116,7 @@ BPFTUNE_HDRS = ../include/bpftune/libbpftune.h \
 ifeq ($(GCC_BPF),)
 all: analyze $(OPATH) $(OPATH)bpftune $(TUNER_LIBS)
 else
+BPF_CFLAGS += -std=gnu17
 all: $(OPATH) $(OPATH)bpftune $(TUNER_LIBS)
 endif
 
