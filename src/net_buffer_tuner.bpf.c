@@ -44,7 +44,8 @@ int BPF_PROG(bpftune_enqueue_to_backlog, struct sk_buff *skb, int cpu,
 {
 	int max_backlog = netdev_max_backlog;
 	struct bpftune_event event =  { 0 };
-	long old[3], new[3];
+	long old[3] = { 0, 0, 0 };
+	long new[3] = { 0, 0, 0 };
 	__u64 time, cpubit;
 
 	/* a high-frequency event so bail early if we can... */
@@ -103,9 +104,11 @@ SEC("fexit/net_rx_action")
 int BPF_PROG(net_rx_action)
 {
 	struct bpftune_event event =  { 0 };
-        long old[3], new[3];
+	long old[3] = { 0, 0, 0 };
+	long new[3] = { 0, 0, 0 };
 	struct softnet_data *sd;
-	unsigned int time_squeeze, *last_time_squeezep, last_time_squeeze;
+	unsigned int time_squeeze, last_time_squeeze;
+	unsigned int *last_time_squeezep = NULL;
 	unsigned int zero = 0;
 
 	if (bpftune_skip_sample(rx_count))
@@ -117,7 +120,7 @@ int BPF_PROG(net_rx_action)
 	if (!time_squeeze)
 		return 0;
 	last_time_squeezep = bpf_map_lookup_elem(&time_squeeze_map, &zero);
-	if (!last_time_squeezep)
+	if (last_time_squeezep == NULL)
 		return 0;
 	last_time_squeeze = *last_time_squeezep;
 	if (time_squeeze <= last_time_squeeze)

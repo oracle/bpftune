@@ -37,13 +37,13 @@ SEC("kretprobe/setup_net")
 int BPF_KRETPROBE(bpftune_setup_net_return, int ret)
 {
 	struct bpftune_event event = {};
-	struct net *netns;
+	struct net *netns = NULL;
 	
 	if (ret != 0)
 		return 0;
 
 	get_entry_data(setup_net_map, setup_net, net, netns);
-	if (!netns)
+	if (netns == NULL)
 		return 0;
 
 	event.tuner_id = tuner_id;
