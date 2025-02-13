@@ -210,6 +210,14 @@ To build the following packages are needed (names may vary by distro);
 - llvm >= 11
 - python3-docutils
 
+The bpf components in bpftune can be built via GCC BPF support.
+See https://gcc.gnu.org/wiki/BPFBackEnd for details on the BPF backend.
+To build with gcc bpf, specify
+
+```
+$ GCC_BPF=bpf-unknown-none-gcc make
+```
+
 From the kernel side, the kernel needs to support BPF ring buffer
 (around the 5.6 kernel, though 5.4 is supported on Oracle Linux
 as ring buffer support was backported), and kernel BTF is
