@@ -318,16 +318,16 @@ Information: If you are using an Fedora Upstream based Distribution you have to 
             chdir: "{{ repo_dest }}"
             target: all
 
+        - name: Run make with taget 'install' target for bpftune
+          community.general.make:
+            chdir: "{{ repo_dest }}"
+            target: install
+
         - name: Check bpftune status
           command: bpftune -S
           register: bpftune_status
           changed_when: false
           failed_when: "'bpftune works fully' not in bpftune_status.stderr"
-
-        - name: Run make with taget 'install' target for bpftune
-          community.general.make:
-            chdir: "{{ repo_dest }}"
-            target: install
 
         - name: restart and enable bpftune service
           ansible.builtin.service:
