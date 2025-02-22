@@ -250,6 +250,93 @@ On exit, bpftune will summarize any tuning done.
 
 Queries of bpftune state can be done via `bpftune -q`.
 
+## Ansible Install Play
+
+Information: If you are using an Fedora Upstream based Distribution you have to enable the correct repository based on the system you are using, because the libbpf-devel package is getting shipped on additional repository, based on the Distribution. You can look it up here: https://pkgs.org/search/?q=libbpf-devel
+
+```
+- name: bpftune download, build, install and start service
+  hosts: all
+  become: true
+  vars:
+    repo_url: "https://github.com/oracle/bpftune"
+    repo_dest: "/root/bpftune/"
+  tasks:
+    - name: Install git and system independent build requirements if not present
+      ansible.builtin.package:
+        name:
+          - git
+          - clang            # build requirement
+          - llvm             # build requirement
+          - bpftool          # build requirement
+          - iperf3           # build requirement
+          - python3-docutils # build requirement
+        state: present
+
+    - name: Gather package manager fact
+      ansible.builtin.setup:
+        filter: ansible_pkg_mgr
+      register: setup_info
+
+    - name: install run and build requirements for bpftune on dnf based systems
+      ansible.builtin.dnf:
+        name:
+          - libbpf       # run requirement
+          - libnl3       # run requirement
+          - libcap       # run requirement
+          - libbpf-devel # build requirement
+          - libnl3-devel # build requirement
+          - libcap-devel # build requirement
+          - clang-libs   # build requirement
+          - llvm-libs    # build requirement
+        state: present
+        # enablerepo: <repository> # !ATTENTION! based on the system you use you have to enable the correct repository based on the system you can look it up here: https://pkgs.org/search/?q=libbpf-devel
+      when: setup_info.ansible_facts.ansible_pkg_mgr == "dnf"
+
+    - name: install build requirements for bpftune on apt based systems
+      ansible.builtin.apt:
+        name:
+          - libbpf-dev        # build requirement
+          - libcap-dev        # build requirement
+          - libnl-3-dev       # build requirement
+          - libnl-route-3-dev # build requirement
+        state: present
+        install_recommends: false
+      when: setup_info.ansible_facts.ansible_pkg_mgr == "apt"
+
+    - name: Clone or update the bpftune repository if a new version is available
+      ansible.builtin.git:
+        repo: "{{ repo_url }}"
+        dest: "{{ repo_dest }}"
+        update: true
+      register: git_result
+
+    - name: if repository changes rebuild software
+      block:
+        - name: Run make with taget 'all' for bpftune
+          community.general.make:
+            chdir: "{{ repo_dest }}"
+            target: all
+
+        - name: Check bpftune status
+          command: bpftune -S
+          register: bpftune_status
+          changed_when: false
+          failed_when: "'bpftune works fully' not in bpftune_status.stderr"
+
+        - name: Run make with taget 'install' target for bpftune
+          community.general.make:
+            chdir: "{{ repo_dest }}"
+            target: install
+
+        - name: restart and enable bpftune service
+          ansible.builtin.service:
+            name: bpftune.service
+            state: started
+            enabled: yes
+      when: git_result.changed
+```
+
 ## Tests
 
 Tests are supplied for each tuner in the tests/ subdirectory.
