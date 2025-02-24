@@ -245,10 +245,13 @@ BPF_FENTRY(tcp_rcv_space_adjust, struct sock *sk)
 
 #ifndef BPFTUNE_LEGACY
 	/* sk_userlocks is a bitfield prior to 6.9 */
+#ifdef BPF_CORE_READ_BITFIELD
 	if (LINUX_KERNEL_VERSION < KERNEL_VERSION(6, 9, 0)) {
-		/* CO-RE does not support bitfields... */
-		sk_userlocks = sk->sk_userlocks;
+		sk_userlocks = BPF_CORE_READ_BITFIELD(sk, sk_userlocks);
+	} else {
+		sk_userlocks = BPFTUNE_CORE_READ(sk, sk_userlocks);
 	}
+#endif
 #endif
 	if ((sk_userlocks & SOCK_RCVBUF_LOCK) || near_memory_pressure ||
 	    near_memory_exhaustion)
