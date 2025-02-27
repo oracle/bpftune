@@ -160,6 +160,19 @@ enum bpftune_support_level {
 	BPFTUNE_SUPPORT_NORMAL
 };
 
+struct bpftune_sample {
+	__u64 count;
+	__u64 ts;
+	__u64 rate;
+};
+
+struct bpftune_sample_desc {
+	const char *name;
+	struct bpftune_sample *sample;
+};
+
+#define BPFTUNE_MAX_SAMPLES	8
+
 struct bpftuner {
 	unsigned int id;
 	enum bpftune_state state;
@@ -189,6 +202,8 @@ struct bpftuner {
 	struct bpftunable *tunables;
 	unsigned int num_scenarios;
 	struct bpftunable_scenario *scenarios;
+	unsigned int num_samples;
+	struct bpftune_sample_desc samples[BPFTUNE_MAX_SAMPLES];
 };
 
 /* from include/linux/log2.h */

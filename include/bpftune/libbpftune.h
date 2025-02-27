@@ -312,6 +312,32 @@ void bpftuner_tunables_fini(struct bpftuner *tuner);
 #define bpftuner_bpf_map_get(tuner_name, tuner, map)			     \
 	bpftuner_bpf_skel_val(tuner_name, tuner, maps.map)
 
+#define bpftuner_bpf_sample_add(tuner_name, tuner, s)		     	     \
+	do {								     \
+		struct tuner_name##_tuner_bpf *__skel = tuner->skel;	     \
+		struct tuner_name##_tuner_bpf_legacy *__lskel = tuner->skel; \
+		struct tuner_name##_tuner_bpf_nobtf *__nskel = tuner->skel;  \
+		struct bpftune_sample_desc *d;				     \
+		d = &tuner->samples[tuner->num_samples];		     \
+		d->name = #s;						     \
+		switch (tuner->bpf_support) {				     \
+                case BPFTUNE_SUPPORT_NORMAL:				     \
+                        d->sample = &__skel->bss->s;			     \
+                        break;                                               \
+                case BPFTUNE_SUPPORT_LEGACY:                                 \
+                        d->sample = &__lskel->bss->s;			     \
+                        break;                                               \
+                case BPFTUNE_SUPPORT_NOBTF:                                  \
+                        d->sample = &__nskel->bss->s;			     \
+                default:						     \
+                        break;                                               \
+                }                                                            \
+		tuner->num_samples++;					     \
+                bpftune_log(LOG_DEBUG, "%s: added sample '%s'\n",	     \
+                            #tuner_name, #s);				     \
+	} while (0)
+
+
 enum bpftune_support_level bpftune_bpf_support(void);
 bool bpftune_have_vmlinux_btf(void);
 void bpftune_force_bpf_support(enum bpftune_support_level);

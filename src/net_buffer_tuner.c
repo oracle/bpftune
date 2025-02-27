@@ -62,6 +62,8 @@ int init(struct bpftuner *tuner)
 			     budget);
 	bpftuner_bpf_var_set(net_buffer, tuner, netdev_budget_usecs,
 			     budget_usecs);
+	bpftuner_bpf_sample_add(net_buffer, tuner, drop_sample);
+	bpftuner_bpf_sample_add(net_buffer, tuner, rx_action_sample);
 	err = bpftuner_bpf_attach(net_buffer, tuner);
 	if (err)
 		return err;

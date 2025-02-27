@@ -274,8 +274,31 @@ unsigned long long bpftune_init_net;
 bool debug;
 
 unsigned int bpftune_sample_rate = 4;
+ 
+#define TEN_MSEC	((__u64)10000000)
 
-#define bpftune_skip_sample(count)	((++count % bpftune_sample_rate) != 0)
+/* Auto-tune sample rate. Start with bpftune_sample_rate, and only
+ * sample every bpftune_sample_rate samples (default 4).  However
+ * if we see multiple events in a 10msec window, double the sample
+ * rate such that we only sample 1/8 etc.  Similarly lower the sample
+ * rate if we have previously increased it and not seen as many samples
+ * in that window.
+ */
+#define bpftune_sample(sample)					\
+do {								\
+	__u64 last_ts = 0;					\
+								\
+	if (!sample.rate)					\
+		sample.rate = bpftune_sample_rate;		\
+	if (((++sample.count) % sample.rate) != 0)		\
+		return 0;					\
+	last_ts = sample.ts;					\
+	sample.ts = bpf_ktime_get_ns();				\
+	if ((sample.ts - last_ts) < TEN_MSEC)			\
+		sample.rate = sample.rate << 1;			\
+	else if (sample.rate > bpftune_sample_rate)		\
+		sample.rate = sample.rate >> 1;			\
+} while (0)
 
 #define __barrier asm volatile("" ::: "memory")
 

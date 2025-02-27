@@ -164,6 +164,7 @@ int init(struct bpftuner *tuner)
 			     ilog2(SK_MEM_QUANTUM));
 	bpftuner_bpf_var_set(tcp_buffer, tuner, nr_free_buffer_pages,
 			     nr_free_buffer_pages(true));
+	bpftuner_bpf_sample_add(tcp_buffer, tuner, rcv_space_sample);
 	err = bpftuner_bpf_attach(tcp_buffer, tuner);
 	if (err)
 		return err;
