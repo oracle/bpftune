@@ -26,11 +26,6 @@
 bool under_memory_pressure = false;
 bool near_memory_pressure = false;
 bool near_memory_exhaustion = false;
-/* use global tcp sock count since tcp memory pressure/exhaustion are
- * computed as fraction of total system memory.
- */
-__s64 tcp_sock_count = 0;
-__s64 tcp_max_sock_count = 0;
 
 /* set from userspace */
 int kernel_page_size;
@@ -227,6 +222,10 @@ BPF_FENTRY(tcp_sndbuf_expand, struct sock *sk)
 	return 0;
 }
 
+__u64 rcv_space_count = 0;
+
+struct bpftune_sample rcv_space_sample = { };
+
 /* sadly tcp_rcv_space_adjust() has checks internal to it so it is called
  * regardless of if we are under memory pressure or not; so use the variable
  * we set when memory pressure is triggered.
@@ -234,12 +233,16 @@ BPF_FENTRY(tcp_sndbuf_expand, struct sock *sk)
 BPF_FENTRY(tcp_rcv_space_adjust, struct sock *sk)
 {
 	struct bpftune_event event = { 0 };
-	struct net *net = BPFTUNE_CORE_READ(sk, sk_net.net);
 	struct tcp_sock *tp = (struct tcp_sock *)sk;
 	long rmem[3], rmem_new[3];
 	__u8 sk_userlocks = 0;
+	struct net *net;
 	long rcvbuf;
 
+	/* only sample subset of events to reduce overhead. */
+	bpftune_sample(rcv_space_sample);
+
+	net = BPFTUNE_CORE_READ(sk, sk_net.net);
 	if (!sk || !net)
 		return 0;
 
@@ -288,17 +291,7 @@ BPF_FENTRY(tcp_init_sock, struct sock *sk)
 {
 	struct bpftune_event event = { 0 };
 
-	if (sk) {
-		if (++tcp_sock_count > tcp_max_sock_count)
-			tcp_max_sock_count = tcp_sock_count;
+	if (sk)
 		(void) tcp_nearly_out_of_memory(sk, &event);
-	}
-	return 0;
-}
-
-BPF_FENTRY(tcp_release_cb, struct sock *sk)
-{
-	if (tcp_sock_count > 0)
-		tcp_sock_count--;
 	return 0;
 }

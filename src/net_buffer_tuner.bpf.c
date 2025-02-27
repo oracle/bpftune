@@ -33,6 +33,8 @@ int netdev_max_backlog = 0;
 int netdev_budget = 0;
 int netdev_budget_usecs = 0;
 
+struct bpftune_sample drop_sample = {};
+
 #ifdef BPFTUNE_LEGACY
 SEC("kretprobe/enqueue_to_backlog")
 int BPF_KRETPROBE(bpftune_enqueue_to_backlog, int ret)
@@ -55,9 +57,8 @@ int BPF_PROG(bpftune_enqueue_to_backlog, struct sk_buff *skb, int cpu,
 	drop_count++;
 
 	/* only sample subset of drops to reduce overhead. */
-	if (bpftune_skip_sample(drop_count))
-		return 0;
-	
+	bpftune_sample(drop_sample);
+
 	/* if we drop more than 1/16 of the backlog queue size/min,
 	 * increase backlog queue size.  This means as the queue size
 	 * increases, the likliehood of hitting that limit decreases.
@@ -92,13 +93,13 @@ int BPF_PROG(bpftune_enqueue_to_backlog, struct sk_buff *skb, int cpu,
 	return 0;
 }
 
+struct bpftune_sample rx_action_sample = {};
+
 #ifndef BPFTUNE_LEGACY
 
 BPF_MAP_DEF(time_squeeze_map, BPF_MAP_TYPE_PERCPU_ARRAY, unsigned int, unsigned int, 1, 0);
 
 extern const struct softnet_data softnet_data __ksym;
-
-__u64 rx_count = 0;
 
 SEC("fexit/net_rx_action")
 int BPF_PROG(net_rx_action)
@@ -111,8 +112,8 @@ int BPF_PROG(net_rx_action)
 	unsigned int *last_time_squeezep = NULL;
 	unsigned int zero = 0;
 
-	if (bpftune_skip_sample(rx_count))
-		return 0;
+	bpftune_sample(rx_action_sample);
+
 	sd = (struct softnet_data *)bpf_this_cpu_ptr(&softnet_data);
 	if (!sd)
 		return 0;

@@ -232,6 +232,52 @@ $ TUNER=tcp_buffer_tuner.so sh qperf_test.sh
 
 Replace TUNER value with the name of the tuner you want to assess.
 
+One approach to reducing overhead is to introduce sampling; i.e.
+a high-frequency program bails early and only does more expensive
+work for 1 out of every N invokations.  bpftune has adaptive sampling
+to support this.  It works as follows.
+
+In your BPF object, add a struct bpftune_sample variable for the
+BPF program you wish to sample.  For example in tcp_buffer_tuner.bpf.c
+we have
+
+```
+struct bpftune_sample rcv_space_sample = { };
+```
+
+Since tcp_rcv_space_adjust() is called frequently, add the following
+early in function lifetime:
+
+```
+	bpftune_sample(rcv_space_sample);
+```
+
+The above will bail if it is not the Nth invokation of the program.
+Note that N is usually bpftune_sample_rate - default 4 - but will
+be adaptively adjusted if the program runs too frequently.  Too
+frequently is 2N instances - i.e. collecting data twice - in a 10 msec
+interval.  In such cases we double the sample rate.  Similarly if
+we fall outside that range we lower the sample rate towards
+bpftune_sample_rate, so over time it should adjust to handle the
+rate of invokations adaptively.
+
+To add reporting to your tuner on exit (how many times the program
+was invoked and what fraction of these we collected data for),
+in the init method add
+
+```
+	        bpftuner_bpf_sample_add(tcp_buffer, tuner, rcv_space_sample);
+```
+
+Then on tuner fini, you will see something like:
+
+```
+bpftune: Sample 'rcv_space_sample': associated program was called 598663 times, collected data every 2048 of these.
+```
+
+In this case the frequency dictated we increase the fractional rate of
+data collection from 1 in 4 to 1 in 2048.
+
 ## Tests
 
 Tests are mandatory for tuners; in the test directory you can see

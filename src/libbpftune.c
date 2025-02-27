@@ -791,6 +791,13 @@ void bpftuner_fini(struct bpftuner *tuner, enum bpftune_state state)
 
 	bpftune_log(LOG_DEBUG, "cleaning up tuner %s with %d tunables, %d scenarios\n",
 		    tuner->name, tuner->num_tunables, tuner->num_scenarios);
+	/* Show sample data before destroying BPF skeleton */
+	for (i = 0; i < tuner->num_samples; i++) {
+		bpftune_log(BPFTUNE_LOG_LEVEL, "Sample '%s': associated program was called %lu times, collected data every %lu of these.\n",
+			    tuner->samples[i].name,
+			    tuner->samples[i].sample->count,
+			    tuner->samples[i].sample->rate);
+	}
 	if (tuner->fini)
 		tuner->fini(tuner);
 	/* report summary of events for tuner */
