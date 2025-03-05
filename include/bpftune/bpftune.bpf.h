@@ -32,11 +32,15 @@
 	__builtin_preserve_access_index(&obj->field)
 #endif
 
+#ifdef VMLINUX_H
+#include <vmlinux.h>
+#else
 #if defined(__TARGET_ARCH_x86)
 #include <bpftune/vmlinux_x86_64.h>
 #elif defined(__TARGET_ARCH_arm64)
 #include <bpftune/vmlinux_aarch64.h>
 #endif
+#endif /* VMLIMUX_H */
 
 #include <bpf/bpf_endian.h>
 #include <bpf/bpf_helpers.h>
