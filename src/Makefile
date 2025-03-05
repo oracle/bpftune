@@ -17,6 +17,7 @@
 # Boston, MA 021110-1307, USA.
 #
 
+ARCH ?= $(shell uname -m)
 SRCARCH ?= $(shell uname -m | sed -e s/i.86/x86/ -e s/x86_64/x86/ \
 				  -e /arm64/!s/arm.*/arm/ -e s/sa110/arm/ \
 				  -e s/aarch64.*/arm64/ )
@@ -74,6 +75,14 @@ KERNEL_REL := $(shell uname -r)
 VMLINUX_BTF_PATHS := /sys/kernel/btf/vmlinux /boot/vmlinux-$(KERNEL_REL)
 VMLINUX_BTF_PATH := $(or $(VMLINUX_BTF),$(firstword			       \
 					  $(wildcard $(VMLINUX_BTF_PATHS))))
+
+# Some systems ship with a vmlinux.h; use it.
+VMLINUX_H_PATH ?= /usr/include/$(ARCH)-linux-gnu/linux/bpf/
+VMLINUX_H_FILE := $(wildcard $(VMLINUX_H_PATH)/vmlinux.h)
+
+ifneq ($(VMLINUX_H_FILE),)
+BPF_CFLAGS += -DVMLINUX_H -I$(VMLINUX_H_PATH)
+endif
 
 OPATH :=
 ifeq ($(SANITIZE),1)
