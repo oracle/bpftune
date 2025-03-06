@@ -21,6 +21,12 @@ static struct bpftunable_desc descs[] = {
 	BPFTUNABLE_NAMESPACED, 3 },
 { TCP_BUFFER_TCP_MEM,	BPFTUNABLE_SYSCTL, "net.ipv4.tcp_mem",
 	0, 3 },
+{ TCP_BUFFER_TCP_MODERATE_RCVBUF, BPFTUNABLE_SYSCTL, "net.ipv4.tcp_moderate_rcvbuf",
+	BPFTUNABLE_NAMESPACED, 1 },
+{ TCP_BUFFER_TCP_NO_METRICS_SAVE, BPFTUNABLE_SYSCTL, "net.ipv4.tcp_no_metrics_save",
+	BPFTUNABLE_NAMESPACED, 1 },
+{ TCP_BUFFER_TCP_NO_SSTHRESH_METRICS_SAVE, BPFTUNABLE_SYSCTL, "net.ipv4.tcp_no_ssthresh_metrics_save",
+	BPFTUNABLE_NAMESPACED, 1 },
 { TCP_BUFFER_TCP_MAX_ORPHANS, BPFTUNABLE_SYSCTL, "net.ipv4.tcp_max_orphans",
 	0, 1 },
 };
@@ -37,6 +43,12 @@ static struct bpftunable_scenario scenarios[] = {
 	"Since memory pressure/exhaustion are unstable system states, adjust tcp memory-related tunables" },
 { TCP_MEM_EXHAUSTION,	"approaching TCP memory exhaustion",
 	"Since memory exhaustion is a highly unstable state, adjust TCP memory-related tunables to avoid exhaustion" },
+{ TCP_MODERATE_RCVBUF_ENABLE, "match receive buffer size with throughput needs",
+	"Since we are tuning rcvbuf max size, ensure auto-tuning of rcvbuf size for the connection is enabled to pick optimal rcvbuf size" },
+{ TCP_NO_METRICS_SAVE_ENABLE, "disable TCP path metrics collection",
+	"In low-memory situations, avoid saving per-path TCP metrics to avoid allocations of 'struct tcp_metrics'" },
+{ TCP_NO_METRICS_SAVE_DISABLE, "enable TCP path metrics collection",
+	"Due to easing of memory strain, (re)-enable TCP metrics collection" },
 { TCP_MAX_ORPHANS_INCREASE,
 			"increase max number of orphaned sockets",
 			"" },
@@ -188,6 +200,7 @@ void event_handler(struct bpftuner *tuner,
 	int scenario = event->scenario_id;
 	struct corr c = { 0 };
 	long double corr = 0;
+	struct bpftunable *t;
 	const char *tunable;
 	long new[3], old[3];
 	struct corr_key key;
@@ -238,7 +251,31 @@ void event_handler(struct bpftuner *tuner,
 "Due to %s change %s(min pressure max) from (%ld %ld %ld) -> (%ld %ld %ld)\n",
 					     lowmem, tunable, old[0], old[1], old[2],
 					     new[0], new[1], new[2]);
+		if (near_memory_exhaustion) {
+			t = bpftuner_tunable(tuner,
+					     TCP_BUFFER_TCP_NO_METRICS_SAVE);
 
+			if (t->current_values[0] == 0) {
+				new[0] = 1;
+				bpftuner_tunable_sysctl_write(tuner,
+							      TCP_BUFFER_TCP_NO_METRICS_SAVE,
+							      TCP_NO_METRICS_SAVE_ENABLE,
+							      event->netns_cookie,
+							      1, new,
+"Due to low memory conditions, set '%s'\n", t->desc.name);
+			}
+			t = bpftuner_tunable(tuner,
+					     TCP_BUFFER_TCP_NO_SSTHRESH_METRICS_SAVE);
+			if (t->current_values[0] == 0) {
+				new[0] = 1;
+				bpftuner_tunable_sysctl_write(tuner,
+							      TCP_BUFFER_TCP_NO_SSTHRESH_METRICS_SAVE,
+							      TCP_NO_METRICS_SAVE_ENABLE,
+							      event->netns_cookie,
+							      1, new,
+"Due to low memory conditions, set '%s'\n", t->desc.name);
+			}
+		}
 		break;
 	case TCP_BUFFER_TCP_WMEM:
 	case TCP_BUFFER_TCP_RMEM:
@@ -267,5 +304,19 @@ void event_handler(struct bpftuner *tuner,
 	case TCP_BUFFER_TCP_MAX_ORPHANS:
 		break;
 	}
+	if (id == TCP_BUFFER_TCP_RMEM) {
+		t = bpftuner_tunable(tuner, TCP_BUFFER_TCP_MODERATE_RCVBUF);
 
+		if (t->current_values[0] != 1) {
+			new[0] = 1;
+			bpftuner_tunable_sysctl_write(tuner,
+						      TCP_BUFFER_TCP_MODERATE_RCVBUF,
+						      TCP_MODERATE_RCVBUF_ENABLE,
+						      event->netns_cookie, 1, new,
+"Because we are changing rcvbuf parameters, set '%s' to auto-tune receive buffer size to match the size required by the path for full throughput.\n",
+						      t->desc.name);
+		}
+
+
+	}
 }

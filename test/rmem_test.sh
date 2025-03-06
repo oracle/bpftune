@@ -48,6 +48,7 @@ for FAMILY in ipv4 ipv6 ; do
 
    rmem_orig_netns=($(ip netns exec $NETNS sysctl -n net.ipv4.tcp_rmem))
 
+   sysctl -w net.ipv4.tcp_moderate_rcvbuf=0
    sysctl -w net.ipv4.tcp_rmem="${rmem_orig[0]} ${rmem_orig[1]} ${rmem_orig[1]}"
    ip netns exec $NETNS sysctl -w net.ipv4.tcp_rmem="${rmem_orig_netns[0]} ${rmem_orig_netns[1]} ${rmem_orig_netns[1]}"
 
@@ -83,12 +84,18 @@ for FAMILY in ipv4 ipv6 ; do
    done
 
    rmem_post=($(sysctl -n net.ipv4.tcp_rmem))
+   moderate_rcvbuf_post=$(sysctl -n net.ipv4.tcp_moderate_rcvbuf)
    rmem_post_netns=($(ip netns exec $NETNS sysctl -n net.ipv4.tcp_rmem))
    sysctl -w net.ipv4.tcp_rmem="${rmem_orig[0]} ${rmem_orig[1]} ${rmem_orig[2]}"
    if [[ $MODE == "test" ]]; then
 	if [[ "${rmem_post[2]}" -gt ${rmem_orig[1]} ]]; then
 		echo "rmem before ${rmem_orig[1]} ; after ${rmem_post[2]}"
 
+		if [[ "${moderate_rcvbuf_post}" -ne 1 ]]; then
+			echo "expected net.ipv4.tcp_moderate_rcvbuf to be 1, is $moderate_rcvbuf_post"
+			sysctl -qw net.ipv4.tcp_moderate_rcvbuf=1
+			test_cleanup
+		fi
 		if [[ "${rmem_post_netns[2]}" -gt ${rmem_orig_netns[1]} ]]; then
 			echo "netns rmem before ${rmem_orig_netns[1]} ; after ${rmem_post_netns[2]}"
 		else
