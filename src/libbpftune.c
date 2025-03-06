@@ -782,33 +782,88 @@ static void __bpftuner_scenario_log(struct bpftuner *tuner, unsigned int tunable
 #define bpftuner_scenario_log(tuner, tunable, scenario, netns_fd, summary) \
 	__bpftuner_scenario_log(tuner, tunable, scenario, netns_fd, summary, NULL, NULL)
 
-void bpftuner_fini(struct bpftuner *tuner, enum bpftune_state state)
+static void bpftuner_rollback(struct bpftuner *tuner, bool log_only)
 {
-	unsigned int i, j;
+	unsigned int i, j, k;
 
-	if (!tuner || tuner->state != BPFTUNE_ACTIVE)
+	if (!tuner || (!log_only && !tuner->rollback))
 		return;
 
-	bpftune_log(LOG_DEBUG, "cleaning up tuner %s with %d tunables, %d scenarios\n",
-		    tuner->name, tuner->num_tunables, tuner->num_scenarios);
-	/* Show sample data before destroying BPF skeleton */
-	for (i = 0; i < tuner->num_samples; i++) {
-		bpftune_log(BPFTUNE_LOG_LEVEL, "Sample '%s': associated program was called %lu times, collected data every %lu of these.\n",
-			    tuner->samples[i].name,
-			    tuner->samples[i].sample->count,
-			    tuner->samples[i].sample->rate);
-	}
-	if (tuner->fini)
-		tuner->fini(tuner);
-	/* report summary of events for tuner */
 	for (i = 0; i < tuner->num_tunables; i++) {
+		struct bpftunable *t = bpftuner_tunable(tuner, i);
+		char oldvals[PATH_MAX] = { };
+		char newvals[PATH_MAX] = { };
+		bool changes = false;
+		char s[PATH_MAX];
+
+		k = 0;
+		/* find dominant scenario for tunable; if a tunable
+		 * increases and decreases, need to choose description
+		 * that best matches.
+		 */
 		for (j = 0; j < tuner->num_scenarios; j++) {
-			bpftune_log(LOG_DEBUG, "checking scenarios for tuner %d, scenario %d\n",
-				    i, j);
-			bpftuner_scenario_log(tuner, i, j, 0, true);
-			bpftuner_scenario_log(tuner, i, j, 1, true);
+			if (t->stats.global_ns[j])
+				changes = true;
+			if (t->stats.global_ns[j] > k)
+				k = j;
+		}
+		/* nothing to rollback? */
+		if (!changes)
+			continue;
+		for (j = 0; j < t->desc.num_values; j++) {
+			snprintf(s, sizeof(s), "%ld ",
+				 t->initial_values[j]);
+			strcat(oldvals, s);
+			snprintf(s, sizeof(s), "%ld ",
+				 t->current_values[j]);
+			strcat(newvals, s);
+		}
+		if (log_only) {
+			bpftune_log(BPFTUNE_LOG_LEVEL, "# To roll back changes to '%s', run the following in a terminal:\n",
+				   t->desc.name);
+			bpftune_log(BPFTUNE_LOG_LEVEL, "sudo sysctl -w %s=\"%s\"\n",
+				    t->desc.name, oldvals);
+		} else {
+			bpftuner_tunable_sysctl_write(tuner, i, k,
+				0,
+				t->desc.num_values,
+				t->initial_values,
+				"Rolling back sysctl values for '%s' from (%s) to original values (%s)...\n",
+				t->desc.name,
+				newvals, oldvals);
+			}
 		}
 	}
+
+void bpftuner_fini(struct bpftuner *tuner, enum bpftune_state state)
+{
+        unsigned int i, j;
+
+        if (!tuner || tuner->state != BPFTUNE_ACTIVE)
+                return;
+
+        bpftune_log(LOG_DEBUG, "cleaning up tuner %s with %d tunables, %d scenarios\n",
+                    tuner->name, tuner->num_tunables, tuner->num_scenarios);
+        /* Show sample data before destroying BPF skeleton */
+        for (i = 0; i < tuner->num_samples; i++) {
+                bpftune_log(BPFTUNE_LOG_LEVEL, "Sample '%s': associated program was called %lu times, collected data every %lu of these.\n",
+                            tuner->samples[i].name,
+                            tuner->samples[i].sample->count,
+                            tuner->samples[i].sample->rate);
+        }
+        if (tuner->fini)
+                tuner->fini(tuner);
+        /* report summary of events for tuner */
+        for (i = 0; i < tuner->num_tunables; i++) {
+                for (j = 0; j < tuner->num_scenarios; j++) {
+                        bpftune_log(LOG_DEBUG, "checking scenarios for tuner %d, scenario %d\n",
+                                    i, j);
+                        bpftuner_scenario_log(tuner, i, j, 0, true);
+                        bpftuner_scenario_log(tuner, i, j, 1, true);
+                }
+        }
+	bpftuner_rollback(tuner, false);
+
 	tuner->state = state;
 }
 
@@ -1296,7 +1351,7 @@ static void __bpftuner_scenario_log(struct bpftuner *tuner, unsigned int tunable
 				    t->stats.nonglobal_ns[scenario];
 		if (!count)
 			return;
-		bpftune_log(BPFTUNE_LOG_LEVEL, "Summary: scenario '%s' occurred %ld times for tunable '%s' in %sglobal ns. %s\n",
+		bpftune_log(BPFTUNE_LOG_LEVEL, "# Summary: scenario '%s' occurred %ld times for tunable '%s' in %sglobal ns. %s\n",
 			    tuner->scenarios[scenario].name, count,
 			    t->desc.name,
 			    global_ns ? "" : "non-",
@@ -1315,20 +1370,11 @@ static void __bpftuner_scenario_log(struct bpftuner *tuner, unsigned int tunable
 					 t->current_values[i]);
 				strcat(newvals, s);
 			}
-			bpftune_log(BPFTUNE_LOG_LEVEL, "sysctl '%s' changed from (%s) -> (%s)\n",
+			bpftune_log(BPFTUNE_LOG_LEVEL, "# sysctl '%s' changed from (%s) -> (%s)\n",
 				    t->desc.name, oldvals, newvals);
-
-			if (tuner->rollback) {
-				bpftuner_tunable_sysctl_write(tuner,
-					tunable,
-					scenario,
-					0,
-					t->desc.num_values,
-					t->initial_values,
-					"Rolling back sysctl values for '%s' from (%s) to original values (%s)...\n",
-					t->desc.name,
-					newvals, oldvals);
-			}
+			bpftune_log(BPFTUNE_LOG_LEVEL, "# To replicate this change on another system, run the following in a terminal:\n");
+			bpftune_log(BPFTUNE_LOG_LEVEL, "sudo sysctl -w %s=\"%s\"\n",
+				    t->desc.name, newvals);
 		}
 	} else {
 		bpftune_log(BPFTUNE_LOG_LEVEL, "Scenario '%s' occurred for tunable '%s' in %sglobal ns. %s\n",
@@ -1977,6 +2023,7 @@ static void bpftune_help_handler(const char *req, char *buf, size_t buf_sz);
 static void bpftune_tuners_handler(const char *req, char *buf, size_t buf_sz);
 static void bpftune_tunables_handler(const char *req, char *buf, size_t buf_sz);
 static void bpftune_summary_handler(const char *req, char *buf, size_t buf_sz);
+static void bpftune_rollback_handler(const char *req, char *buf, size_t buf_sz);
 
 /* add bpftune server requests with handlers here */
 struct bpftune_req bpftune_reqs[] = {
@@ -1984,6 +2031,8 @@ struct bpftune_req bpftune_reqs[] = {
  { "tuners",	"show state of tuners",		bpftune_tuners_handler },
  { "tunables",	"show list of tunables",	bpftune_tunables_handler },
  { "summary",	"show summary of changes",	bpftune_summary_handler },
+ { "rollback",	"show changes needed to roll back",
+	 					bpftune_rollback_handler }
 };
 
 static void bpftune_help_handler(__attribute__((unused)) const char *req,
@@ -2036,7 +2085,7 @@ static void bpftune_summary_handler(__attribute__((unused)) const char *req,
 	int off = 0;
 
 	off = snprintf(buf, buf_sz,
-		       "Summary of changes made across all tuners:\n");
+		       "# Summary of changes made across all tuners:\n");
 	ctx_buf.nextlogfn = bpftune_logfn;
 	ctx_buf.buf = buf;
 	ctx_buf.buf_off = off;
@@ -2063,6 +2112,30 @@ static void bpftune_summary_handler(__attribute__((unused)) const char *req,
 	bpftune_set_log(bpftune_loglevel, ctx_buf.nextlogfn, NULL);
 	bpftune_log(LOG_DEBUG, "got the following sz %d off %d, orig off %d '%s'\n",
 		    ctx_buf.buf_sz, ctx_buf.buf_off, off, buf);
+}
+
+static void bpftune_rollback_handler(__attribute__((unused)) const char *req,
+				     char *buf, size_t buf_sz)
+{
+	struct bpftune_log_ctx_buf ctx_buf;
+	struct bpftuner *t;
+	int off = 0;
+
+	off = snprintf(buf, buf_sz,
+		       "# Summary of rollback operations needed to restore original state for all tuners:\n");
+	ctx_buf.nextlogfn = bpftune_logfn;
+	ctx_buf.buf = buf;
+	ctx_buf.buf_off = off;
+	ctx_buf.buf_sz = buf_sz;
+	ctx_buf.buf_thread = pthread_self();
+
+        /* have rollback log to buffer + usual log destination */
+	bpftune_set_log(bpftune_loglevel, bpftune_log_buf, &ctx_buf);
+
+	bpftune_for_each_tuner(t) {
+		bpftuner_rollback(t, true);
+	}
+	bpftune_set_log(bpftune_loglevel, ctx_buf.nextlogfn, NULL);
 }
 
 static bool bpftune_server_running = false;
