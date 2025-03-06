@@ -39,6 +39,7 @@ for QUERY in help tuners tunables ; do
 done
 test_cleanup
 
+for QUERY in summary rollback ; do 
 for FAMILY in ipv4 ; do
  for NS in global; do
    case $FAMILY in
@@ -62,7 +63,7 @@ for FAMILY in ipv4 ; do
 	;;
    esac
 
-   test_start "$0|query summary test to $ADDR:$PORT $FAMILY $NS"
+   test_start "$0|query $QUERY test to $ADDR:$PORT $FAMILY $NS"
 
    if [[ $NS == "global" ]]; then
 	 CLIENT_PREFIX="ip netns exec $NETNS"
@@ -123,7 +124,7 @@ for FAMILY in ipv4 ; do
    if [[ $MODE == "test" ]]; then
 	if [[ "${frag_post}" -gt ${frag_pre} ]]; then
 		grep "approaching fragmentation maximum threshold" $LOGFILE
-		${BPFTUNE_PROG} -q summary
+		${BPFTUNE_PROG} -q $QUERY
 		pkill -TERM bpftune
 		test_pass
 	else
@@ -134,6 +135,7 @@ for FAMILY in ipv4 ; do
 
    test_cleanup
  done
+done
 done
 
 test_exit

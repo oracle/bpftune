@@ -96,11 +96,11 @@ void summarize(struct bpftuner *tuner)
 	cong_choices = bpftuner_bpf_var_get(tcp_conn, tuner, tcp_cong_choices);
 	if (cong_choices) {
 		bpftune_log(BPFTUNE_LOG_LEVEL,
-			    "Summary: tcp_conn_tuner: %20s %20s\n",
+			    "# Summary: tcp_conn_tuner: %20s %20s\n",
 			    "CongAlg", "Count");
 		for (i = 0; i < NUM_TCP_CONG_ALGS; i++) {
 			bpftune_log(BPFTUNE_LOG_LEVEL,
-				    "Summary: tcp_conn_tuner: %20s %20lu\n",
+				    "# Summary: tcp_conn_tuner: %20s %20lu\n",
 				    congs[i], cong_choices[i]);
 		}
 	}
@@ -113,13 +113,13 @@ void summarize(struct bpftuner *tuner)
 		if (bpf_map_lookup_elem(map_fd, &key, &r))
 			continue;
 
-		bpftune_log(LOG_DEBUG, "Summary: tcp_conn_tuner: %48s %8s %20s %8s %8s %8s %8s\n",
+		bpftune_log(LOG_DEBUG, "# Summary: tcp_conn_tuner: %48s %8s %20s %8s %8s %8s %8s\n",
 			    "IPAddress", "CongAlg", "Metric", "Count", "Greedy", "MinRtt", "MaxDlvr");
 		inet_ntop(AF_INET6, &key, buf, sizeof(buf));
 
 		for (i = 0; i < NUM_TCP_CONN_METRICS; i++) {
 
-			bpftune_log(LOG_DEBUG, "Summary: tcp_conn_tuner: %48s %8s %20llu %8llu %8llu %8llu %8llu\n",
+			bpftune_log(LOG_DEBUG, "# Summary: tcp_conn_tuner: %48s %8s %20llu %8llu %8llu %8llu %8llu\n",
 				    buf, congs[i],
 				    r.metrics[i].metric_value,
 				    r.metrics[i].metric_count,
