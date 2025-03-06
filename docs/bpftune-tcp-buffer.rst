@@ -53,6 +53,10 @@ DESCRIPTION
 
         So for slow apps, a negative value might make sense.
 
+        In combination with changes to net.ipv4.tcp_rmem, we ensure that
+        net.ipv4.tcp_moderate_rcvbuf is set to auto-tune receive buffer sizes
+        when changes to rcvbuf size are made.
+
         net.ipv4.tcp_mem represents the min, pressure, max values for overall
         TCP memory use in pages.
 
@@ -69,3 +73,7 @@ DESCRIPTION
         We attempt to avoid memory exhaustion where possible, but if we
         hit the limit of memory exhaustion and cannot increase it further,
         wmem and rmem max values are decreased to reduce per-socket overhead.
+
+        When near memory exhaustion, per-path TCP metrics are disabled by setting
+        net.ipv4.tcp_no_metrics_save and net.ipv4.tcp_no_ssthresh_metrics_save to
+        1; this limits memory overheads associated with allocating per-path metrics.

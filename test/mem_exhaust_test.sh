@@ -46,6 +46,8 @@ for FAMILY in ipv4 ipv6 ; do
 
    mem_test=($(echo 50 100 100))
 
+   sysctl -w net.ipv4.tcp_no_metrics_save=0
+   sysctl -w net.ipv4.tcp_no_ssthresh_metrics_save=0
    sysctl -w net.ipv4.tcp_mem="${mem_test[0]} ${mem_test[1]} ${mem_test[2]}"
 
    test_setup true
@@ -69,16 +71,22 @@ for FAMILY in ipv4 ipv6 ; do
    done
 
    mem_post=($(sysctl -n net.ipv4.tcp_mem))
+   no_metrics_save=($(sysctl -n net.ipv4.tcp_no_metrics_save))
+   no_ssthresh_metrics_save=($(sysctl -n net.ipv4.tcp_no_ssthresh_metrics_save))
    sysctl -w net.ipv4.tcp_mem="${mem_orig[0]} ${mem_orig[1]} ${mem_orig[2]}"
    echo "mem before ${mem_test[0]} ${mem_test[1]} ${mem_test[2]}"
    echo "mem after ${mem_post[0]} ${mem_post[1]} ${mem_post[2]}"
+   echo "no_[ssthresh]metrics_save before 0, 0"
+   echo "no_[ssthresh]metrics_save after $no_metrics_save , $no_ssthresh_metrics_save"
    if [[ $MODE == "test" ]]; then
 	echo "Following changes were made:"
 	set +e
 	grep bpftune $LOGFILE
 	set -e
 	if [[ "${mem_post[2]}" -gt ${mem_test[2]} ]]; then
-		test_pass
+		if [[ "$no_metrics_save" -eq 1 ]]; then
+			test_pass
+		fi
 	else
 		test_cleanup
 	fi
