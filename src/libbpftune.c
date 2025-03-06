@@ -784,7 +784,7 @@ static void __bpftuner_scenario_log(struct bpftuner *tuner, unsigned int tunable
 
 void bpftuner_fini(struct bpftuner *tuner, enum bpftune_state state)
 {
-	unsigned int i, j;
+	unsigned int i, j, k;
 
 	if (!tuner || tuner->state != BPFTUNE_ACTIVE)
 		return;
@@ -809,6 +809,47 @@ void bpftuner_fini(struct bpftuner *tuner, enum bpftune_state state)
 			bpftuner_scenario_log(tuner, i, j, 1, true);
 		}
 	}
+	if (tuner->rollback) {
+		for (i = 0; i < tuner->num_tunables; i++) {
+			struct bpftunable *t = bpftuner_tunable(tuner, i);
+			char oldvals[PATH_MAX] = { };
+			char newvals[PATH_MAX] = { };
+			bool changes = false;
+			char s[PATH_MAX];
+
+			k = 0;
+			/* find dominant scenario for tunable; if a tunable
+			 * increases and decreases, need to choose description
+			 * that best matches.
+			 */
+			for (j = 0; j < tuner->num_scenarios; j++) {
+				if (t->stats.global_ns[j])
+					changes = true;
+				if (t->stats.global_ns[j] > k)
+					k = j;
+			}
+			/* nothing to rollback? */
+			if (!changes)
+				continue;
+			for (j = 0; j < t->desc.num_values; j++) {
+				snprintf(s, sizeof(s), "%ld ",
+					 t->initial_values[j]);
+				strcat(oldvals, s);
+				snprintf(s, sizeof(s), "%ld ",
+					 t->current_values[j]);
+				strcat(newvals, s);
+			}
+			bpftuner_tunable_sysctl_write(tuner, i, k,
+				0,
+				t->desc.num_values,
+				t->initial_values,
+				"Rolling back sysctl values for '%s' from (%s) to original values (%s)...\n",
+				t->desc.name,
+				newvals, oldvals);
+		}
+	}
+
+
 	tuner->state = state;
 }
 
@@ -1317,18 +1358,6 @@ static void __bpftuner_scenario_log(struct bpftuner *tuner, unsigned int tunable
 			}
 			bpftune_log(BPFTUNE_LOG_LEVEL, "sysctl '%s' changed from (%s) -> (%s)\n",
 				    t->desc.name, oldvals, newvals);
-
-			if (tuner->rollback) {
-				bpftuner_tunable_sysctl_write(tuner,
-					tunable,
-					scenario,
-					0,
-					t->desc.num_values,
-					t->initial_values,
-					"Rolling back sysctl values for '%s' from (%s) to original values (%s)...\n",
-					t->desc.name,
-					newvals, oldvals);
-			}
 		}
 	} else {
 		bpftune_log(BPFTUNE_LOG_LEVEL, "Scenario '%s' occurred for tunable '%s' in %sglobal ns. %s\n",
