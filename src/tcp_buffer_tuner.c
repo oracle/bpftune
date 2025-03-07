@@ -190,6 +190,36 @@ void fini(struct bpftuner *tuner)
 	bpftuner_bpf_fini(tuner);
 }
 
+static void update_lowmem_tunables(struct bpftuner *tuner,
+				   struct bpftune_event *event,
+				   bool lowmem)
+{
+	struct bpftunable *t = bpftuner_tunable(tuner, TCP_BUFFER_TCP_NO_METRICS_SAVE);
+	char *msg = lowmem ? "Due to low memory conditions, set '%s'\n" :
+			     "Due to leaving low memory conditions, set '%s'\n";
+	long needs_change = lowmem ? 0 : 1;
+	long new_val = lowmem ? 1 : 0;
+	long new[3];
+
+	if (t->current_values[0] == needs_change) {
+		new[0] = new_val;
+		bpftuner_tunable_sysctl_write(tuner,
+					      TCP_BUFFER_TCP_NO_METRICS_SAVE,
+					      TCP_NO_METRICS_SAVE_ENABLE,
+					      event->netns_cookie,
+					      1, new, msg, t->desc.name);
+	}
+	t = bpftuner_tunable(tuner, TCP_BUFFER_TCP_NO_SSTHRESH_METRICS_SAVE);
+	if (t->current_values[0] == needs_change) {
+		new[0] = new_val;
+		bpftuner_tunable_sysctl_write(tuner,
+					      TCP_BUFFER_TCP_NO_SSTHRESH_METRICS_SAVE,
+					      TCP_NO_METRICS_SAVE_ENABLE,
+					      event->netns_cookie,
+					      1, new, msg, t->desc.name);
+	}
+}
+
 void event_handler(struct bpftuner *tuner,
 		   struct bpftune_event *event,
 		   __attribute__((unused))void *ctx)
@@ -232,6 +262,9 @@ void event_handler(struct bpftuner *tuner,
 		lowmem = "under memory pressure";
 	else if (near_memory_pressure)
 		lowmem = "near memory pressure";
+	else {
+		update_lowmem_tunables(tuner, event, false);
+	}
 
 	key.id = (__u64)id;
 	key.netns_cookie = event->netns_cookie;
@@ -251,31 +284,8 @@ void event_handler(struct bpftuner *tuner,
 "Due to %s change %s(min pressure max) from (%ld %ld %ld) -> (%ld %ld %ld)\n",
 					     lowmem, tunable, old[0], old[1], old[2],
 					     new[0], new[1], new[2]);
-		if (near_memory_exhaustion) {
-			t = bpftuner_tunable(tuner,
-					     TCP_BUFFER_TCP_NO_METRICS_SAVE);
-
-			if (t->current_values[0] == 0) {
-				new[0] = 1;
-				bpftuner_tunable_sysctl_write(tuner,
-							      TCP_BUFFER_TCP_NO_METRICS_SAVE,
-							      TCP_NO_METRICS_SAVE_ENABLE,
-							      event->netns_cookie,
-							      1, new,
-"Due to low memory conditions, set '%s'\n", t->desc.name);
-			}
-			t = bpftuner_tunable(tuner,
-					     TCP_BUFFER_TCP_NO_SSTHRESH_METRICS_SAVE);
-			if (t->current_values[0] == 0) {
-				new[0] = 1;
-				bpftuner_tunable_sysctl_write(tuner,
-							      TCP_BUFFER_TCP_NO_SSTHRESH_METRICS_SAVE,
-							      TCP_NO_METRICS_SAVE_ENABLE,
-							      event->netns_cookie,
-							      1, new,
-"Due to low memory conditions, set '%s'\n", t->desc.name);
-			}
-		}
+		if (near_memory_exhaustion)
+			update_lowmem_tunables(tuner, event, true);
 		break;
 	case TCP_BUFFER_TCP_WMEM:
 	case TCP_BUFFER_TCP_RMEM:
