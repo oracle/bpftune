@@ -77,3 +77,6 @@ DESCRIPTION
         When near memory exhaustion, per-path TCP metrics are disabled by setting
         net.ipv4.tcp_no_metrics_save and net.ipv4.tcp_no_ssthresh_metrics_save to
         1; this limits memory overheads associated with allocating per-path metrics.
+        Similarly we disable high order sk_buff allocations as in low-memory conditions
+        these can have performance impacts. When memory conditions improve, these
+        tunables are re-enabled.
