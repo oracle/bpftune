@@ -796,6 +796,8 @@ static void bpftuner_rollback(struct bpftuner *tuner, bool log_only)
 		bool changes = false;
 		char s[PATH_MAX];
 
+		if (t->desc.type != BPFTUNABLE_SYSCTL)
+			continue;
 		k = 0;
 		/* find dominant scenario for tunable; if a tunable
 		 * increases and decreases, need to choose description
@@ -819,9 +821,9 @@ static void bpftuner_rollback(struct bpftuner *tuner, bool log_only)
 			strcat(newvals, s);
 		}
 		if (log_only) {
-			bpftune_log(BPFTUNE_LOG_LEVEL, "# To roll back changes to '%s', run the following in a terminal:\n",
+			bpftune_log(BPFTUNE_LOG_LEVEL, "# To roll back changes to '%s', run the following as a privileged user in a terminal:\n",
 				   t->desc.name);
-			bpftune_log(BPFTUNE_LOG_LEVEL, "sudo sysctl -w %s=\"%s\"\n",
+			bpftune_log(BPFTUNE_LOG_LEVEL, "sysctl -w %s=\"%s\"\n",
 				    t->desc.name, oldvals);
 		} else {
 			bpftuner_tunable_sysctl_write(tuner, i, k,
@@ -1372,8 +1374,8 @@ static void __bpftuner_scenario_log(struct bpftuner *tuner, unsigned int tunable
 			}
 			bpftune_log(BPFTUNE_LOG_LEVEL, "# sysctl '%s' changed from (%s) -> (%s)\n",
 				    t->desc.name, oldvals, newvals);
-			bpftune_log(BPFTUNE_LOG_LEVEL, "# To replicate this change on another system, run the following in a terminal:\n");
-			bpftune_log(BPFTUNE_LOG_LEVEL, "sudo sysctl -w %s=\"%s\"\n",
+			bpftune_log(BPFTUNE_LOG_LEVEL, "# To replicate this change on another system, run the following as a privileged user in a terminal:\n");
+			bpftune_log(BPFTUNE_LOG_LEVEL, "sysctl -w %s=\"%s\"\n",
 				    t->desc.name, newvals);
 		}
 	} else {
