@@ -27,6 +27,8 @@ static struct bpftunable_desc descs[] = {
 	BPFTUNABLE_NAMESPACED, 1 },
 { TCP_BUFFER_TCP_NO_SSTHRESH_METRICS_SAVE, BPFTUNABLE_SYSCTL, "net.ipv4.tcp_no_ssthresh_metrics_save",
 	BPFTUNABLE_NAMESPACED, 1 },
+{ TCP_BUFFER_NET_CORE_HIGH_ORDER_ALLOC_DISABLE, BPFTUNABLE_SYSCTL, "net.core.high_order_alloc_disable",
+	BPFTUNABLE_NAMESPACED, 1 },
 { TCP_BUFFER_TCP_MAX_ORPHANS, BPFTUNABLE_SYSCTL, "net.ipv4.tcp_max_orphans",
 	0, 1 },
 };
@@ -45,10 +47,10 @@ static struct bpftunable_scenario scenarios[] = {
 	"Since memory exhaustion is a highly unstable state, adjust TCP memory-related tunables to avoid exhaustion" },
 { TCP_MODERATE_RCVBUF_ENABLE, "match receive buffer size with throughput needs",
 	"Since we are tuning rcvbuf max size, ensure auto-tuning of rcvbuf size for the connection is enabled to pick optimal rcvbuf size" },
-{ TCP_NO_METRICS_SAVE_ENABLE, "disable TCP path metrics collection",
-	"In low-memory situations, avoid saving per-path TCP metrics to avoid allocations of 'struct tcp_metrics'" },
-{ TCP_NO_METRICS_SAVE_DISABLE, "enable TCP path metrics collection",
-	"Due to easing of memory strain, (re)-enable TCP metrics collection" },
+{ TCP_LOW_MEM_ENTER_ENABLE, "set tunable on entering low-memory state",
+	"In low-memory situations, avoid activities like skb high order allocations, per-path TCP metric collection which can lead to overheads" },
+{ TCP_LOW_MEM_LEAVE_DISABLE, "unset tunable set earlier in low-memory state",
+	"Due to easing of memory strain, unset tunables to allow skb high order allocations, (re)-enable TCP metrics collection etc" },
 { TCP_MAX_ORPHANS_INCREASE,
 			"increase max number of orphaned sockets",
 			"" },
@@ -197,7 +199,10 @@ static void update_lowmem_tunables(struct bpftuner *tuner,
 	struct bpftunable *t = bpftuner_tunable(tuner, TCP_BUFFER_TCP_NO_METRICS_SAVE);
 	char *msg = lowmem ? "Due to low memory conditions, set '%s'\n" :
 			     "Due to leaving low memory conditions, set '%s'\n";
+	enum tcp_buffer_scenarios scenario = lowmem ? TCP_LOW_MEM_ENTER_ENABLE :
+						      TCP_LOW_MEM_LEAVE_DISABLE;
 	long needs_change = lowmem ? 0 : 1;
+
 	long new_val = lowmem ? 1 : 0;
 	long new[3];
 
@@ -205,7 +210,7 @@ static void update_lowmem_tunables(struct bpftuner *tuner,
 		new[0] = new_val;
 		bpftuner_tunable_sysctl_write(tuner,
 					      TCP_BUFFER_TCP_NO_METRICS_SAVE,
-					      TCP_NO_METRICS_SAVE_ENABLE,
+					      scenario,
 					      event->netns_cookie,
 					      1, new, msg, t->desc.name);
 	}
@@ -214,7 +219,16 @@ static void update_lowmem_tunables(struct bpftuner *tuner,
 		new[0] = new_val;
 		bpftuner_tunable_sysctl_write(tuner,
 					      TCP_BUFFER_TCP_NO_SSTHRESH_METRICS_SAVE,
-					      TCP_NO_METRICS_SAVE_ENABLE,
+					      scenario,
+					      event->netns_cookie,
+					      1, new, msg, t->desc.name);
+	}
+	t = bpftuner_tunable(tuner, TCP_BUFFER_NET_CORE_HIGH_ORDER_ALLOC_DISABLE);
+	if (t->current_values[0] == needs_change) {
+		new[0] = new_val;
+		bpftuner_tunable_sysctl_write(tuner,
+					      TCP_BUFFER_NET_CORE_HIGH_ORDER_ALLOC_DISABLE,
+					      scenario,
 					      event->netns_cookie,
 					      1, new, msg, t->desc.name);
 	}
