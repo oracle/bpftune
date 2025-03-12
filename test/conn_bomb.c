@@ -32,6 +32,7 @@
 #include <sys/wait.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <pthread.h>
 
 static int usage(const char *prog)
 {
@@ -42,42 +43,54 @@ static int usage(const char *prog)
 	return 1;
 }
 
+char msgbuf[1024];
+int buflen = 1024;
+int family = AF_INET;
+struct sockaddr_storage laddr, raddr;
+int conn_count = 1;
+int listen_backlog = 0;
+int count = 0;
+volatile int active_conn = 0;
+int isserver = 0;
+int addrlen = sizeof(struct sockaddr_in);
+int quiet = 0;
+int sock;
+int timeout = 30;
+
+static void *perthread(void *arg);
+
 int main(int argc, char **argv)
 {
-	int sock, addrlen = sizeof(struct sockaddr_in);
-	struct sockaddr_storage laddr, raddr;
-	char msgbuf[1024];
-	int buflen = 1024;
-	char *buf, *recvbuf;
+	pthread_t *pthreads;
+	int *socks;
 	struct sockaddr_in6 *sin6;
 	struct sockaddr_in *sin;
-	int family = AF_INET;
-	int i = 0, count = 0, conn_count = 1;
-	int waitstatus = 0;
-	struct iovec iov;
-	int isserver = 0;
-	int conn_num = 0;
+	int i = 0, j = 0;
+	pthread_attr_t attr = {};
 	int c, ret = 0;
 	int orphan = 0;
-	int gotmsg = 0;
-	int child = 0;
-	int quiet = 0;
+	int iters = 0;
 	void *a;
 
 	memset(&laddr, 0, sizeof(laddr));
 	memset(&raddr, 0, sizeof(raddr));
 
-	while ((c = getopt(argc, argv, "C:c:l:m:o:r:p:P:qs:")) != -1) {
+	while ((c = getopt(argc, argv, "b:C:c:l:m:o:r:p:P:qs:t:")) != -1) {
 		switch (c) {
+		case 'b':
+			listen_backlog = atoi(optarg);
+			break;
 		case 'C':
 			conn_count = atoi(optarg);
+			pthreads = calloc(conn_count, sizeof(*pthreads));
+			socks = calloc(conn_count, sizeof(int));
 			break;
 		case 'c':
 			count = atoi(optarg);
 			break;
 		case 'm':
 			strncpy(msgbuf, optarg, sizeof(msgbuf));
-			buflen = sizeof(buf);
+			buflen = strlen(optarg) + 1;
 			break;
 		case 'l':
 			a = &((struct sockaddr_in *)&laddr)->sin_addr;
@@ -126,15 +139,15 @@ int main(int argc, char **argv)
 		case 's':
 			buflen = atoi(optarg);
 			break;
+		case 't':
+			timeout = atoi(optarg);
+			break;
 		default:
 			return usage(argv[0]);
 		}
 	}
 
-	buf = calloc(1, buflen);
-	strncpy(buf, msgbuf, sizeof(msgbuf));
-
-	recvbuf = calloc(1, buflen);
+	pthread_attr_init(&attr);
 
 	if (laddr.ss_family == 0 && raddr.ss_family == 0) {
 		fprintf(stderr,
@@ -168,12 +181,9 @@ int main(int argc, char **argv)
                         ret = 1;
 			goto out;
 		}
-	}
-
-	if (isserver) {
 		if (!quiet)
                         printf("listening...\n");
-                if (listen(sock, conn_count) < 0) {
+                if (listen(sock, listen_backlog ? listen_backlog : conn_count) < 0) {
                         perror("listen");
                         ret = 1;
                         goto out;
@@ -181,9 +191,7 @@ int main(int argc, char **argv)
 	}
 
 	for (i = 0; i < conn_count; i++) {
-		int newsock, pid;
-
-		++conn_num;
+		int newsock = 0;
 
 		if (isserver) {
 			newsock = accept(sock, (struct sockaddr *)&raddr, &addrlen);
@@ -191,70 +199,83 @@ int main(int argc, char **argv)
 				perror("accept");
 				continue;
 			}
-			pid = fork();
-			if (pid != 0) {
-				if (pid < 0)
-					perror("fork");
-				if (!orphan)
-					close(newsock);
-				continue;
-			}
-			child = 1;
-		} else {
-			pid = fork();
-			if (pid != 0) {
-				if (pid < 0)
-					perror("fork");
-				continue;
-			}
-
-			sock = socket(family, SOCK_STREAM, 0);
-	                if (sock < 0) {
-        	                perror("socket");
-				exit(1);	
-			}
-			if (connect(sock, (struct sockaddr *)&raddr, addrlen) < 0) {
-				perror("connect");
-				exit(1);
-			}
+			socks[i] = newsock;
+                }
+		if (pthread_create(&pthreads[i], &attr, perthread, &socks[i])
+		    != 0) {
+			perror("pthread_create");
+			continue;
 		}
-		/* In child process context now... */
-		for (i = 1; i <= count; i++) {
-			int recvbuflen = buflen;
-
-			if (isserver) {
-				buflen = sizeof(buf);
-				if (recv(newsock, recvbuf, recvbuflen, 0) < 0) {
-					perror("recv");
-					exit(1);
-				}
-				if (!quiet)
-				printf("conn# %d: %s\n", conn_num, recvbuf);
-				if (send(newsock, recvbuf, recvbuflen, 0) < 0) {
-					perror("send");
-					exit(1);
-				}
-			} else {
-				if (send(sock, buf, buflen, 0) < 0) {
-					perror("send");
-					exit(1);
-				}
-				if (recv(sock, recvbuf, recvbuflen, 0) < 0) {
-					perror("recv");
-					exit(1);
-				}
-				if (!quiet)
-				printf("conn# %d: %s\n", conn_num, recvbuf);
-			}
-		}
-		if (!isserver && orphan)
-			sleep(orphan);
-		exit(0);
+		active_conn++;
+	}
+	while (active_conn > 0 && ++iters < timeout) {
+		sleep(1);
 	}
 
+	printf("%s handled %d/%d connections, exiting %s\n",
+               isserver ? "server" : "client", i, conn_count,
+	       iters >= timeout ? "due to timeout" : "normally");
 out:
-	while (wait(&waitstatus) > 0) {};
-	close(sock);
+        close(sock);
 
-	return ret;
+        return ret;
+}
+
+static void *perthread(void *arg)
+{
+	char *buf, *recvbuf;
+	int retval = 0;
+	int newsock = -1;
+	int j;
+
+	buf = calloc(1, buflen);
+        strncpy(buf, msgbuf, buflen);
+        recvbuf = calloc(1, buflen);
+
+	if (isserver) {
+		newsock = *(int *)arg;
+	} else {
+		newsock = socket(family, SOCK_STREAM, 0);
+		if (sock < 0) {
+			perror("socket");
+			goto out;
+		}
+		if (connect(newsock, (struct sockaddr *)&raddr, addrlen) < 0) {
+			perror("connect");
+			goto out;
+		}
+	}
+	for (j = 0; j < count; j++) {
+		int recvbuflen = buflen;
+
+		if (isserver) {
+			buflen = sizeof(buf);
+			if (recv(newsock, recvbuf, recvbuflen, 0) < 0) {
+				perror("recv");
+				goto out;
+			}
+			if (!quiet)
+				printf("%s\n", recvbuf);
+			if (send(newsock, recvbuf, recvbuflen, 0) < 0) {
+				perror("send");
+				goto out;
+			}
+		} else {
+			if (send(newsock, buf, buflen, 0) < 0) {
+				perror("send");
+				goto out;
+			}
+			if (recv(newsock, recvbuf, recvbuflen, 0) < 0) {
+				perror("recv");
+				goto out;
+			}
+			if (!quiet)
+				printf("%s\n", recvbuf);
+		}
+	}
+out:
+	if (newsock >= 0)
+		close(newsock);
+	active_conn--;
+	return NULL;
 }

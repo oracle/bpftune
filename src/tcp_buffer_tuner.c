@@ -29,6 +29,10 @@ static struct bpftunable_desc descs[] = {
 	BPFTUNABLE_NAMESPACED, 1 },
 { TCP_BUFFER_NET_CORE_HIGH_ORDER_ALLOC_DISABLE, BPFTUNABLE_SYSCTL, "net.core.high_order_alloc_disable",
 	BPFTUNABLE_NAMESPACED, 1 },
+{ TCP_BUFFER_TCP_SYNCOOKIES, BPFTUNABLE_SYSCTL | BPFTUNABLE_OPTIONAL, "net.ipv4.tcp_syncookies",
+	BPFTUNABLE_NAMESPACED, 1 },
+{ TCP_BUFFER_TCP_MAX_SYN_BACKLOG, BPFTUNABLE_SYSCTL, "net.ipv4.tcp_max_syn_backlog",
+	BPFTUNABLE_NAMESPACED, 1 },
 { TCP_BUFFER_TCP_MAX_ORPHANS, BPFTUNABLE_SYSCTL, "net.ipv4.tcp_max_orphans",
 	0, 1 },
 };
@@ -51,6 +55,14 @@ static struct bpftunable_scenario scenarios[] = {
 	"In low-memory situations, avoid activities like skb high order allocations, per-path TCP metric collection which can lead to overheads" },
 { TCP_LOW_MEM_LEAVE_DISABLE, "unset tunable set earlier in low-memory state",
 	"Due to easing of memory strain, unset tunables to allow skb high order allocations, (re)-enable TCP metrics collection etc" },
+{ TCP_MAX_SYN_BACKLOG_INCREASE, "increase maximum syn backlog under load since syncookies are disabled",
+	"Due to the fact that syncookies are disabled and we are seeing a large number of legitimate-seeming TCP connections, increase TCP maximum SYN backlog queue length" },
+{ TCP_MAX_SYN_BACKLOG_DECREASE, "decrease maximum syn backlog due to large numbers of uncompleted connections",
+	"A large number of connection requests (SYNs) uncorrelated with connection establishment suggest a more cautious approach to handling pending connections to avoid Denial of Service attacks" },
+{ TCP_SYNCOOKIES_ENABLE, "enable syncookies as furthern SYN backlog increases do not help",
+	"SYN flood conditions have been detected, but further increases to SYN backlog are not advisable; try using syncookies instead" },
+{ TCP_SYNCOOKIES_DISABLE, "disable syncookies as they are ineffective",
+	"TCP syncookies are not effective; none have been validated successfully" },
 { TCP_MAX_ORPHANS_INCREASE,
 			"increase max number of orphaned sockets",
 			"" },
@@ -156,7 +168,8 @@ retry:
 int init(struct bpftuner *tuner)
 {
 	/* on some platforms, this function is inlined */
-	const char *optionals[] = { "entry__tcp_sndbuf_expand", NULL };
+	const char *optionals[] = { "entry__tcp_sndbuf_expand", "bpftune__cookie_v4_check",
+				    "bpftune__cookie_v6_check", NULL };
 	int pagesize;
 	int err;
 
@@ -179,6 +192,7 @@ int init(struct bpftuner *tuner)
 	bpftuner_bpf_var_set(tcp_buffer, tuner, nr_free_buffer_pages,
 			     nr_free_buffer_pages(true));
 	bpftuner_bpf_sample_add(tcp_buffer, tuner, rcv_space_sample);
+	bpftuner_bpf_sample_add(tcp_buffer, tuner, syn_flood_action_sample);
 	err = bpftuner_bpf_attach(tcp_buffer, tuner);
 	if (err)
 		return err;
@@ -232,7 +246,23 @@ static void update_lowmem_tunables(struct bpftuner *tuner,
 					      event->netns_cookie,
 					      1, new, msg, t->desc.name);
 	}
+	t = bpftuner_tunable(tuner, TCP_BUFFER_TCP_MAX_SYN_BACKLOG);
+	if (lowmem) {
+		new[0] = BPFTUNE_SHRINK_BY_DELTA(t->current_values[0]);
+		if (new[0] < TCP_SYN_BACKLOG_MIN)
+			return;
+	} else {
+		new[0] = BPFTUNE_GROW_BY_DELTA(t->current_values[0]);
+	}
+
+	bpftuner_tunable_sysctl_write(tuner,
+				      TCP_BUFFER_TCP_MAX_SYN_BACKLOG,
+				      scenario,
+				      event->netns_cookie,
+				      1, new, msg, t->desc.name);
 }
+
+bool near_memory_exhaustion, under_memory_pressure, near_memory_pressure;
 
 void event_handler(struct bpftuner *tuner,
 		   struct bpftune_event *event,
@@ -240,8 +270,8 @@ void event_handler(struct bpftuner *tuner,
 {
 	const char *lowmem = "normal memory conditions";
 	const char *reason = "unknown reason";
-	bool near_memory_exhaustion, under_memory_pressure, near_memory_pressure;
 	int scenario = event->scenario_id;
+	bool prev_lowmem = false;
 	struct corr c = { 0 };
 	long double corr = 0;
 	struct bpftunable *t;
@@ -264,6 +294,8 @@ void event_handler(struct bpftuner *tuner,
 		bpftune_log(LOG_DEBUG, "unknown tunable [%d] for tcp_buffer_tuner\n", id);
 		return;
 	}
+	prev_lowmem = under_memory_pressure || near_memory_exhaustion;
+
 	near_memory_exhaustion = bpftuner_bpf_var_get(tcp_buffer, tuner,
 						     near_memory_exhaustion);
 	under_memory_pressure = bpftuner_bpf_var_get(tcp_buffer, tuner,
@@ -276,21 +308,9 @@ void event_handler(struct bpftuner *tuner,
 		lowmem = "under memory pressure";
 	else if (near_memory_pressure)
 		lowmem = "near memory pressure";
-	else {
+	else if (prev_lowmem)
 		update_lowmem_tunables(tuner, event, false);
-	}
 
-	key.id = (__u64)id;
-	key.netns_cookie = event->netns_cookie;
-
-	if (!bpf_map_lookup_elem(tuner->corr_map_fd, &key, &c)) {
-		corr = corr_compute(&c);
-		bpftune_log(LOG_DEBUG, "covar for '%s' netns %ld (new %ld %ld %ld): %LF ; corr %LF\n",
-			    tunable, key.netns_cookie, new[0], new[1], new[2],
-			    covar_compute(&c), corr);
-		if (corr > CORR_THRESHOLD && scenario == TCP_BUFFER_INCREASE)
-			scenario = TCP_BUFFER_DECREASE_LATENCY;
-	}
 	switch (id) {
 	case TCP_BUFFER_TCP_MEM:
 		bpftuner_tunable_sysctl_write(tuner, id, scenario,
@@ -303,6 +323,17 @@ void event_handler(struct bpftuner *tuner,
 		break;
 	case TCP_BUFFER_TCP_WMEM:
 	case TCP_BUFFER_TCP_RMEM:
+		key.id = (__u64)id;
+                key.netns_cookie = event->netns_cookie;
+		if (!bpf_map_lookup_elem(tuner->corr_map_fd, &key, &c)) {
+			corr = corr_compute(&c);
+			bpftune_log(LOG_DEBUG, "covar for '%s' netns %ld (new %ld %ld %ld): %LF ; corr %LF\n",
+				    tunable, key.netns_cookie, new[0], new[1], new[2],
+				    covar_compute(&c), corr);
+			if (corr > CORR_THRESHOLD && scenario == TCP_BUFFER_INCREASE)
+				scenario = TCP_BUFFER_DECREASE_LATENCY;
+		}
+
 		switch (scenario) {
 		case TCP_BUFFER_INCREASE:
 			reason = "need to increase max buffer size to maximize throughput";
@@ -324,13 +355,9 @@ void event_handler(struct bpftuner *tuner,
 					      reason, tunable,
 					      old[0], old[1], old[2],
 					      new[0], new[1], new[2]);
-		break;
-	case TCP_BUFFER_TCP_MAX_ORPHANS:
-		break;
-	}
-	if (id == TCP_BUFFER_TCP_RMEM) {
+		if (id != TCP_BUFFER_TCP_RMEM)
+			break;
 		t = bpftuner_tunable(tuner, TCP_BUFFER_TCP_MODERATE_RCVBUF);
-
 		if (t->current_values[0] != 1) {
 			new[0] = 1;
 			bpftuner_tunable_sysctl_write(tuner,
@@ -340,7 +367,73 @@ void event_handler(struct bpftuner *tuner,
 "Because we are changing rcvbuf parameters, set '%s' to auto-tune receive buffer size to match the size required by the path for full throughput.\n",
 						      t->desc.name);
 		}
+		break;
+	case TCP_BUFFER_TCP_MAX_SYN_BACKLOG:
+		if (scenario != TCP_MAX_SYN_BACKLOG_INCREASE)
+			break;
+		t = bpftuner_tunable(tuner, TCP_BUFFER_TCP_SYNCOOKIES);
+		if (t && t->current_values[0] > 0) {
+			__u64 good = bpftuner_bpf_var_get(tcp_buffer, tuner, tcp_good_syncookies);
+			__u64 bad = bpftuner_bpf_var_get(tcp_buffer, tuner, tcp_bad_syncookies);
 
+			/* syncookies are enabled; are they effective? compare good/bad counts.
+			 * If none are good, syncookies are not really effective and we would
+			 * do better to rely on syn backlog increases.
+			 */
+			if (bad >= TCP_SYNCOOKIES_BAD_COUNT && !good) {
+				bpftuner_bpf_var_set(tcp_buffer, tuner, tcp_good_syncookies, 0);
+				bpftuner_bpf_var_set(tcp_buffer, tuner, tcp_bad_syncookies, 0);
 
+				new[0] = 0;
+				bpftuner_tunable_sysctl_write(tuner, TCP_BUFFER_TCP_SYNCOOKIES,
+							      TCP_SYNCOOKIES_DISABLE,
+							      event->netns_cookie, 1, new,
+"Due to receiving %d invalid syncookies and no valid ones, disable '%s' as they are ineffective under current network conditions\n",
+							      t->desc.name);
+				break;
+
+			}
+		} else if (t && (under_memory_pressure || near_memory_exhaustion)) {
+			new[0] = 1;
+			bpftuner_tunable_sysctl_write(tuner, TCP_BUFFER_TCP_SYNCOOKIES,
+						      TCP_SYNCOOKIES_ENABLE,
+						      event->netns_cookie, 1, new,
+"Due to low memory conditions under SYN flood, enable '%s' rather than increasing max SYN backlog\n",
+						      t->desc.name);
+			break;
+		}
+		/* Do not increase - rather decrease - max syn backlog and set other lowmem tunables */
+		if (near_memory_exhaustion) {
+			update_lowmem_tunables(tuner, event, true);
+			break;
+		}
+		t = bpftuner_tunable(tuner, TCP_BUFFER_TCP_MAX_SYN_BACKLOG);
+		key.id = (__u64)id;
+		key.netns_cookie = event->netns_cookie;
+		if (!bpf_map_lookup_elem(tuner->corr_map_fd, &key, &c)) {
+			corr = corr_compute(&c);
+			bpftune_log(LOG_DEBUG, "covar for '%s' netns %ld (new %ld): %LF ; corr %LF\n",
+				    tunable, key.netns_cookie, new[0],
+				    covar_compute(&c), corr);
+			if (c.n > CORR_MIN_SAMPLES  && corr < CORR_THRESHOLD) {
+				new[0] = BPFTUNE_SHRINK_BY_DELTA(old[0]);
+				if (new[0] < TCP_SYN_BACKLOG_MIN)
+					break;
+				bpftuner_tunable_sysctl_write(tuner, TCP_BUFFER_TCP_MAX_SYN_BACKLOG,
+							      TCP_MAX_SYN_BACKLOG_DECREASE,
+							      event->netns_cookie, 1, new,
+"Due to SYN flood not correlated with TCP connection acceptance - suggesting an attack - reduce '%s' from %ld -> %ld\n",
+							      t->desc.name, old[0], new[0]);
+				break;
+			}
+                }
+		bpftuner_tunable_sysctl_write(tuner, TCP_BUFFER_TCP_MAX_SYN_BACKLOG,
+					      TCP_MAX_SYN_BACKLOG_INCREASE,
+					      event->netns_cookie, 1, new,
+"Due to SYN flood events on a system with TCP syncookies disabled and no low memory issues, increase '%s'\n",
+					      t->desc.name);
+		break;
+	case TCP_BUFFER_TCP_MAX_ORPHANS:
+		break;
 	}
 }

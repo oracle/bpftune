@@ -102,7 +102,7 @@ static inline long double corr_compute(struct corr *c)
 	long double cov = covar_compute(c);
 	long double var_x, var_y;
 
-	if (c->n < 2)
+	if (c->n < CORR_MIN_SAMPLES)
 		return 0;
 	var_x = ((long double)c->sum_x_sq -
 		 ((long double)(c->sum_x * c->sum_x)/c->n))/
