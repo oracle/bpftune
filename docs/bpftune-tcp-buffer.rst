@@ -80,3 +80,19 @@ DESCRIPTION
         Similarly we disable high order sk_buff allocations as in low-memory conditions
         these can have performance impacts. When memory conditions improve, these
         tunables are re-enabled.
+
+        TCP needs to protect itself against many forms of attack. One common method
+        is the SYN flood, where a large number of SYNs are sent to drive Denial of
+        Service (DoS).  TCP supports syncookies as a mechanism to guard against this;
+        However not all TCP stacks support syncookies, so when enabled we check how
+        many good versus bad syncookies we see; if we see no good syncookies, there
+        is not much use in having the feature enabled and it is disabled.
+
+        With syncookies disabled, SYN floods are limited by the maximum SYN backlog
+        supported; this tunable is increased provided there is a correlation between
+        number of SYN flood events (queue full) and number of passive connections
+        accepted; in the absence of such a correlation the tunable is decreased as a
+        means of protecting against malicious SYN flood attacks.
+
+        We see in these examples that tuning is contextual; different contexts
+        (a malicious SYN flood versus a benign one) lead to different approaches.

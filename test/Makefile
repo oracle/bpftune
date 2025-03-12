@@ -37,6 +37,7 @@ TUNER_TESTS =	support_test log_test service_test inotify_test cap_test \
 		neigh_table_legacy_test \
 		mem_pressure_test mem_pressure_legacy_test \
 		mem_exhaust_test mem_exhaust_legacy_test \
+		good_syn_flood_test syn_flood_test \
 		wmem_test wmem_legacy_test \
 		rmem_test rmem_legacy_test \
 		cong_test cong_legacy_test
@@ -48,6 +49,8 @@ TESTS = $(DEFAULT_TESTS)
 LIBS = test_lib.sh
 
 PROGS = conn_bomb
+
+CFLAGS += -lpthread
 
 OBJS = conn_bomb.o
 
