@@ -298,10 +298,6 @@ BPF_FENTRY(tcp_init_sock, struct sock *sk)
 
 __u64 tcp_syn_flood_count;
 __u64 tcp_established_count;
-__u64 tcp_bad_syncookies;
-__u64 tcp_good_syncookies;
-
-long tcp_syncookies;
 
 struct bpftune_sample syn_flood_action_sample = { };
 
@@ -326,9 +322,6 @@ BPF_FENTRY(tcp_syn_flood_action, struct sock *sk, const char *proto)
 	if (state != TCP_LISTEN)
 		return 0;
 
-	if (tcp_syncookies > 0)
-		return 0;
-
 	syn_backlog[0] = BPFTUNE_CORE_READ(net, ipv4.sysctl_max_syn_backlog);
 
 	syn_backlog_new[0] = BPFTUNE_GROW_BY_DELTA(syn_backlog[0]);
@@ -346,33 +339,5 @@ BPF_FENTRY(tcp_init_transfer, struct sock *sk, int bpf_op)
 {
 	if (bpf_op == BPF_TCP_ESTABLISHED)
 		tcp_established_count++;
-	return 0;
-}
-
-#ifdef BPFTUNE_LEGACY
-SEC("kretprobe/__cookie_v4_check")
-int BPF_KRETPROBE(bpftune__cookie_v4_check, int ret)
-#else
-SEC("fexit/__cookie_v4_check")
-int BPF_PROG(bpftune__cookie_v4_check, const struct iphdr *iph, const struct tcphdr *th, u32 cookie, int ret)
-#endif
-{
-	if (ret == 0)
-		tcp_bad_syncookies++;
-	tcp_good_syncookies++;
-	return 0;
-}
-
-#ifdef BPFTUNE_LEGACY
-SEC("kretprobe/__cookie_v6_check")
-int BPF_KRETPROBE(bpftune__cookie_v6_check, int ret)
-#else
-SEC("fexit/__cookie_v6_check")
-int BPF_PROG(bpftune__cookie_v6_check, const struct ipv6hdr *iph, const struct tcphdr *th, __u32 cookie, int ret)
-#endif
-{
-	if (ret == 0)
-		tcp_bad_syncookies++;
-	tcp_good_syncookies++;
 	return 0;
 }

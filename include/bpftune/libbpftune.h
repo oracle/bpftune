@@ -352,6 +352,7 @@ int bpftune_sysctl_read(int netns_fd, const char *name, long *values);
 int bpftune_sysctl_write(int netns_fd, const char *name, __u8 num_values, long *values);
 long long bpftune_ksym_addr(char type, const char *name);
 int bpftune_snmpstat_read(unsigned long netns_cookie, int family, const char *name, long *value);
+int bpftune_netstat_read(unsigned long netns_cookie, int family, const char *name, long *value);
 int bpftune_sched_wait_run_percent_read(void);
 bool bpftune_netns_cookie_supported(void);
 int bpftune_netns_set(int fd, int *orig_fd, bool quiet);

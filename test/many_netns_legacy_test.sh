@@ -52,7 +52,7 @@ for FAMILY in ipv4 ipv6 ; do
 	;;
    esac
 
-   test_start "$0|wmem test to $ADDR:$PORT $FAMILY opts $CLIENT_OPTS $LATENCY"
+   test_start "$0|many netns legacy test to $ADDR:$PORT $FAMILY opts $CLIENT_OPTS $LATENCY"
 
    wmem_orig=($(sysctl -n net.ipv4.tcp_wmem))
 
@@ -95,6 +95,17 @@ for FAMILY in ipv4 ipv6 ; do
         fi
 	sleep $SLEEPTIME
    done
+
+   fds=$($LSOF -p $(pgrep bpftune) 2>/dev/null|wc -l)
+   # if we have 20 more than the original number of fds open, likely a leak
+   fdsX=${fds_orig}+20
+   if [[ "$fds" -gt $fdsX ]]; then
+        echo "bpftune has $fds open versus original $fds_orig; fd leak? files:"
+        $LSOF -p $(pgrep bpftune)
+        test_cleanup
+   fi
+   echo "found $fds fds open for bpftune"
+   pkill -TERM bpftune
 
    wmem_post=($(sysctl -n net.ipv4.tcp_wmem))
    wmem_post_netns=($(ip netns exec $NETNS sysctl -n net.ipv4.tcp_wmem))
@@ -139,16 +150,6 @@ for FAMILY in ipv4 ipv6 ; do
 		echo "baseline (${rbase}) < test (${rtest})"
 	fi
    done 
-
-   fds=$($LSOF -p $(pgrep bpftune) 2>/dev/null|wc -l)
-   # if we have 20 more than the original number of fds open, likely a leak
-   fdsX=${fds_orig}+20
-   if [[ "$fds" -gt $fdsX ]]; then
-        echo "bpftune has $fds open versus original $fds_orig; fd leak? files:"
-	$LSOF -p $(pgrep bpftune)
-        test_cleanup
-   fi
-   echo "found $fds fds open for bpftune"
 
    test_pass
 

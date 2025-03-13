@@ -1134,24 +1134,13 @@ out:
 	return ret;
 }
 
-int bpftune_snmpstat_read(unsigned long netns_cookie, int family,
-			  const char *name, long *value)
+static int bpftune_nstat_read(unsigned long netns_cookie, int family,
+			      const char *file, const char *name, long *value)
 {
 	int err, netns_fd = 0, orig_netns_fd = 0, stat_index = 0;
-	const char *file;
 	char line[1024];
 	FILE *fp = NULL;
 
-	switch (family) {
-	case AF_INET:
-		file = "/proc/net/snmp";
-		break;
-	case AF_INET6:
-		file = "/proc/net/snmp6";
-		break;
-	default:
-		return -EINVAL;
-	}
 	err = bpftune_cap_add();
 	if (err)
 		return err;
@@ -1215,6 +1204,22 @@ out_unset:
 		close(orig_netns_fd);
 	bpftune_cap_drop();
 	return err;
+}
+
+int bpftune_snmpstat_read(unsigned long netns_cookie, int family,
+                          const char *name, long *value)
+{
+	return bpftune_nstat_read(netns_cookie, family,
+				  family == AF_INET ? "/proc/net/snmp" :
+				 		      "/proc/net/snmp6",
+				  name, value);
+}
+
+int bpftune_netstat_read(unsigned long netns_cookie, int family,
+			 const char *name, long *value)
+{
+	return bpftune_nstat_read(netns_cookie, family, "/proc/net/netstat",
+				  name, value);
 }
 
 /* return % of overall wait/run time on all cpus gathered from

@@ -168,8 +168,7 @@ retry:
 int init(struct bpftuner *tuner)
 {
 	/* on some platforms, this function is inlined */
-	const char *optionals[] = { "entry__tcp_sndbuf_expand", "bpftune__cookie_v4_check",
-				    "bpftune__cookie_v6_check", NULL };
+	const char *optionals[] = { "entry__tcp_sndbuf_expand", NULL };
 	int pagesize;
 	int err;
 
@@ -271,6 +270,7 @@ void event_handler(struct bpftuner *tuner,
 	const char *lowmem = "normal memory conditions";
 	const char *reason = "unknown reason";
 	int scenario = event->scenario_id;
+	long goodcookies, badcookies;
 	bool prev_lowmem = false;
 	struct corr c = { 0 };
 	long double corr = 0;
@@ -372,23 +372,24 @@ void event_handler(struct bpftuner *tuner,
 		if (scenario != TCP_MAX_SYN_BACKLOG_INCREASE)
 			break;
 		t = bpftuner_tunable(tuner, TCP_BUFFER_TCP_SYNCOOKIES);
-		if (t && t->current_values[0] > 0) {
-			__u64 good = bpftuner_bpf_var_get(tcp_buffer, tuner, tcp_good_syncookies);
-			__u64 bad = bpftuner_bpf_var_get(tcp_buffer, tuner, tcp_bad_syncookies);
+		if (t && t->current_values[0] > 0 &&
+		    !bpftune_netstat_read(event->netns_cookie, AF_INET,
+					  "SyncookiesRecv", &goodcookies) &&
+		    !bpftune_netstat_read(event->netns_cookie, AF_INET,
+					  "SyncookiesFailed", &badcookies)) {
 
 			/* syncookies are enabled; are they effective? compare good/bad counts.
 			 * If none are good, syncookies are not really effective and we would
 			 * do better to rely on syn backlog increases.
 			 */
-			if (bad >= TCP_SYNCOOKIES_BAD_COUNT && !good) {
-				bpftuner_bpf_var_set(tcp_buffer, tuner, tcp_good_syncookies, 0);
-				bpftuner_bpf_var_set(tcp_buffer, tuner, tcp_bad_syncookies, 0);
-
+			if (badcookies >= TCP_SYNCOOKIES_BAD_COUNT &&
+			    !goodcookies) {
 				new[0] = 0;
 				bpftuner_tunable_sysctl_write(tuner, TCP_BUFFER_TCP_SYNCOOKIES,
 							      TCP_SYNCOOKIES_DISABLE,
 							      event->netns_cookie, 1, new,
 "Due to receiving %d invalid syncookies and no valid ones, disable '%s' as they are ineffective under current network conditions\n",
+							      badcookies,
 							      t->desc.name);
 				break;
 
