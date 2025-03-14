@@ -28,9 +28,9 @@ LOGFILE=$TESTLOG_LAST
 
 SLEEPTIME=1
 TIMEOUT=30
-MAX_CONN=50
+MAX_CONN=500
 
-for SOCKS in 10 1000; do 
+for SOCKS in 10 $MAX_CONN ; do 
    test_start "$0|stress-ng test, $SOCKS sockets"
 
    test_setup true
