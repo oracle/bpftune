@@ -21,6 +21,7 @@
 
 enum tcp_cong_tunables {
 	TCP_CONG,
+	TCP_THIN_LINEAR_TIMEOUTS
 };
 
 enum tcp_cong_scenarios {

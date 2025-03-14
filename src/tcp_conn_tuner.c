@@ -35,6 +35,7 @@
 static struct bpftunable_desc descs[] = {
  
 { TCP_CONG, BPFTUNABLE_OTHER, "TCP congestion control", 0, 0 },
+{ TCP_THIN_LINEAR_TIMEOUTS, BPFTUNABLE_SYSCTL, "net.ipv4.tcp_thin_linear_timeouts", BPFTUNABLE_NAMESPACED, 1 },
 };
 
 static struct bpftunable_scenario scenarios[] = {
@@ -48,6 +49,7 @@ int tcp_iter_fd;
 
 int init(struct bpftuner *tuner)
 {
+	struct bpftunable *t;
 	int i, err;
 
 	/* make sure cong modules are loaded; might be builtin so do not
@@ -74,14 +76,20 @@ int init(struct bpftuner *tuner)
 	}
 
 	/* attach to root cgroup */
-	if (bpftuner_cgroup_attach(tuner, "conn_tuner_sockops", BPF_CGROUP_SOCK_OPS))
-		goto error;
+	err = bpftuner_cgroup_attach(tuner, "conn_tuner_sockops", BPF_CGROUP_SOCK_OPS);
+	if (err)
+		goto out;
 
-	return bpftuner_tunables_init(tuner, ARRAY_SIZE(descs), descs,
-				      ARRAY_SIZE(scenarios), scenarios);
-error:
+	err = bpftuner_tunables_init(tuner, ARRAY_SIZE(descs), descs,
+				     ARRAY_SIZE(scenarios), scenarios);
+	if (err)
+		goto out;
+	t = bpftuner_tunable(tuner, TCP_THIN_LINEAR_TIMEOUTS);
+	if (t)
+		bpftuner_bpf_var_set(tcp_conn, tuner, tcp_thin_lto, t->initial_values[0]);
+out:
 	bpftune_cap_drop();
-	return 1;
+	return err;
 }
 
 void summarize(struct bpftuner *tuner)
@@ -90,9 +98,15 @@ void summarize(struct bpftuner *tuner)
 	struct in6_addr key, *prev_key = NULL;
 	int map_fd = bpf_map__fd(map);
 	unsigned long greedy_count = 0;
+	__u64 thin_lto_choices;
 	__u64 *cong_choices;
 	int i;
 
+	thin_lto_choices = bpftuner_bpf_var_get(tcp_conn, tuner, tcp_thin_lto_choices);
+	if (thin_lto_choices) {
+		bpftune_log(BPFTUNE_LOG_LEVEL, "# Summary: tcp_conn_tuner: set 'net.ipv4.tcp_thin_linear_timeouts' for %lu connections to improve responsiveness of thin flows durning retransmission\n",
+			    thin_lto_choices);
+	}
 	cong_choices = bpftuner_bpf_var_get(tcp_conn, tuner, tcp_cong_choices);
 	if (cong_choices) {
 		bpftune_log(BPFTUNE_LOG_LEVEL,

@@ -21,7 +21,11 @@
 
 #include "tcp_conn_tuner.h"
 
+#define TCP_THIN_LINEAR_TIMEOUTS	16
+
 __u64 tcp_cong_choices[NUM_TCP_CONG_ALGS];
+
+long tcp_thin_lto = 0;
 
 BPF_MAP_DEF(remote_host_map, BPF_MAP_TYPE_HASH, struct in6_addr, struct remote_host, 1024, 0);
 
@@ -73,6 +77,8 @@ static __always_inline void set_cong(struct bpf_sock_ops *ops, __u8 i)
 	}
 }
 
+__u64 tcp_thin_lto_choices;
+
 SEC("sockops")
 int conn_tuner_sockops(struct bpf_sock_ops *ops)
 {
@@ -103,6 +109,14 @@ int conn_tuner_sockops(struct bpf_sock_ops *ops)
 							    0, 0);
 			}
 			if (!statep || *statep != TCP_STATE_CONG_BBR) {
+				/* turn on TCP thin linear timeouts for lossy connections */
+				if (!statep && !tcp_thin_lto) {
+					int one = 1;
+
+					if (!bpf_setsockopt(ops, SOL_TCP, TCP_THIN_LINEAR_TIMEOUTS,
+							    &one, sizeof(one)))
+						tcp_thin_lto_choices++;
+				}
 				set_cong(ops, TCP_STATE_CONG_BBR);
 				/* no more need for retrans events... */
 				bpf_sock_ops_cb_flags_set(ops, BPF_SOCK_OPS_STATE_CB_FLAG);
