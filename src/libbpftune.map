@@ -41,6 +41,7 @@ LIBBPFTUNE_0.1.1 {
 		bpftuner_bpf_prog_in_strategy;
 		bpftuner_tunables_fini;
 		bpftune_netns_cookie_supported;
+		bpftune_global_netns_cookie;
 		bpftuner_netns_init;
 		bpftuner_netns_fini;
 		bpftuner_netns_from_cookie;

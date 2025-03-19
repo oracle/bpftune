@@ -75,9 +75,9 @@ void event_handler(struct bpftuner *tuner,
 	key.netns_cookie = event->netns_cookie;
 
 	af = id == IP_FRAG_MAX_THRESHOLD ? AF_INET : AF_INET6;
-	if (!bpftune_snmpstat_read(event->netns_cookie, af,
+	if (!bpftune_snmpstat_read(event->netns_cookie, af, NULL,
 				   "ReasmFails", &reasmfails) &&
-	    !bpftune_snmpstat_read(event->netns_cookie, af,
+	    !bpftune_snmpstat_read(event->netns_cookie, af, NULL,
 				   "ReasmReqds", &reasmreqds)) {
 		/* % of reasm fails */
 		reasm_failrate = (reasmfails * 100)/reasmreqds;

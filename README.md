@@ -166,6 +166,8 @@ The key components are
   which helps power namespace awareness for bpftune as a whole.
   Namespace awareness is important as we want to be able to auto-tune
   containers also.  See [bpftune-netns (8)](./docs/bpftune-netns.rst)
+- UDP buffer tuner: auto-tune buffers relating to UDP. See
+  [bpftune-udp-buffer (8)](./docs/bpftune-udp-buffer.rst)
 
 ## Code organization
 
