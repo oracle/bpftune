@@ -124,6 +124,9 @@ DESCRIPTION
         and it matches dctcp for minimum RTT (3us) and maximum delivery rate is
         close (9377 for dctcp, 8951 for cubic).
 
+        In addition, when retransmits occur for a TCP connection, we enable
+        TCP thin linear timeouts to improve responsiveness for thin TCP connections.
+
         References:
 
         BBR: Congestion-Based Congestion Control
