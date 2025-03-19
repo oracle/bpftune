@@ -233,6 +233,10 @@ unsigned long long bpftune_init_net;
 #define SK_MEM_QUANTUM_SHIFT	ilog2(SK_MEM_QUANTUM)
 #endif
 
+#ifndef SOL_SOCKET
+#define SOL_SOCKET		1
+#endif
+
 #ifndef SOL_TCP
 #define SOL_TCP        		6
 #endif
@@ -274,6 +278,9 @@ unsigned long long bpftune_init_net;
 #endif
 
 #define EINVAL		22
+#define ENOMEM		12
+#define EAGAIN		11
+#define ENOBUFS		105
 
 bool debug;
 
@@ -348,7 +355,6 @@ static __always_inline long send_net_sysctl_event(struct net *net,
 	__u64 event_key = 0;
 	long nscookie = 0;
 	__u64 *last_timep = NULL;
-	int ret = 0;
 
 	nscookie = get_netns_cookie(net);
 	if (nscookie < 0)
@@ -359,7 +365,7 @@ static __always_inline long send_net_sysctl_event(struct net *net,
 	last_timep = bpf_map_lookup_elem(&last_event_map, &event_key);
 	if (last_timep) {
 		if ((now - *last_timep) < (25 * MSEC))
-			return 0;
+			return -EAGAIN;
 		*last_timep = now;
 	} else {
 		bpf_map_update_elem(&last_event_map, &event_key, &now, 0);
@@ -375,11 +381,7 @@ static __always_inline long send_net_sysctl_event(struct net *net,
 	event->update[0].new[0] = new[0];
 	event->update[0].new[1] = new[1];
 	event->update[0].new[2] = new[2];
-	ret = bpf_ringbuf_output(&ring_buffer_map, event, sizeof(*event), 0);
-	bpftune_debug("tuner [%d] scenario [%d]: event send: %d ",
-		    tuner_id, scenario_id, ret);
-	bpftune_debug("\told '%ld %ld %ld'\n", old[0], old[1], old[2]);
-	bpftune_debug("\tnew '%ld %ld %ld'\n", new[0], new[1], new[2]);
+	bpf_ringbuf_output(&ring_buffer_map, event, sizeof(*event), 0);
 	return 0;
 }
 

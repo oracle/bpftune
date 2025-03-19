@@ -692,6 +692,13 @@ static void bpftune_global_netns_init(void)
 	}
 }
 
+unsigned long bpftune_global_netns_cookie(void)
+{
+	if (!global_netns_cookie)
+		bpftune_global_netns_init();
+	return global_netns_cookie;
+}
+
 /* add a tuner to the list of tuners, or replace existing inactive tuner.
  * If successful, call init().
  */
@@ -725,6 +732,8 @@ struct bpftuner *bpftuner_init(const char *path)
 		free(tuner);
 		return NULL;
 	}
+	tuner->bpf_support = support_level;
+
 	/* If we have a ringbuf fd from any tuner, use its fd to be re-used
  	 * for other ringbuf maps (so we can use the same ring buffer for all
  	 * BPF events.
@@ -1135,7 +1144,8 @@ out:
 }
 
 static int bpftune_nstat_read(unsigned long netns_cookie, int family,
-			      const char *file, const char *name, long *value)
+			      const char *file, const char *linename,
+			      const char *name, long *value)
 {
 	int err, netns_fd = 0, orig_netns_fd = 0, stat_index = 0;
 	char line[1024];
@@ -1188,6 +1198,12 @@ static int bpftune_nstat_read(unsigned long netns_cookie, int family,
 			 * have same index on the next line.
 			 */
 			if (strcmp(next, name) == 0) {
+				/* ensure line is Udp: or Tcp: if specified;
+				 * avoids matching InErrs for wrong protocol.
+				 */
+				if (linename &&
+				    strncmp(line, linename, strlen(linename)) != 0)
+					continue;
 				stat_index = index;
 				break;
 			}
@@ -1207,19 +1223,19 @@ out_unset:
 }
 
 int bpftune_snmpstat_read(unsigned long netns_cookie, int family,
-                          const char *name, long *value)
+                          const char *linename, const char *name, long *value)
 {
 	return bpftune_nstat_read(netns_cookie, family,
 				  family == AF_INET ? "/proc/net/snmp" :
 				 		      "/proc/net/snmp6",
-				  name, value);
+				  linename, name, value);
 }
 
 int bpftune_netstat_read(unsigned long netns_cookie, int family,
-			 const char *name, long *value)
+			 const char *linename, const char *name, long *value)
 {
 	return bpftune_nstat_read(netns_cookie, family, "/proc/net/netstat",
-				  name, value);
+				  linename, name, value);
 }
 
 /* return % of overall wait/run time on all cpus gathered from

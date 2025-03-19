@@ -54,6 +54,9 @@ extern unsigned short bpftune_learning_rate;
 /* shrink by delta (default 25%) */
 #define BPFTUNE_SHRINK_BY_DELTA(val)  ((val) - ((val) >> BPFTUNE_BITSHIFT))
 
+#define BPFTUNE_WITHIN_BITSHIFT(val1, val2, shift)			\
+	((val1 + (val1 >> shift)) > val2)
+
 #define MSEC				((__u64)1000000)
 #define SECOND				((__u64)1000000000)
 #define MINUTE				(60 * SECOND)

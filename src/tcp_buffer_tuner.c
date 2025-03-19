@@ -373,9 +373,9 @@ void event_handler(struct bpftuner *tuner,
 			break;
 		t = bpftuner_tunable(tuner, TCP_BUFFER_TCP_SYNCOOKIES);
 		if (t && t->current_values[0] > 0 &&
-		    !bpftune_netstat_read(event->netns_cookie, AF_INET,
+		    !bpftune_netstat_read(event->netns_cookie, AF_INET, NULL,
 					  "SyncookiesRecv", &goodcookies) &&
-		    !bpftune_netstat_read(event->netns_cookie, AF_INET,
+		    !bpftune_netstat_read(event->netns_cookie, AF_INET, NULL,
 					  "SyncookiesFailed", &badcookies)) {
 
 			/* syncookies are enabled; are they effective? compare good/bad counts.
