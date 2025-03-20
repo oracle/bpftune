@@ -162,6 +162,9 @@ export PYTHONCMD="python3 -B"
 
 export EXITCODE=1
 
+export MAJ_KVER=$(uname -r | awk -F '.' '{print $1}')
+export MIN_KVER=$(uname -r | awk -F '.' '{print $2}')
+
 bold()
 {
 	echo "${B}$1${N}"

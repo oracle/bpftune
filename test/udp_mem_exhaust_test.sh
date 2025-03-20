@@ -29,7 +29,15 @@ SLEEPTIME=5
 TIMEOUT=30
 MAX_CONN=10
 
-for FAMILY in ipv4 ipv6 ; do
+# udp_fail_queue_rcv_skb tracepoint IPv6 support only on 6.4+ kernels.
+FAMILIES="ipv4"
+if [[ $MAJ_KVER -ge 6 ]]; then
+	if [[ $MIN_KVER -ge 4 ]]; then
+		FAMILIES="$FAMILIES ipv6"
+	fi
+fi
+
+for FAMILY in $FAMILIES ; do
 
    case $FAMILY in
    ipv4)
@@ -44,8 +52,6 @@ for FAMILY in ipv4 ipv6 ; do
 
    rmem_default_orig=$(sysctl -n net.core.rmem_default)
    sysctl -w net.core.rmem_default=8192
-   #rmem_max_orig=$(sysctl -n net.core.rmem_max)
-   #sysctl -w net.core.rmem_max=8192
    mem_orig=($(sysctl -n net.ipv4.udp_mem))
 
    mem_test=($(echo 10 20 20))
@@ -73,9 +79,7 @@ for FAMILY in ipv4 ipv6 ; do
    done
 
    mem_post=($(sysctl -n net.ipv4.udp_mem))
-   rmem_max_post=$(sysctl -n net.core.rmem_max)
    sysctl -w net.ipv4.udp_mem="${mem_orig[0]} ${mem_orig[1]} ${mem_orig[2]}"
-   #sysctl -w net.core.rmem_max=${rmem_max_orig}
    sysctl -w net.core.rmem_default=${rmem_default_orig}
    echo "mem before ${mem_test[0]} ${mem_test[1]} ${mem_test[2]}"
    echo "mem after ${mem_post[0]} ${mem_post[1]} ${mem_post[2]}"

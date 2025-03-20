@@ -30,9 +30,6 @@ test_start "$0|support test: does 'bpftune -S' show support level?"
 
 ARCH=$(uname -m)
 
-MAJ_KVER=$(uname -r | awk -F '.' '{print $1}')
-MIN_KVER=$(uname -r | awk -F '.' '{print $2}')
-
 expected="bpftune is not supported"
 expected_netns="does not support per-netns policy"
 
