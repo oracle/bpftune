@@ -167,8 +167,10 @@ retry:
 
 int init(struct bpftuner *tuner)
 {
-	/* on some platforms, this function is inlined */
-	const char *optionals[] = { "entry__tcp_sndbuf_expand", NULL };
+	/* on some platforms, these functions are inlined */
+	const char *optionals[] = { "entry__tcp_sndbuf_expand",
+				    "entry__tcp_syn_flood_action",
+				    NULL };
 	int pagesize;
 	int err;
 
