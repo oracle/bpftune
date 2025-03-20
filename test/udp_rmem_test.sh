@@ -29,7 +29,15 @@ SLEEPTIME=5
 TIMEOUT=30
 MAX_CONN=1
 
-for FAMILY in ipv4 ipv6 ; do
+# udp_fail_queue_rcv_skb tracepoint IPv6 support only on 6.4+ kernels.
+FAMILIES="ipv4"
+if [[ $MAJ_KVER -ge 6 ]]; then
+	if [[ $MIN_KVER -ge 4 ]]; then
+		FAMILIES="$FAMILIES ipv6"
+	fi
+fi
+
+for FAMILY in $FAMILIES ; do
  for BW in 500m 1000m 5000m 10000m ; do
    case $FAMILY in
    ipv4)
