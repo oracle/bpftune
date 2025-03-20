@@ -131,7 +131,7 @@ void bpftuner_cgroup_detach(struct bpftuner *tuner, const char *prog_name,
 
 
 struct bpftuner *bpftuner_init(const char *path);
-int __bpftuner_bpf_load(struct bpftuner *tuner, const char **optionals);
+int __bpftuner_bpf_load(struct bpftuner *tuner, const char **optionals, bool quiet);
 int __bpftuner_bpf_attach(struct bpftuner *tuner);
 
 int bpftuner_tunables_init(struct bpftuner *tuner, unsigned int num_descs,
@@ -251,12 +251,12 @@ void bpftuner_tunables_fini(struct bpftuner *tuner);
 #define bpftuner_bpf_load(tuner_name, tuner, optionals) ({		     \
 	int __err;							     \
 									     \
-	__err = __bpftuner_bpf_load(tuner, NULL);			     \
+	__err = __bpftuner_bpf_load(tuner, NULL, optionals != NULL);	     \
 	if (__err && optionals != NULL) {				     \
 		bpftuner_bpf_fini(tuner);				     \
 		__err = bpftuner_bpf_open(tuner_name, tuner);		     \
 		if (!__err)						     \
-			__err = __bpftuner_bpf_load(tuner, optionals);	     \
+			__err = __bpftuner_bpf_load(tuner, optionals, false);\
 	}								     \
 	if (__err)							     \
 		bpftuner_bpf_destroy(tuner_name, tuner);		     \
