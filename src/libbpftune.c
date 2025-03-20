@@ -575,7 +575,7 @@ static void bpftuner_map_init(struct bpftuner *tuner, const char *name,
 	}
 }
 
-int __bpftuner_bpf_load(struct bpftuner *tuner, const char **optionals)
+int __bpftuner_bpf_load(struct bpftuner *tuner, const char **optionals, bool quiet)
 {
 	int err = 0;
 
@@ -590,7 +590,6 @@ int __bpftuner_bpf_load(struct bpftuner *tuner, const char **optionals)
 			       netns_map_fd, &tuner->netns_map_fd) ||
 	    bpftuner_map_reuse("corr_map", tuner->corr_map,
 			       corr_map_fd, &tuner->corr_map_fd)) {
-		bpftune_log(LOG_DEBUG, "got here!!\n");
 		err = -1;
 		goto out;
 	}
@@ -613,7 +612,10 @@ int __bpftuner_bpf_load(struct bpftuner *tuner, const char **optionals)
 		}
 	}
 	err = bpf_object__load_skeleton(tuner->skeleton);
-	if (err) {
+	/* only show errors when not in quiet mode (load with no optionals
+	 * or retry when loading without optionals failed.
+	 */
+	if (err && !quiet) {
 		switch (err) {
 		case -ESRCH:
 			bpftune_log(LOG_ERR, "tuner '%s' failed to load, tracing target was not found; this can occur for unstable tracing targets like kernel functions.\n",
