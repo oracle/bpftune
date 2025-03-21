@@ -34,7 +34,13 @@
 
 static struct bpftunable_desc descs[] = {
  
-{ TCP_CONG, BPFTUNABLE_OTHER, "TCP congestion control", 0, 0 },
+{ TCP_CONG, BPFTUNABLE_OTHER, "Per-socket TCP congestion control", 0, 0 },
+{ TCP_ALLOWED_CONG, BPFTUNABLE_SYSCTL, "net.ipv4.tcp_allowed_congestion_control",
+  BPFTUNABLE_NAMESPACED | BPFTUNABLE_STRING, 1 },
+{ TCP_AVAILABLE_CONG, BPFTUNABLE_SYSCTL, "net.ipv4.tcp_available_congestion_control",
+  BPFTUNABLE_NAMESPACED | BPFTUNABLE_STRING, 1 },
+{ TCP_CONG_DEFAULT, BPFTUNABLE_SYSCTL, "net.ipv4.tcp_congestion_control",
+  BPFTUNABLE_NAMESPACED | BPFTUNABLE_STRING, 1 },
 { TCP_THIN_LINEAR_TIMEOUTS, BPFTUNABLE_SYSCTL, "net.ipv4.tcp_thin_linear_timeouts", BPFTUNABLE_NAMESPACED, 1 },
 };
 
@@ -156,20 +162,9 @@ void fini(struct bpftuner *tuner)
 	bpftuner_bpf_fini(tuner);
 }
 
-void event_handler(struct bpftuner *tuner, struct bpftune_event *event,
+void event_handler(struct bpftuner *tuner,  __attribute__((unused))struct bpftune_event *event,
 		   __attribute__((unused))void *ctx)
 {
-	struct tcp_conn_event_data *event_data = (struct tcp_conn_event_data *)&event->raw_data;
-	__u8 state = event_data->state_flags & 0x3;
-	char buf[INET6_ADDRSTRLEN];
-
-	inet_ntop(AF_INET6, &event_data->raddr, buf, sizeof(buf));
-
 	bpftune_log(LOG_DEBUG,
-"%s: %s: cong alg '%s': got rate_delivered %lld, rtt %lld, metric %lld\n",
-				tuner->name,
-				buf, congs[state],
-				event_data->rate_delivered,
-				event_data->min_rtt,
-				event_data->metric);
+		    "%s: got unexpected event\n", tuner->name);
 }

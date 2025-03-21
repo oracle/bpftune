@@ -55,7 +55,9 @@ LIBBPFTUNE_0.1.1 {
 		bpftune_ring_buffer_fini;
 		bpftune_sysctl_name_to_path;
 		bpftune_sysctl_read;
+		bpftune_sysctl_read_string;
 		bpftune_sysctl_write;
+		bpftune_sysctl_write_string;
 		bpftune_ksym_addr;
 		bpftune_netstat_read;
 		bpftune_snmpstat_read;

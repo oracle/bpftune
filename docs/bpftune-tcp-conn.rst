@@ -19,7 +19,7 @@ DESCRIPTION
         such cases, BBR is a good fit since it continuously estimates bottleneck
         bandwidth and attempts to fit the congestion algorithm to it.
 
-        When we have limited information about a remote host - i.e. we have
+        When we have limited information about a destination - i.e. we have
         not had > REMOTE_HOST_MIN_INSTANCES connections involving it,
         the only auto-selection involved is to use BBR in cases where
         loss rates exceed 1/(2^DROP_SHIFT) (1.5%) of the packet sent rate -
@@ -37,7 +37,7 @@ DESCRIPTION
          BDP = BottleneckBandwidth * MinRoundTripTime
 
         The algorithm works as follows; BPF maintains a map of metrics keyed
-        by remote IP address.  For each remote IP address, we track the
+        by remote gateway.  For each remote gateway, we track the
         minimum RTT observed across all TCP connections and the max bandwidth
         observed.  The former tells us - as closely as we can determine -
         what the true RTT of the link is.  The latter estimates the

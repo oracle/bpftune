@@ -277,6 +277,10 @@ unsigned long long bpftune_init_net;
 #define NTF_EXT_LEARNED	0x10
 #endif
 
+#ifndef RTF_GATEWAY
+#define RTF_GATEWAY	0x02
+#endif
+
 #define EINVAL		22
 #define ENOMEM		12
 #define EAGAIN		11
