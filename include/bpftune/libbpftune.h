@@ -158,7 +158,7 @@ int bpftuner_tunable_sysctl_write(struct bpftuner *tuner,
 				  unsigned int tunable,
 				  unsigned int scenario,
 				  unsigned long netns_cookie,
-				  __u8 num_values, long *values,
+				  __u8 num_values, void *values,
 				  const char *fmt, ...);
 
 int bpftuner_tunable_update(struct bpftuner *tuner,
@@ -349,7 +349,9 @@ void bpftune_ring_buffer_fini(void *ring_buffer);
 
 void bpftune_sysctl_name_to_path(const char *name, char *path, size_t path_sz);
 int bpftune_sysctl_read(int netns_fd, const char *name, long *values);
+int bpftune_sysctl_read_string(int netns_fd, const char *name, char *val);
 int bpftune_sysctl_write(int netns_fd, const char *name, __u8 num_values, long *values);
+int bpftune_sysctl_write_string(int netns_fd, const char *name, char *val);
 long long bpftune_ksym_addr(char type, const char *name);
 int bpftune_snmpstat_read(unsigned long netns_cookie, int family, const char *linename, const char *name, long *value);
 int bpftune_netstat_read(unsigned long netns_cookie, int family, const char *linename, const char *name, long *value);

@@ -92,6 +92,7 @@ struct bpftunable_scenario {
 
 #define BPFTUNABLE_NAMESPACED	0x1	/* settable in non-global namespace? */
 #define BPFTUNABLE_OPTIONAL	0x2	/* do not fail it tunable not found (e.g. ipv6 */
+#define BPFTUNABLE_STRING	0x4	/* tunable is a string, not numeric */
 
 struct bpftunable_desc {
 	unsigned int id;
@@ -106,11 +107,19 @@ struct bpftunable_stats {
 	unsigned long nonglobal_ns[BPFTUNE_MAX_SCENARIOS];
 };
 
+#define BPFTUNE_MAX_STR		128
+
 struct bpftunable {
 	struct bpftunable_desc desc;
 	enum bpftune_state state;
-	long initial_values[BPFTUNE_MAX_VALUES];
-	long current_values[BPFTUNE_MAX_VALUES];
+	union {
+		long initial_values[BPFTUNE_MAX_VALUES];
+		char initial_str[BPFTUNE_MAX_STR];
+	};
+	union {
+		long current_values[BPFTUNE_MAX_VALUES];
+		char current_str[BPFTUNE_MAX_STR];
+	};
 	struct bpftunable_stats stats;
 };
 

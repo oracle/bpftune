@@ -806,6 +806,7 @@ static void bpftuner_rollback(struct bpftuner *tuner, bool log_only)
 		char newvals[PATH_MAX] = { };
 		bool changes = false;
 		char s[PATH_MAX];
+		void *val;
 
 		if (t->desc.type != BPFTUNABLE_SYSCTL)
 			continue;
@@ -823,13 +824,20 @@ static void bpftuner_rollback(struct bpftuner *tuner, bool log_only)
 		/* nothing to rollback? */
 		if (!changes)
 			continue;
-		for (j = 0; j < t->desc.num_values; j++) {
-			snprintf(s, sizeof(s), "%ld ",
-				 t->initial_values[j]);
-			strcat(oldvals, s);
-			snprintf(s, sizeof(s), "%ld ",
-				 t->current_values[j]);
-			strcat(newvals, s);
+		if (t->desc.flags & BPFTUNABLE_STRING) {
+			strncpy(oldvals, t->initial_str, sizeof(oldvals));
+			strncpy(newvals, t->current_str, sizeof(newvals));
+			val = t->initial_str;
+		} else {
+			for (j = 0; j < t->desc.num_values; j++) {
+				snprintf(s, sizeof(s), "%ld ",
+					 t->initial_values[j]);
+				strcat(oldvals, s);
+				snprintf(s, sizeof(s), "%ld ",
+					 t->current_values[j]);
+				strcat(newvals, s);
+			}
+			val = t->initial_values;
 		}
 		if (log_only) {
 			bpftune_log(BPFTUNE_LOG_LEVEL, "# To roll back changes to '%s', run the following as a privileged user in a terminal:\n",
@@ -840,7 +848,7 @@ static void bpftuner_rollback(struct bpftuner *tuner, bool log_only)
 			bpftuner_tunable_sysctl_write(tuner, i, k,
 				0,
 				t->desc.num_values,
-				t->initial_values,
+				val,
 				"Rolling back sysctl values for '%s' from (%s) to original values (%s)...\n",
 				t->desc.name,
 				newvals, oldvals);
@@ -1001,9 +1009,11 @@ void bpftune_sysctl_name_to_path(const char *name, char *path, size_t path_sz)
 			path[i] = '/';
 }
 
-int bpftune_sysctl_read(int netns_fd, const char *name, long *values)
+static int __bpftune_sysctl_read(int netns_fd, const char *name, void *val,
+				 bool isstr)
 {
 	int i, orig_netns_fd = 0, num_values = 0;
+	long *values = val;
 	char path[PATH_MAX];
 	int err = 0;	
 	FILE *fp;
@@ -1025,12 +1035,26 @@ int bpftune_sysctl_read(int netns_fd, const char *name, long *values)
 			    path, netns_fd, strerror(-err));
 		goto out;
 	}
-	num_values = fscanf(fp, "%ld %ld %ld",
-			    &values[0], &values[1], &values[2]);
-	if (num_values == 0)
-		err = -ENOENT;
-	else if (num_values < 0)
-		err = -errno;
+	if (isstr) {
+		num_values = fscanf(fp, "%[^\n]", (char *)val);
+		if (num_values != 1)
+			err = -ENOENT;
+		else
+			bpftune_log(LOG_DEBUG, "Read %s = %s\n", name, (char *)val);
+	} else {
+		num_values = fscanf(fp, "%ld %ld %ld",
+				    &values[0], &values[1], &values[2]);
+		if (num_values == 0) {
+			err = -ENOENT;
+		} else if (num_values < 0) {
+			err = -errno;
+		} else {
+			for (i = 0; i < num_values; i++) {
+				bpftune_log(LOG_DEBUG, "Read %s[%d] = %ld\n",
+					    name, i, values[i]);
+			}
+		}
+	}
 	fclose(fp);
 
 	if (err) {
@@ -1038,12 +1062,6 @@ int bpftune_sysctl_read(int netns_fd, const char *name, long *values)
 			    strerror(-err));
 		goto out;
 	}
-
-	for (i = 0; i < num_values; i++) {
-		bpftune_log(LOG_DEBUG, "Read %s[%d] = %ld\n",
-			    name, i, values[i]);
-	}
-
 out:
 	bpftune_netns_set(orig_netns_fd, NULL, true);
 out_unset:
@@ -1053,11 +1071,24 @@ out_unset:
 	return err ? err : num_values;
 }
 
-int bpftune_sysctl_write(int netns_fd, const char *name, __u8 num_values, long *values)
+int bpftune_sysctl_read(int netns_fd, const char *name, long *values)
+{
+	return __bpftune_sysctl_read(netns_fd, name, values, false);
+}
+
+int bpftune_sysctl_read_string(int netns_fd, const char *name, char *val)
+{
+	return __bpftune_sysctl_read(netns_fd, name, val, true);
+}
+
+static int __bpftune_sysctl_write(int netns_fd, const char *name, __u8 num_values,
+				  void *val, bool isstr)
 {
 	long old_values[BPFTUNE_MAX_VALUES] = {};
+	char old_value_str[PATH_MAX] = {};
 	int i, err = 0, orig_netns_fd = 0;
 	int old_num_values;
+	long *values = val;
 	char path[PATH_MAX];
 	FILE *fp;
 
@@ -1074,18 +1105,27 @@ int bpftune_sysctl_write(int netns_fd, const char *name, __u8 num_values, long *
 		goto out_unset;
 
 	/* If value is already set to val, do nothing. */
-	old_num_values = bpftune_sysctl_read(0, name, old_values);
+	if (isstr) {
+		old_num_values = bpftune_sysctl_read_string(0, name, old_value_str);
+	} else {
+		old_num_values = bpftune_sysctl_read(0, name, old_values);
+	}
 	if (old_num_values < 0) {
 		err = old_num_values;
 		goto out;
 	}
 	if (num_values == old_num_values) {
-		for (i = 0; i < num_values; i++) {
-			if (old_values[i] != values[i])
-				break;
+		if (isstr) {
+			if (strcmp(old_value_str, val) == 0)
+				goto out;
+		} else {
+			for (i = 0; i < num_values; i++) {
+				if (old_values[i] != values[i])
+					break;
+			}
+			if (i == num_values)
+				goto out;
 		}
-		if (i == num_values)
-			goto out;
 	}
         fp = fopen(path, "w");
         if (!fp) {
@@ -1095,14 +1135,18 @@ int bpftune_sysctl_write(int netns_fd, const char *name, __u8 num_values, long *
 		goto out;
 	}
 
-	for (i = 0; i < num_values; i++)
-		fprintf(fp, "%ld ", values[i]);
+	if (isstr) {
+		fprintf(fp, "%s", (char *)val);
+		bpftune_log(LOG_DEBUG, "Wrote %s = %s\n", name, val);
+	} else {
+		for (i = 0; i < num_values; i++) {
+			fprintf(fp, "%ld ", values[i]);
+			bpftune_log(LOG_DEBUG, "Wrote %s[%d] = %ld\n",
+				    name, i, values[i]);
+		}
+	}
         fclose(fp);
 
-	for (i = 0; i < num_values; i++) {
-		bpftune_log(LOG_DEBUG, "Wrote %s[%d] = %ld\n",
-			    name, i, values[i]);
-	}
 out:
 	bpftune_netns_set(orig_netns_fd, NULL, true);
 out_unset:
@@ -1111,6 +1155,17 @@ out_unset:
 	bpftune_cap_drop();
         return err;
 }
+
+int bpftune_sysctl_write(int netns_fd, const char *name, __u8 num_values, long *values)
+{
+	return __bpftune_sysctl_write(netns_fd, name, num_values, values, false);
+}
+
+int bpftune_sysctl_write_string(int netns_fd, const char *name, char *val)
+{
+	return __bpftune_sysctl_write(netns_fd, name, 1, val, true);
+}
+
 
 long long bpftune_ksym_addr(char type, const char *name)
 {
@@ -1302,8 +1357,12 @@ int bpftuner_tunables_init(struct bpftuner *tuner, unsigned int num_descs,
 
 		if (descs[i].type != BPFTUNABLE_SYSCTL)
 			continue;
-		num_values = bpftune_sysctl_read(0, descs[i].name,
-				tuner->tunables[i].current_values);
+		if (descs[i].flags & BPFTUNABLE_STRING)
+			num_values = bpftune_sysctl_read_string(0, descs[i].name,
+								tuner->tunables[i].current_str);
+		else
+			num_values = bpftune_sysctl_read(0, descs[i].name,
+					tuner->tunables[i].current_values);
 		if (num_values < 0) {
 			if (descs[i].flags & BPFTUNABLE_OPTIONAL) {
 				bpftune_log(LOG_DEBUG, "error reading optional tunable '%s': %s\n",
@@ -1319,9 +1378,15 @@ int bpftuner_tunables_init(struct bpftuner *tuner, unsigned int num_descs,
 				    descs[i].num_values, num_values);
 			return -EINVAL;
 		}
-		memcpy(tuner->tunables[i].initial_values,
-		       tuner->tunables[i].current_values,
-		       sizeof(tuner->tunables[i].initial_values));
+		if (descs[i].flags & BPFTUNABLE_STRING) {
+			strncpy(tuner->tunables[i].initial_str,
+				tuner->tunables[i].current_str,
+				sizeof(tuner->tunables[i].initial_str));
+		} else {
+			memcpy(tuner->tunables[i].initial_values,
+			       tuner->tunables[i].current_values,
+			       sizeof(tuner->tunables[i].initial_values));
+		}
 	}
 
 	return 0;
@@ -1387,13 +1452,18 @@ static void __bpftuner_scenario_log(struct bpftuner *tuner, unsigned int tunable
 			char s[PATH_MAX];
 			__u8 i;
 
-			for (i = 0; i < t->desc.num_values; i++) {
-				snprintf(s, sizeof(s), "%ld ",
-					 t->initial_values[i]);
-				strcat(oldvals, s);
-				snprintf(s, sizeof(s), "%ld ",
-					 t->current_values[i]);
-				strcat(newvals, s);
+			if (t->desc.flags & BPFTUNABLE_STRING) {
+				strncpy(oldvals, t->initial_str, sizeof(oldvals));
+				strncpy(newvals, t->current_str, sizeof(newvals));
+			} else {
+				for (i = 0; i < t->desc.num_values; i++) {
+					snprintf(s, sizeof(s), "%ld ",
+						 t->initial_values[i]);
+					strcat(oldvals, s);
+					snprintf(s, sizeof(s), "%ld ",
+						 t->current_values[i]);
+					strcat(newvals, s);
+				}
 			}
 			bpftune_log(BPFTUNE_LOG_LEVEL, "# sysctl '%s' changed from (%s) -> (%s)\n",
 				    t->desc.name, oldvals, newvals);
@@ -1415,7 +1485,7 @@ static void __bpftuner_scenario_log(struct bpftuner *tuner, unsigned int tunable
 
 int bpftuner_tunable_sysctl_write(struct bpftuner *tuner, unsigned int tunable,
 				  unsigned int scenario, unsigned long netns_cookie,
-				  __u8 num_values, long *values,
+				  __u8 num_values, void *values,
 				  const char *fmt, ...)
 {
 	struct bpftunable *t = bpftuner_tunable(tuner, tunable);
@@ -1450,7 +1520,10 @@ int bpftuner_tunable_sysctl_write(struct bpftuner *tuner, unsigned int tunable,
 	}
 	global_ns = fd == 0;
 
-	ret = bpftune_sysctl_write(fd, t->desc.name, num_values, values);
+	if (t->desc.flags & BPFTUNABLE_STRING)
+		ret = bpftune_sysctl_write_string(fd, t->desc.name, values);
+	else
+		ret = bpftune_sysctl_write(fd, t->desc.name, num_values, values);
 	if (!ret) {
 		__u8 i;
 
@@ -1458,8 +1531,12 @@ int bpftuner_tunable_sysctl_write(struct bpftuner *tuner, unsigned int tunable,
 
 		/* only cache values for rollback for global ns */
 		if (global_ns) {
-			for (i = 0; i < t->desc.num_values; i++)
-				t->current_values[i] = values[i];
+			if (t->desc.flags & BPFTUNABLE_STRING) {
+				strncpy(t->current_str, values, sizeof(t->current_str));
+			} else {
+				for (i = 0; i < t->desc.num_values; i++)
+					t->current_values[i] = ((long *)values)[i];
+			}
 		}
 	} else if (ret < 0) {
 		/* If sysctl update failed, mark non-global netns as gone to

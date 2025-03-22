@@ -47,10 +47,11 @@ static __always_inline struct remote_host *get_remote_host(struct in6_addr *key,
 		bpf_map_update_elem(&remote_host_map, key, &new_remote_host,
 				    BPF_ANY);
 		return NULL;
+	} else {
+		/* bump for initial conn established */
+		if (initial)
+			remote_host->instances++;
 	}
-	/* bump for initial conn established */
-	if (initial)
-		remote_host->instances++;
 	if (remote_host->instances < REMOTE_HOST_MIN_INSTANCES)
 		return NULL;
 	return remote_host;
@@ -84,10 +85,13 @@ int conn_tuner_sockops(struct bpf_sock_ops *ops)
 {
 	int cb_flags = BPF_SOCK_OPS_STATE_CB_FLAG|BPF_SOCK_OPS_RETRANS_CB_FLAG;
 	struct remote_host *remote_host;
-	struct bpftune_event event = {};
-	struct tcp_conn_event_data *event_data = (struct tcp_conn_event_data *)&event.raw_data;
-	struct in6_addr *key = &event_data->raddr;
+	struct in6_addr raddr = {};
+	struct in6_addr *key = &raddr;
 	struct bpf_sock *sk = ops->sk;
+	struct rtable *rtable = NULL;
+	struct rt6_info *rt6 = NULL;
+	struct tcp_sock *tp = NULL;
+	unsigned int rt_flags = 0;
 	__u64 *statep = NULL;
 	bool initial = false;
 	int state;
@@ -138,19 +142,34 @@ int conn_tuner_sockops(struct bpf_sock_ops *ops)
 	default:
 		return 1;
 	}
-	switch (ops->family) {
-	case AF_INET:
-		key->s6_addr32[2] = bpf_htonl(0xffff);
-		key->s6_addr32[3] = ops->remote_ip4;
-		break;
-	case AF_INET6:
-		key->s6_addr32[0] = ops->remote_ip6[0];
-		key->s6_addr32[1] = ops->remote_ip6[1];
-		key->s6_addr32[2] = ops->remote_ip6[2];
-		key->s6_addr32[3] = ops->remote_ip6[3];
-		break;
-	default:
+
+	if (!sk)
 		return 1;
+	tp = bpf_skc_to_tcp_sock(sk);
+	if (tp) {
+		/* get remote host info from cached destination gateway */
+		rtable = (struct rtable *)BPFTUNE_CORE_READ((struct sock *)tp,
+							    sk_dst_cache);
+	}
+	if (rtable) {
+		switch (ops->family) {
+		case AF_INET:
+			key->s6_addr32[2] = bpf_htonl(0xffff);
+			key->s6_addr32[3] = BPFTUNE_CORE_READ(rtable, rt_gw4);
+			break;
+		case AF_INET6:
+			rt6 = (struct rt6_info *)rtable;
+			rt_flags = BPFTUNE_CORE_READ(rt6, rt6i_flags);
+			if (!(rt_flags & RTF_GATEWAY))
+				break;
+			key->s6_addr32[0] = BPFTUNE_CORE_READ(rt6, rt6i_gateway.in6_u.u6_addr32[0]);
+			key->s6_addr32[1] = BPFTUNE_CORE_READ(rt6, rt6i_gateway.in6_u.u6_addr32[1]);
+			key->s6_addr32[2] = BPFTUNE_CORE_READ(rt6, rt6i_gateway.in6_u.u6_addr32[2]);
+			key->s6_addr32[3] = BPFTUNE_CORE_READ(rt6, rt6i_gateway.in6_u.u6_addr32[3]);
+			break;
+		default:
+			return 1;
+		}
 	}
 	remote_host = get_remote_host(key, initial);
 	/* no RL unless seen a number of times... */
@@ -214,7 +233,6 @@ int conn_tuner_sockops(struct bpf_sock_ops *ops)
 		/* update metric/send metric event on connection close. */
 		__u64 metric, metric_old, min_rtt, rate_interval_us, rate_delivered, mss;
 		struct tcp_conn_metric *m;
-		struct tcp_sock *tp;
 		bool greedy = true;
 		__u8 i, s;
 
@@ -227,7 +245,6 @@ int conn_tuner_sockops(struct bpf_sock_ops *ops)
 		if (!statep)
 			return 1;
 		s = *statep & 0x3;
-		tp = bpf_skc_to_tcp_sock(sk);
 		if (!tp)
 			return 1;
 		min_rtt = (__u64)tp->rtt_min.s[0].v;
@@ -244,11 +261,6 @@ int conn_tuner_sockops(struct bpf_sock_ops *ops)
                 	m->max_rate_delivered = rate_delivered;
 
 		metric = tcp_metric_calc(remote_host, min_rtt, m->max_rate_delivered);
-		event_data->state_flags = *statep;
-		event_data->min_rtt = min_rtt;
-		event_data->rate_delivered = rate_delivered;
-		event_data->metric = metric;
-
 		for (i = 0; i < NUM_TCP_CONN_METRICS; i++) {
 			if (s == i)
 				continue;
@@ -262,10 +274,6 @@ int conn_tuner_sockops(struct bpf_sock_ops *ops)
 		m->metric_count++;
 		if (greedy)
 			m->greedy_count++;
-		if (debug) {
-			event.tuner_id = tuner_id;
-			bpf_ringbuf_output(&ring_buffer_map, &event, sizeof(event), 0);
-		}
 		return 1;
 	}
 	default:

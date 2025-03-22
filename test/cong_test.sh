@@ -28,7 +28,7 @@ LOGFILE=$TESTLOG_LAST
 SLEEPTIME=1
 TIMEOUT=30
 
-for FAMILY in ipv4 ipv6 ; do
+for FAMILY in ipv6 ipv4 ; do
 
 for DROP_PERCENT in 0 10; do
  for LATENCY in "delay 100" ""; do
