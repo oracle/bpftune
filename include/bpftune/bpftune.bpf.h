@@ -305,7 +305,7 @@ do {								\
 								\
 	if (!sample.rate)					\
 		sample.rate = bpftune_sample_rate;		\
-	if (((++sample.count) % sample.rate) != 0)		\
+	if (((sample.count++) % sample.rate) != 0)		\
 		return 0;					\
 	last_ts = sample.ts;					\
 	sample.ts = bpf_ktime_get_ns();				\
