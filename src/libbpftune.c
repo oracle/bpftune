@@ -1909,48 +1909,23 @@ struct bpftuner_netns *bpftuner_netns_from_cookie(unsigned long tuner_id,
 	return NULL;
 }
 
-static int bpftune_module_path(const char *name, char *modpath, size_t pathsz)
-{
-	struct utsname utsname;
-	int ret;
-
-	if (uname(&utsname) < 0) {
-		ret = -errno;
-		bpftune_log(LOG_DEBUG, "uname failed: %s\n", strerror(ret));
-		return ret;
-	}
-	snprintf(modpath, pathsz, "/lib/modules/%s/kernel/%s",
-		 utsname.release, name);
-	return 0;
-}
-
 /* load module name, e.g. net/ipv4/foo.ko */
 int bpftune_module_load(const char *name)
 {
-	char modpath[PATH_MAX];
-	int ret, fd;
+	char modcmd[PATH_MAX];
+	int ret;
 
 	ret = bpftune_cap_add();
 	if (ret)
 		return ret;
-	ret = bpftune_module_path(name, modpath, sizeof(modpath));
-	if (ret)
-		goto out;
+	snprintf(modcmd, sizeof(modcmd), "modprobe %s", name);
 
-	fd = open(modpath, O_RDONLY);
-	if (fd < 0) {
-		bpftune_log(LOG_DEBUG, "no module '%s' found.\n", modpath);
-		ret = -errno;
-		goto out;
-	}
-	ret = syscall(__NR_finit_module, fd, "", 0);
+	ret = system(modcmd);
 	if (ret) {
 		bpftune_log(LOG_DEBUG, "could not init module '%s'\n",
-			    modpath);
-		ret = -errno;
+			    name);
+		ret = -ENOENT;
 	}
-	close(fd);
-out:
 	bpftune_cap_drop();
 	return ret;
 }

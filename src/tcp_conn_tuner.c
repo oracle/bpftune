@@ -64,7 +64,7 @@ int init(struct bpftuner *tuner)
 	for (i = 0; i < NUM_TCP_CONN_METRICS; i++) {
 		char name[32];
 
-		snprintf(name, sizeof(name), "net/ipv4/tcp_%s.ko", congs[i]);
+		snprintf(name, sizeof(name), "tcp_%s", congs[i]);
 		err = bpftune_module_load(name);
 		if (err != -EEXIST)
 			bpftune_log(LOG_DEBUG, "could not load module '%s': %s\n",
@@ -90,6 +90,22 @@ int init(struct bpftuner *tuner)
 				     ARRAY_SIZE(scenarios), scenarios);
 	if (err)
 		goto out;
+	t = bpftuner_tunable(tuner, TCP_ALLOWED_CONG);
+	if (t) {
+		for (i = 0; i < NUM_TCP_CONN_METRICS; i++) {
+			char new_allowed[BPFTUNE_MAX_STR];
+
+			if (strstr(t->current_str, congs[i]))
+				continue;
+			if (snprintf(new_allowed, sizeof(new_allowed), "%s %s", t->current_str,
+				     congs[i]) > BPFTUNE_MAX_STR)
+				break;
+			bpftuner_tunable_sysctl_write(tuner, TCP_ALLOWED_CONG, TCP_CONG_SET, 0,
+						      1, new_allowed, "updating '%s' to '%s'\n",
+						      t->desc.name, new_allowed);
+		}
+	}
+
 	t = bpftuner_tunable(tuner, TCP_THIN_LINEAR_TIMEOUTS);
 	if (t)
 		bpftuner_bpf_var_set(tcp_conn, tuner, tcp_thin_lto, t->initial_values[0]);
