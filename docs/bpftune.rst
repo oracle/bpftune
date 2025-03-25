@@ -101,3 +101,8 @@ OPTIONS
                 summary     - show summary of changes made by tuners
                 tuners      - show loaded tuners and their state
                 tunables    - show supported tunables for loaded tuners
+                jtunables   - show supported tunables in json format
+                status      - show current status of tunables
+                jstatus     - show current status of tunables in json format
+                rollback    - show changes needed to roll back changes made
+                              by bpftune

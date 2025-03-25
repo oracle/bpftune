@@ -39,7 +39,19 @@ for QUERY in help tuners tunables ; do
 done
 test_cleanup
 
-for QUERY in summary rollback ; do 
+if [[ -n "$JQ_CMD" ]]; then
+   test_setup true
+   for JQUERY in jtunables jstatus ; do
+	test_start "$0|query $JQUERY test"
+	test_run_cmd_local "$BPFTUNE -s &" true
+	sleep $SETUPTIME
+	$BPFTUNE_CMD -q $JQUERY | $JQ_CMD
+	test_pass
+    done
+    test_cleanup
+fi
+
+for QUERY in summary rollback status ; do 
 for FAMILY in ipv4 ; do
  for NS in global; do
    case $FAMILY in
