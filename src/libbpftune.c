@@ -102,20 +102,24 @@ void bpftune_log_syslog(__attribute__((unused)) void *ctx, int level,
 		syslog(level, buf, buflen + 1);
 }
 
-/* log to ctx buffer as well as usual log destination */
+/* log to ctx buffer for specific thread, fall back to usual log destination */
 void bpftune_log_buf(void *ctx, int level, const char *fmt, va_list args)
 {
 	struct bpftune_log_ctx_buf *c = ctx;
 	va_list nextargs;
+	pthread_t self;
 
 	if (!c || level > bpftune_loglevel)
 		return;
 	va_copy(nextargs, args);
-	if (c->buf_thread == pthread_self() && c->buf_off <= c->buf_sz) {
+	self = pthread_self();
+	if (c->buf_thread == self && c->buf_off <= c->buf_sz) {
 		c->buf_off += vsnprintf(c->buf + c->buf_off,
 					c->buf_sz - c->buf_off, fmt, args);
+	} else {
+		if (c->buf_thread != self && c->nextlogfn)
+			c->nextlogfn(ctx, level, fmt, nextargs);
 	}
-	c->nextlogfn(ctx, level, fmt, nextargs);
 	va_end(nextargs);
 }
 
@@ -2099,7 +2103,10 @@ struct bpftune_req {
 static void bpftune_help_handler(const char *req, char *buf, size_t buf_sz);
 static void bpftune_tuners_handler(const char *req, char *buf, size_t buf_sz);
 static void bpftune_tunables_handler(const char *req, char *buf, size_t buf_sz);
+static void bpftune_jtunables_handler(const char *req, char *buf, size_t buf_sz);
 static void bpftune_summary_handler(const char *req, char *buf, size_t buf_sz);
+static void bpftune_status_handler(const char *req, char *buf, size_t buf_sz);
+static void bpftune_jstatus_handler(const char *req, char *buf, size_t buf_sz);
 static void bpftune_rollback_handler(const char *req, char *buf, size_t buf_sz);
 
 /* add bpftune server requests with handlers here */
@@ -2107,7 +2114,10 @@ struct bpftune_req bpftune_reqs[] = {
  { "help",	"list supported queries",	bpftune_help_handler },
  { "tuners",	"show state of tuners",		bpftune_tuners_handler },
  { "tunables",	"show list of tunables",	bpftune_tunables_handler },
+ { "jtunables",	"show list of tunables(json)",	bpftune_jtunables_handler },
  { "summary",	"show summary of changes",	bpftune_summary_handler },
+ { "status",	"show status of tunables",	bpftune_status_handler },
+ { "jstatus",	"show status of tunables(json)",bpftune_jstatus_handler },
  { "rollback",	"show changes needed to roll back",
 	 					bpftune_rollback_handler }
 };
@@ -2136,22 +2146,76 @@ static void bpftune_tuners_handler(__attribute__((unused)) const char *req,
 	}
 }
 
-static void bpftune_tunables_handler(__attribute__((unused)) const char *req,
-				     char *buf, size_t buf_sz)
+static void __bpftune_tunables_handler(__attribute__((unused)) const char *req,
+				       char *buf, size_t buf_sz, bool json)
 {
+	struct bpftune_log_ctx_buf ctx_buf;
 	struct bpftuner *t;
-	int off = 0;
+	bool first = true;
+
+	ctx_buf.nextlogfn = bpftune_logfn;
+	ctx_buf.buf = buf;
+	ctx_buf.buf_off = 0;
+	ctx_buf.buf_sz = buf_sz;
+	ctx_buf.buf_thread = pthread_self();
+
+	bpftune_set_log(bpftune_loglevel, bpftune_log_buf, &ctx_buf);
+
+	if (json)
+		bpftune_log(BPFTUNE_LOG_LEVEL, "{\n");
 
 	bpftune_for_each_tuner(t) {
 		struct bpftunable *u;
 		unsigned int i;
 
+		if (json) {
+			if (!first)
+				bpftune_log(BPFTUNE_LOG_LEVEL, "\t},\n");
+			first = false;
+			bpftune_log(BPFTUNE_LOG_LEVEL, "\t\"%s\":{\n",
+				    t->name);
+		}
 		for (i = 0; i < t->num_tunables; i++) {
 			u = bpftuner_tunable(t, i);
-			off += snprintf(buf + off, buf_sz - off, "%20s %50s\n",
-					t->name, u->desc.name);
+			if (json) {
+				if (i > 0)
+					bpftune_log(BPFTUNE_LOG_LEVEL, "\t\t},\n");
+				bpftune_log(BPFTUNE_LOG_LEVEL, "\t\t\"%s\":{\n",
+					    u->desc.name);
+				bpftune_log(BPFTUNE_LOG_LEVEL,
+					    "\t\t\t\"type\":\"%s\",\n",
+					    u->desc.flags & BPFTUNABLE_STRING ?
+					    "string" : "integer");
+				bpftune_log(BPFTUNE_LOG_LEVEL,
+					    "\t\t\t\"num_values\":%d\n",
+					    u->desc.num_values);
+			} else {
+				bpftune_log(BPFTUNE_LOG_LEVEL,
+					    "%16s %50s %8s %2d\n",
+					    t->name, u->desc.name,
+					    u->desc.flags & BPFTUNABLE_STRING ?
+							"string" : "integer",
+					    u->desc.num_values);
+			}
 		}
+		if (json && t->num_tunables > 0)
+			bpftune_log(BPFTUNE_LOG_LEVEL, "\t\t}\n");
         }
+	if (json)
+		bpftune_log(BPFTUNE_LOG_LEVEL, "\t}\n}\n");
+	bpftune_set_log(bpftune_loglevel, ctx_buf.nextlogfn, NULL);
+}
+
+static void bpftune_tunables_handler(__attribute__((unused)) const char *req,
+                                       char *buf, size_t buf_sz)
+{
+	return __bpftune_tunables_handler(req, buf, buf_sz, false);
+}
+
+static void bpftune_jtunables_handler(__attribute__((unused)) const char *req,
+				     char *buf, size_t buf_sz)
+{
+	return __bpftune_tunables_handler(req, buf, buf_sz, true);
 }
 
 static void bpftune_summary_handler(__attribute__((unused)) const char *req,
@@ -2169,7 +2233,6 @@ static void bpftune_summary_handler(__attribute__((unused)) const char *req,
 	ctx_buf.buf_sz = buf_sz;
 	ctx_buf.buf_thread = pthread_self();
 
-	/* have summary log to buffer + usual log destination */
 	bpftune_set_log(bpftune_loglevel, bpftune_log_buf, &ctx_buf);
 
 	bpftune_for_each_tuner(t) {
@@ -2187,9 +2250,85 @@ static void bpftune_summary_handler(__attribute__((unused)) const char *req,
 		}
 	}
 	bpftune_set_log(bpftune_loglevel, ctx_buf.nextlogfn, NULL);
-	bpftune_log(LOG_DEBUG, "got the following sz %d off %d, orig off %d '%s'\n",
-		    ctx_buf.buf_sz, ctx_buf.buf_off, off, buf);
 }
+
+static void __bpftune_status_handler(__attribute__((unused)) const char *req,
+				     char *buf, size_t buf_sz, bool json)
+{
+	struct bpftune_log_ctx_buf ctx_buf;
+	struct bpftuner *t;
+	bool first = true;
+	unsigned int i;
+
+	ctx_buf.nextlogfn = bpftune_logfn;
+	ctx_buf.buf = buf;
+	ctx_buf.buf_off = 0;
+	ctx_buf.buf_sz = buf_sz;
+	ctx_buf.buf_thread = pthread_self();
+
+	buf[0] = '\0';
+	/* have status log to buffer, fall back to usual destination for other threads */
+	bpftune_set_log(bpftune_loglevel, bpftune_log_buf, &ctx_buf);
+
+	if (json)
+		bpftune_log(BPFTUNE_LOG_LEVEL, "{\n");
+	bpftune_for_each_tuner(t) {
+		if (json) {
+			if (!first)
+				bpftune_log(BPFTUNE_LOG_LEVEL, "\t},\n");
+			first = false;
+			bpftune_log(BPFTUNE_LOG_LEVEL, "\t\"%s\":{\n", t->name);
+		}
+		for (i = 0; i < t->num_tunables; i++) {
+			char s[PATH_MAX], vals[PATH_MAX] = {};
+			struct bpftunable *u;
+			unsigned int j;
+
+			u = bpftuner_tunable(t, i);
+			if (u->desc.type != BPFTUNABLE_SYSCTL)
+				continue;
+
+			if (u->desc.flags & BPFTUNABLE_STRING) {
+				snprintf(vals, sizeof(vals), "\"%s\"", u->current_str);	
+			} else {
+				for (j = 0; j < u->desc.num_values; j++) {
+					snprintf(s, sizeof(s), "%s%ld",
+						 j == 0 ? "" : json ? ", " : " ",
+						 u->current_values[j]);
+					strcat(vals, s);
+				}
+			}
+			if (json) {
+				bpftune_log(BPFTUNE_LOG_LEVEL, "\t\t\"%s\":%s %s %s%s\n",
+					    u->desc.name,
+					    u->desc.num_values > 1 ? "[" : "",
+					    vals,
+					    u->desc.num_values > 1 ? "]" : "",
+					    i < t->num_tunables - 1 ? "," : "");
+			} else {
+				bpftune_log(BPFTUNE_LOG_LEVEL, "%16s %50s %34s\n",
+					    t->name, u->desc.name, vals);
+			}
+		}
+	}
+	if (json)
+		bpftune_log(BPFTUNE_LOG_LEVEL, "\t}\n}\n");
+
+	bpftune_set_log(bpftune_loglevel, ctx_buf.nextlogfn, NULL);
+}
+
+static void bpftune_status_handler(__attribute__((unused)) const char *req,
+				   char *buf, size_t buf_sz)
+{
+	return __bpftune_status_handler(req, buf, buf_sz, false);
+}
+
+static void bpftune_jstatus_handler(__attribute__((unused)) const char *req,
+                                   char *buf, size_t buf_sz)
+{
+	return __bpftune_status_handler(req, buf, buf_sz, true);
+}
+
 
 static void bpftune_rollback_handler(__attribute__((unused)) const char *req,
 				     char *buf, size_t buf_sz)
@@ -2206,7 +2345,7 @@ static void bpftune_rollback_handler(__attribute__((unused)) const char *req,
 	ctx_buf.buf_sz = buf_sz;
 	ctx_buf.buf_thread = pthread_self();
 
-        /* have rollback log to buffer + usual log destination */
+        /* have rollback log to buffer, fall back to usual log destination for other threads */
 	bpftune_set_log(bpftune_loglevel, bpftune_log_buf, &ctx_buf);
 
 	bpftune_for_each_tuner(t) {

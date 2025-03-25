@@ -34,7 +34,7 @@
 
 static struct bpftunable_desc descs[] = {
  
-{ TCP_CONG, BPFTUNABLE_OTHER, "Per-socket TCP congestion control", 0, 0 },
+{ TCP_CONG, BPFTUNABLE_OTHER, "net.persock.tcp.congestion_control", 0, 0 },
 { TCP_ALLOWED_CONG, BPFTUNABLE_SYSCTL, "net.ipv4.tcp_allowed_congestion_control",
   BPFTUNABLE_NAMESPACED | BPFTUNABLE_STRING, 1 },
 { TCP_AVAILABLE_CONG, BPFTUNABLE_SYSCTL, "net.ipv4.tcp_available_congestion_control",

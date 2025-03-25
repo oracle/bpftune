@@ -29,7 +29,7 @@ struct netns_tuner_bpf *skel;
 
 static struct bpftunable_desc descs[] = {
 {
- NETNS, BPFTUNABLE_OTHER, "Network namespace", BPFTUNABLE_NAMESPACED, 0 },
+ NETNS, BPFTUNABLE_OTHER, "network_namespace", BPFTUNABLE_NAMESPACED, 0 },
 };
 
 static struct bpftunable_scenario scenarios[] = {
