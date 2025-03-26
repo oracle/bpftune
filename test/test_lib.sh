@@ -68,6 +68,7 @@ export FIREWALL_CMD=$(which firewall-cmd 2>/dev/null)
 export AUDIT_CMD=$(which auditctl 2>/dev/null)
 export JQ_CMD=$(which jq 2>/dev/null)
 export SYSLOGFILE=${SYSLOGFILE:-"/var/log/messages"}
+export DBPMDA_CMD=$(which dbpmda 2>/dev/null)
 if [[ ! -f $SYSLOGFILE ]]; then
 	export SYSLOGFILE="/var/log/syslog"
 fi

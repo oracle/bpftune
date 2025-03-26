@@ -1,6 +1,8 @@
+#!/usr/bin/bash
+#
 # SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note
 #
-# Copyright (c) 2023, Oracle and/or its affiliates.
+# Copyright (c) 2025, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public
@@ -17,29 +19,27 @@
 # Boston, MA 021110-1307, USA.
 #
 
+. ./test_lib.sh
 
-INSTALLFILES = Install Remove pmdabpftune.python
 
-DESTDIR ?=
-prefix ?= /usr
-installprefix ?= $(DESTDIR)/$(prefix)
+SETUPTIME=10
 
-INSTALLPATH = $(installprefix)/../var/lib/pcp/pmdas/bpftune
+test_start "$0|pcp pmda test: are tunables available"
 
-install_sh_PROGRAM = install
-install_sh_DIR = install -dv
+if [[ -n "$DBPMDA_CMD" ]]; then
+	test_run_cmd_local "$BPFTUNE -s &" true
+	sleep $SETUPTIME
+	cat<<EOF | $DBPMDA_CMD -n ../src/pcp/pmns-for-testing
+	open pipe ../src/pcp/pmdabpftune.python
+	fetch bpftune.tcp_conn.net.ipv4.tcp_congestion_control
+	fetch bpftune.ip_frag.net.ipv4.ipfrag_high_thresh
+	fetch bpftune.tcp_buffer.net.ipv4.tcp_rmem
+EOF
+	test_pass
+else
+	echo "skipping as dbpmda is not available"
+	test_pass
+fi
 
-all:
-	
-PHONY: clean
-	
-clean:
-
-test:
-	
-install: $(INSTALLFILES)
-	$(install_sh_DIR) -d $(INSTALLPATH) ; \
-	$(install_sh_PROGRAM) $^ -t $(INSTALLPATH) ; \
-	install README -t $(INSTALLPATH);
-
-PHONY: clean
+test_cleanup
+test_exit
