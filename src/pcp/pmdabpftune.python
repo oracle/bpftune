@@ -1,0 +1,153 @@
+#!/usr/bin/env pmpython
+# SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note
+#
+# Copyright (c) 2025, Oracle and/or its affiliates.
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public
+# License v2 as published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public
+# License along with this program; if not, write to the
+# Free Software Foundation, Inc., 59 Temple Place - Suite 330,
+# Boston, MA 021110-1307, USA.
+#
+
+try:
+    import ConfigParser
+except ImportError:
+    import configparser as ConfigParser
+
+import os
+import sys
+import argparse
+import atexit
+import subprocess
+import time
+import json
+
+from pcp.pmapi import pmUnits
+from pcp.pmapi import pmContext as PCP
+from pcp.pmda import PMDA, pmdaIndom, pmdaMetric, pmdaInstid
+from cpmapi import PM_INDOM_NULL
+from cpmapi import PM_TYPE_U32, PM_TYPE_U64, PM_TYPE_STRING
+from cpmapi import PM_SEM_COUNTER, PM_SEM_INSTANT, PM_SEM_DISCRETE
+from cpmapi import PM_COUNT_ONE, PM_SPACE_BYTE, PM_SPACE_KBYTE, PM_TIME_SEC, PM_TIME_NSEC
+from cpmapi import PM_ERR_INST, PM_ERR_NYI, PM_ERR_PMID
+from cpmda import PMDA_FETCH_NOVALUES
+
+domain = 486
+tunablecounter = 0
+tunablevalues = dict()
+tunablenames = dict()
+
+firstrun = 1
+lasttime = 0
+refreshtime = 10
+
+def bpftune_get(pmda):
+
+    global lasttime
+    global refreshtime
+    global tunablecounter
+    global firstrun
+
+    output = dict()
+    currtime = round(time.time())
+    difftime = currtime - lasttime
+    if difftime > refreshtime:
+        with open(os.devnull, 'w') as devnull:
+            p = subprocess.Popen(["/usr/sbin/bpftune", "-q", "jstatus"], stdout=subprocess.PIPE, stderr=devnull)
+            r = p.communicate()[0].decode("utf-8")
+            if r:
+                output = json.loads(r)
+            else:
+                output = {}
+    else:
+        if pmda:
+            pmda.log("using cached values since time diff is " + str(difftime))
+        lasttime = currtime
+        return
+
+    for tuner in output.keys():
+        for tunable in output[tuner]:
+            o = output[tuner][tunable]
+            t = tuner + "." + tunable
+            tunablevalues[t] = output[tuner][tunable]
+            if firstrun:
+                tunablenames[tunablecounter] = t
+                tunablecounter += 1
+    firstrun = 0
+    lasttime = currtime
+
+class bpftunePMDA(PMDA):
+    """ PCP bpftune PMDA """
+
+    """ instance domain for list values """
+    listelems = [pmdaInstid(0, '0'),
+                 pmdaInstid(1, '1'),
+                 pmdaInstid(2, '2')]
+
+    def bpftune_fetch_callback(self, cluster, item, inst):
+        ''' Returns a list of value,status for metric '''
+        self.log("fetch callback for %d.%d[%d]" % (cluster, item, inst))
+        bpftune_get(self)
+
+        name = tunablenames[item]
+        value = tunablevalues[tunablenames[item]]
+
+        if isinstance(value, list):
+            v = value[inst]
+        else:
+            v = value
+        self.log("item  '" + name + "' = " + str(v))
+        return [v, 1]
+
+    def __init__(self, name, domain):
+        """ Constructor """
+        PMDA.__init__(self, name, domain)
+        self.connect_pmcd()
+
+        self.listindom = self.indom(0)
+        self.add_indom(pmdaIndom(self.listindom, self.listelems))
+
+        bpftune_get(self)
+        t = 0
+        for k in tunablevalues.keys():
+            numvalues = 1
+            indom = PM_INDOM_NULL
+            if isinstance(tunablevalues[k], str):
+                tunabletype = PM_TYPE_STRING
+            else:
+                if isinstance(tunablevalues[k], list):
+                    indom = self.listindom
+                tunabletype = PM_TYPE_U64
+
+            self.add_metric(name + "." + k,
+                            pmdaMetric(self.pmid(0, t),
+                            tunabletype, indom, PM_SEM_INSTANT,
+                            pmUnits()))
+            t += 1
+            self.log("added metric '" + name + "." + k + "'")
+        self.log("added " + str(t) + " metrics")
+        self.set_fetch_callback(self.bpftune_fetch_callback)
+        self.set_user(PCP.pmGetConfig('PCP_USER'))
+
+# main
+parser = argparse.ArgumentParser()
+parser.add_argument("-d", "--debug", dest="debug_value", type=int, choices=[0, 1, 2],
+                    help="change debug level, 0 is default")
+args = parser.parse_args()
+
+if args.debug_value:
+    bpftune_get(none)
+    print(tunablevalues)
+
+if __name__ == '__main__':
+    bpftunePMDA('bpftune', domain).run()
+
