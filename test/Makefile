@@ -25,6 +25,7 @@ TUNER_TESTS =	support_test log_test service_test inotify_test cap_test \
 		strategy_test strategy_legacy_test \
 		rollback_test rollback_legacy_test \
 		query_test rate_test \
+		pcp_pmda_test \
 		many_netns_test many_netns_legacy_test \
 		podman_globalonly_test podman_globalonly_legacy_test \
 		sysctl_test sysctl_legacy_test sysctl_netns_test \
