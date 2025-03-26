@@ -71,7 +71,7 @@ distclean_src:
 testclean:
 	cd test; make clean
 
-install: srcinstall includeinstall docinstall
+install: srcinstall includeinstall docinstall pcpinstall
 	
 srcinstall:
 	cd src; make install
@@ -79,3 +79,5 @@ includeinstall:
 	cd include; make install
 docinstall:
 	cd docs; make install
+pcpinstall:
+	cd src/pcp; make install

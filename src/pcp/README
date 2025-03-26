@@ -1,0 +1,59 @@
+# SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note
+#
+# Copyright (c) 2025, Oracle and/or its affiliates.
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public
+# License v2 as published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public
+# License along with this program; if not, write to the
+# Free Software Foundation, Inc., 59 Temple Place - Suite 330,
+# Boston, MA 021110-1307, USA.
+#
+
+bpftune PMDA
+============
+
+This PMDA exports information about bpftune-controlled tunables;
+these are mostly sysctl values.
+
+Metrics
+=======
+Metrics exported are dynamic and based upon the bpftune tuners
+loaded; information is gathered from bpftune via a query
+
+bpftune -q jstatus
+
+Installation
+============
+
+ + Ensure that bpftune is installed and running
+
+ + # cd $PCP_PMDAS_DIR/bpftune
+
+ + Check there is no clash in the Performance Metrics domain
+   defined in ./domain.h.  If there is edit ./domain.h to
+   choose another number
+
+ + Then run
+
+   # sudo ./Install
+
+De-installation
+===============
+
+# cd $PCP_PMDAS_DIR/bpftune
+# sudo ./Remove
+
+Troubleshooting
+===============
+ + Ensure bpftune is running
+
+ + Ensure bpftune -q jstatus returns valid json
+

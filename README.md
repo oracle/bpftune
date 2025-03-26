@@ -252,6 +252,39 @@ On exit, bpftune will summarize any tuning done.
 
 Queries of bpftune state can be done via `bpftune -q`.
 
+## Performance Co-Pilot (PCP) Support
+
+Support has been added to export bpftune tunable values to Performance
+Co-Pilot via a PMDA (Performance Metric Domain Agent).  It uses
+bpftune quereies to populate metrics in PCP via a python-based
+PMDA.  See src/pcp/pmdabpftune.python.
+
+To install the PMDA (ensuring pcp and python3-pcp packages are installed
+first), simply run
+
+```
+$ sudo make install
+$ cd /var/lib/pcp/pmdas/bpftune
+$ sudo ./Install
+
+```
+
+Once the above has been done, PCP metrics will be available for bpftune
+tunables.  To see these:
+
+```
+$ pminfo -f bpftune
+
+bpftune.udp_buffer.net.core.rmem_default
+    value 212992
+
+bpftune.udp_buffer.net.core.rmem_max
+    value 3099438
+...
+```
+
+The PMDA is also packaged in bpftune-pcp-pmda; see buildrpm/bpftune.spec.
+
 ## Ansible Install Play
 
 Information: If you are using an Fedora Upstream based Distribution you have to enable the correct repository based on the system you are using, because the libbpf-devel package is getting shipped on additional repository, based on the Distribution. You can look it up here: https://pkgs.org/search/?q=libbpf-devel
