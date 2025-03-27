@@ -285,6 +285,35 @@ bpftune.udp_buffer.net.core.rmem_max
 
 The PMDA is also packaged in bpftune-pcp-pmda; see buildrpm/bpftune.spec.
 
+To create grafana dashboards using bpftune tunables, see the
+[blog entry here](https://blogs.oracle.com/linux/post/visualising-pcp-metrics-using-grafana)
+for details on setting up grafana to handle PCP metric visualization.
+
+From there it is necessary to ensure that pmlogger is logging the metrics
+regularly; add something like the following to
+
+/var/lib/pcp/config/pmlogger/config.default
+
+```
+log advisory on default {
+        bpftune.tcp_buffer.net.ipv4.tcp_rmem
+        bpftune.tcp_buffer.net.ipv4.tcp_wmem
+        bpftune.tcp_buffer.net.ipv4.tcp_mem
+}
+```
+
+...and restart pmlogger
+
+```
+$ sudo service pmlogger restart
+```
+
+Once that is done, it should be possible to create dashboards with
+queries of bpftune metrics.  For example here is a simple dashboard
+created for the tcp_buffer tuner:
+
+![alt text](bpftune.tcp_buffer.png "bpftune grafana dashboard for tcp_buffer tuner")
+
 ## Ansible Install Play
 
 Information: If you are using an Fedora Upstream based Distribution you have to enable the correct repository based on the system you are using, because the libbpf-devel package is getting shipped on additional repository, based on the Distribution. You can look it up here: https://pkgs.org/search/?q=libbpf-devel
