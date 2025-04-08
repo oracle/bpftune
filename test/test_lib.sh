@@ -228,9 +228,9 @@ test_setup_local()
 	if [[ ! -d $CGROUPDIR ]]; then
 		mkdir -p $CGROUPDIR
 	fi
-	set +e
 	# test_setup_local() can be called multiple times for a test...
 	set +e
+	modprobe sch_netem
 	ip netns list 2>/dev/null | grep $NETNS
 	FOUND=$?
 	set -e

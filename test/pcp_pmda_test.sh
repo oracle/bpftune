@@ -24,13 +24,15 @@
 
 SETUPTIME=10
 
+CWD=$(dirname $0)
+
 test_start "$0|pcp pmda test: are tunables available"
 
 if [[ -n "$DBPMDA_CMD" ]]; then
 	test_run_cmd_local "$BPFTUNE -s &" true
 	sleep $SETUPTIME
-	cat<<EOF | $DBPMDA_CMD -n ../src/pcp/pmns-for-testing
-	open pipe ../src/pcp/pmdabpftune.python
+	cat<<EOF | $DBPMDA_CMD -n ${CWD}/../src/pcp/pmns-for-testing
+	open pipe ${CWD}/../src/pcp/pmdabpftune.python
 	fetch bpftune.tcp_conn.net.ipv4.tcp_congestion_control
 	fetch bpftune.ip_frag.net.ipv4.ipfrag_high_thresh
 	fetch bpftune.tcp_buffer.net.ipv4.tcp_rmem
