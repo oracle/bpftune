@@ -57,6 +57,10 @@ unsigned short bpftune_learning_rate;
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
 
+/* quiet clang analyzer false positive leak complaints */
+#ifdef __clang_analyzer__
+#define bpf_object__destroy_skeleton free
+#endif
 #include "probe.skel.h"
 #include "probe.skel.legacy.h"
 #include "probe.skel.nobtf.h"
