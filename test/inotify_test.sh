@@ -36,10 +36,10 @@ for TUNER in neigh_table ; do
 
    sleep $SETUPTIME
 
+   sleep $SLEEPTIME
    cp /usr/lib64/bpftune/tcp_buffer_tuner.so /tmp
    rm /usr/lib64/bpftune/tcp_buffer_tuner.so
    
-   sleep $SLEEPTIME
    grep "fini tuner" $TESTLOG_LAST
 
    sleep $SLEEPTIME
