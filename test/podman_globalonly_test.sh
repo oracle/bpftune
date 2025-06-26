@@ -55,7 +55,17 @@ for FAMILY in ipv4 ; do
 		test_run_cmd_local "$BPFTUNE -s &" true
 	fi
 	sleep $SETUPTIME
-	container=$(ip netns show | awk '/^netns/ { print $1 }')
+	for (( i=0; i < 5; i++ ))
+	do
+		container=$(ip netns show | awk '/^netns/ { print $1 }')
+		if [[ -n "$container" ]]; then
+			break
+		fi
+		sleep 1
+	done
+	if [[ -z "$container" ]]; then
+		test_cleanup
+	fi
 	container_ip=$(ip netns exec $container ip addr show dev eth0 | awk '/inet / { split($2, a, "/"); print a[1] }')
 	ip netns exec $container  ethtool --offload eth0 rx off tx off gso off gro off lro off tso off
 	set +e
