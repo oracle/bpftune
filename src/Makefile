@@ -156,6 +156,10 @@ install: $(OPATH)libbpftune.so $(OPATH)bpftune bpftune.service
 	$(INSTALL) $(TUNER_LIBS) $(INSTALLPATH)/$(libdir)/bpftune
 	$(INSTALL) -m 0755 -d $(CONF)
 	$(INSTALL) -m 0755 -d $(CONFPATH)
+	$(INSTALL) -m 0755 -d $(CONF)/conf.d
+	$(INSTALL) -m 0755 -d $(CONF)/init.d
+	$(INSTALL) -m 0644 bpftune.confd $(CONF)/conf.d/bpftune
+	$(INSTALL) -m 0755 bpftune.initd $(CONF)/init.d/bpftune
 	echo $(prefix)/$(libdir) > $(CONFPATH)/libbpftune.conf
 	if [ $(DESTDIR) =  / ]; then ldconfig; fi
 

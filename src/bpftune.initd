@@ -1,0 +1,20 @@
+#!/sbin/openrc-run
+# SPDX-License-Identifier: GPL-2.0-or-later
+
+description="BPF-based auto-tuning of system parameters"
+command="/usr/sbin/bpftune"
+: "${command_args:=-R -c /sys/fs/cgroup}"
+extra_commands="checkconf"
+supervisor=supervise-daemon
+
+depend() {
+	need cgroups sysctl net
+}
+
+checkconf() {
+	"${command}" -S "${command_args}" 2>&1
+}
+
+start_pre() {
+	checkconf > /dev/null 2>&1
+}
