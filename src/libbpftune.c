@@ -1490,13 +1490,12 @@ static void __bpftuner_scenario_log(struct bpftuner *tuner, unsigned int tunable
 				    t->desc.name, newvals);
 		}
 	} else {
-		if (!quiet)
-			bpftune_log(BPFTUNE_LOG_LEVEL,
-				    "Scenario '%s' occurred for tunable '%s' in %sglobal ns. %s\n",
-				    sc->name,
-				    t->desc.name,
-				    global_ns ? "" : "non-",
-				    sc->description ? sc->description : "");
+		bpftune_log(BPFTUNE_LOG_LEVEL,
+				"Scenario '%s' occurred for tunable '%s' in %sglobal ns. %s\n",
+				sc->name,
+				t->desc.name,
+				global_ns ? "" : "non-",
+				sc->description ? sc->description : "");
 		if (fmt && args)
 			__bpftune_log(BPFTUNE_LOG_LEVEL, fmt, *args);
 		__bpftuner_tunable_stats_update(t, scenario, global_ns, 1);
