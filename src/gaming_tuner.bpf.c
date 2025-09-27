@@ -7,10 +7,12 @@
 #include <bpftune/bpftune.bpf.h>
 #include "gaming_tuner.h"
 #include <bpf/bpf_helpers.h>
+#include <bpf/bpf_endian.h>
 
 struct gaming_stats {
     __u64 udp_packets;
     __u64 tracked_udp_packets;
+    __u64 quic_packets;
     __u64 last_activity;
     __u32 current_pps;
     __u32 is_gaming;
@@ -149,14 +151,29 @@ static __always_inline void record_activity(struct gaming_stats *stats, __u64 no
 
 static __always_inline void handle_pps_window(struct gaming_stats *stats, __u64 now);
 
+static __always_inline __u16 gaming_sock_dport(const struct sock *sk)
+{
+    __u16 dport = 0;
+
+    if (!sk)
+        return 0;
+
+    dport = BPF_CORE_READ(sk, __sk_common.skc_dport);
+    return bpf_ntohs(dport);
+}
+
 static __always_inline void gaming_count_packet(struct gaming_stats *stats,
-                                                __u64 now, __u64 len)
+                                                __u64 now, __u64 len,
+                                                __u16 dport)
 {
     if (!stats)
         return;
 
     if (len <= GAMING_TUNER_UDP_MAX_SIZE) {
         stats->tracked_udp_packets++;
+
+        if (dport == 443)
+            stats->quic_packets++;
 
         if (now - stats->last_pps_update >= GAMING_PPS_WINDOW_NS)
             handle_pps_window(stats, now);
@@ -191,6 +208,8 @@ static __always_inline void handle_pps_window(struct gaming_stats *stats, __u64 
 {
     __u32 smooth_pps;
     __u32 variance;
+    __u64 recent_packets;
+    __u64 quic_packets;
 
     stats->pps_history_idx = (stats->pps_history_idx + 1) % GAMING_TUNER_PPS_HISTORY;
     stats->pps_history[stats->pps_history_idx] = stats->tracked_udp_packets;
@@ -198,16 +217,20 @@ static __always_inline void handle_pps_window(struct gaming_stats *stats, __u64 
     smooth_pps = calculate_smooth_pps(stats);
     variance = calculate_pps_variance(stats, smooth_pps);
 
+    recent_packets = stats->tracked_udp_packets;
+    quic_packets = stats->quic_packets;
+
     stats->current_pps = smooth_pps;
     stats->pps_variance = variance;
     stats->tracked_udp_packets = 0;
     stats->last_pps_update = now;
+    stats->quic_packets = 0;
 
     if (!stats->is_gaming) {
         if (smooth_pps >= GAMING_TUNER_UDP_MIN_PPS) {
             __u32 variance_threshold = smooth_pps / 2;
-            bool bursty = stats->tracked_udp_packets >=
-                          (GAMING_TUNER_UDP_MIN_PPS * 2);
+            bool bursty = recent_packets >= (GAMING_TUNER_UDP_MIN_PPS * 2);
+            bool quic_heavy = quic_packets >= GAMING_TUNER_UDP_MIN_PPS;
 
             if (variance_threshold < 15)
                 variance_threshold = 15;
@@ -216,6 +239,9 @@ static __always_inline void handle_pps_window(struct gaming_stats *stats, __u64 
                 stats->steady_periods = 0;
                 return;
             }
+
+            if (quic_heavy && !bursty)
+                return;
 
             if (variance <= variance_threshold || bursty)
                 stats->steady_periods++;
@@ -328,12 +354,13 @@ BPF_FENTRY(udp_sendmsg, struct sock *sk, struct msghdr *msg, size_t len)
     __u32 key = 0;
     struct gaming_stats *stats = bpf_map_lookup_elem(&stats_map, &key);
     __u64 now = bpf_ktime_get_ns();
+    __u16 dport = gaming_sock_dport(sk);
 
     if (!stats)
         return 0;
 
     stats->udp_packets++;
-    gaming_count_packet(stats, now, len);
+    gaming_count_packet(stats, now, len, dport);
 
 #ifndef BPFTUNE_LEGACY
     if (sk) {
@@ -364,6 +391,7 @@ BPF_FENTRY(udp_recvmsg, struct sock *sk, struct msghdr *msg, size_t len,
     __u32 key = 0;
     struct gaming_stats *stats;
     __u64 now;
+    __u16 dport = gaming_sock_dport(sk);
 
     stats = bpf_map_lookup_elem(&stats_map, &key);
     if (!stats)
@@ -372,7 +400,7 @@ BPF_FENTRY(udp_recvmsg, struct sock *sk, struct msghdr *msg, size_t len,
     now = bpf_ktime_get_ns();
 
     if (len > 0)
-        gaming_count_packet(stats, now, (__u64)len);
+        gaming_count_packet(stats, now, (__u64)len, dport);
 
     record_activity(stats, now);
 
