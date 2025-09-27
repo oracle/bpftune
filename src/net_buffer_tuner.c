@@ -26,14 +26,18 @@ static struct bpftunable_desc descs[] = {
 };
 
 static struct bpftunable_scenario scenarios[] = {
-{ NETDEV_MAX_BACKLOG_INCREASE,	"need to increase max backlog size",
-	"Need to increase backlog size to prevent drops for faster connection" },
-{ FLOW_LIMIT_CPU_SET,		"need to set per-cpu bitmap value",
-	"Need to set flow limit per-cpu to prioritize small flows" },
-{ NETDEV_BUDGET_INCREASE,	"need to increase # of packets processed per NAPI poll",
-	"Need to increase number of packets processed across network devices during NAPI poll to use all of net.core.netdev_budget_usecs" },
-{ NETDEV_BUDGET_DECREASE,	"need to decrease # of packets processed per NAPI poll",
-	"Need to decrease netdev_budget[_usecs] since the ratio of time spent waiting to run versus time spent running for tasks has increased as we have increased netdev budget.  This indicates either our budget increases directly let to increased wait times for other tasks, or that general load has increased; either way spending too much time in NAPI processing will hurt system performance." }
+	BPFTUNABLE_SCENARIO(NETDEV_MAX_BACKLOG_INCREASE,
+			"need to increase max backlog size",
+	"Need to increase backlog size to prevent drops for faster connection"),
+	BPFTUNABLE_SCENARIO(FLOW_LIMIT_CPU_SET,
+			"need to set per-cpu bitmap value",
+	"Need to set flow limit per-cpu to prioritize small flows"),
+	BPFTUNABLE_SCENARIO(NETDEV_BUDGET_INCREASE,
+			"need to increase # of packets processed per NAPI poll",
+	"Need to increase number of packets processed across network devices during NAPI poll to use all of net.core.netdev_budget_usecs"),
+	BPFTUNABLE_SCENARIO(NETDEV_BUDGET_DECREASE,
+			"need to decrease # of packets processed per NAPI poll",
+	"Need to decrease netdev_budget[_usecs] since the ratio of time spent waiting to run versus time spent running for tasks has increased as we have increased netdev budget.  This indicates either our budget increases directly let to increased wait times for other tasks, or that general load has increased; either way spending too much time in NAPI processing will hurt system performance."),
 };
 
 int init(struct bpftuner *tuner)

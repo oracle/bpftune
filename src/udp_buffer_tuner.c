@@ -24,14 +24,18 @@ static struct bpftunable_desc descs[] = {
 };
 
 static struct bpftunable_scenario scenarios[] = {
-{ UDP_BUFFER_INCREASE,	"need to increase UDP buffer size(s)",
-	"Need to increase buffer size(s) to maximize throughput and reduce loss" },
-{ UDP_BUFFER_DECREASE,	"need to decrease UDP buffer size(s)",
-	"Need to decrease buffer size(s) to reduce memory utilization" },
-{ UDP_MEM_PRESSURE,	"approaching UDP memory pressure",
-	"Since memory pressure/exhaustion are unstable system states, adjust UDP memory-related tunables" },
-{ UDP_MEM_EXHAUSTION,	"approaching UDP memory exhaustion",
-	"Since memory exhaustion is a highly unstable state, adjust UDP memory-related tunables to avoid exhaustion" },
+	BPFTUNABLE_SCENARIO(UDP_BUFFER_INCREASE,
+			"need to increase UDP buffer size(s)",
+	"Need to increase buffer size(s) to maximize throughput and reduce loss"),
+	BPFTUNABLE_SCENARIO(UDP_BUFFER_DECREASE,
+			"need to decrease UDP buffer size(s)",
+	"Need to decrease buffer size(s) to reduce memory utilization"),
+	BPFTUNABLE_SCENARIO(UDP_MEM_PRESSURE,
+			"approaching UDP memory pressure",
+	"Since memory pressure/exhaustion are unstable system states, adjust UDP memory-related tunables"),
+	BPFTUNABLE_SCENARIO(UDP_MEM_EXHAUSTION,
+			"approaching UDP memory exhaustion",
+	"Since memory exhaustion is a highly unstable state, adjust UDP memory-related tunables to avoid exhaustion"),
 };
 
 /* When UDP starts up, it calls nr_free_buffer_pages() and uses it to estimate

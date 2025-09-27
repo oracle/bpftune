@@ -22,10 +22,12 @@ static struct bpftunable_desc descs[] = {
 };
 
 static struct bpftunable_scenario scenarios[] = {
-{ IP_FRAG_THRESHOLD_INCREASE,	"need to increase IP fragmentation high threshold",
-  "this allows additional memory to be used to accommodate more defragmentation." },
-{ IP_FRAG_THRESHOLD_DECREASE,	"need to decrease IP fragmentation high threshold",
-  "as we increased fragmentation high threshold we saw a correlation in reassembly failures; this indicates that we received more invalid fragments as we added memory to process them.  As such, further increases are likely to be ineffective so reduce high threshold." },
+	BPFTUNABLE_SCENARIO(IP_FRAG_THRESHOLD_INCREASE,
+			"need to increase IP fragmentation high threshold",
+	"this allows additional memory to be used to accommodate more defragmentation."),
+	BPFTUNABLE_SCENARIO(IP_FRAG_THRESHOLD_DECREASE,
+			"need to decrease IP fragmentation high threshold",
+	"as we increased fragmentation high threshold we saw a correlation in reassembly failures; this indicates that we received more invalid fragments as we added memory to process them.  As such, further increases are likely to be ineffective so reduce high threshold."),
 };
 
 int init(struct bpftuner *tuner)

@@ -100,7 +100,7 @@ endif
 
 TUNERS = tcp_buffer_tuner route_table_tuner neigh_table_tuner sysctl_tuner \
 	 tcp_conn_tuner netns_tuner net_buffer_tuner ip_frag_tuner \
-	 udp_buffer_tuner
+	 udp_buffer_tuner gaming_tuner
 
 TUNER_OBJS = $(patsubst %,%.o,$(TUNERS))
 TUNER_SRCS = $(patsubst %,%.c,$(TUNERS))

@@ -57,8 +57,9 @@ static struct bpftunable_desc descs[] = {
 };
 
 static struct bpftunable_scenario scenarios[] = {
-{ NEIGH_TABLE_FULL,	"neighbour table nearly full",
-		"neighbour table is nearly full, preventing new entries from being added." },
+	BPFTUNABLE_SCENARIO(NEIGH_TABLE_FULL,
+			"neighbour table nearly full",
+	"neighbour table is nearly full, preventing new entries from being added."),
 };
 
 int init(struct bpftuner *tuner)

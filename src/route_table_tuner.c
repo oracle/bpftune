@@ -33,8 +33,9 @@ static struct bpftunable_desc descs[] = {
 };
 
 static struct bpftunable_scenario scenarios[] = {
-{ ROUTE_TABLE_FULL,	"destination table nearly full",
-		"destination table is nearly full, preventing new entries from being added." },
+	BPFTUNABLE_SCENARIO(ROUTE_TABLE_FULL,
+			"destination table nearly full",
+	"destination table is nearly full, preventing new entries from being added."),
 };
 
 int init(struct bpftuner *tuner)
