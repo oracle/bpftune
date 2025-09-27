@@ -1442,7 +1442,6 @@ static void __bpftuner_scenario_log(struct bpftuner *tuner, unsigned int tunable
 	struct bpftunable *t = bpftuner_tunable(tuner, tunable);
 	struct bpftunable_scenario *sc;
 	bool global_ns = netns_fd == 0;
-	bool quiet = false;
 
 	if (!t)
 		return;
@@ -1450,7 +1449,6 @@ static void __bpftuner_scenario_log(struct bpftuner *tuner, unsigned int tunable
 		return;
 
 	sc = &tuner->scenarios[scenario];
-	quiet = sc->flags & BPFTUNABLE_SCENARIO_QUIET;
 
 	if (summary) {
 		unsigned long count;
