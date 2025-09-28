@@ -744,8 +744,8 @@ static void gaming_schedule_revert(void)
     pthread_cond_broadcast(&g_state_cond);
     pthread_mutex_unlock(&g_state_lock);
 
-    bpftune_log(LOG_NOTICE,
-                "Gaming traffic paused; will restore baseline if still quiet after %d seconds",
+    bpftune_log(LOG_DEBUG,
+                "Gaming traffic paused; baseline restore scheduled in %d seconds",
                 GAMING_REVERT_GRACE_SECONDS);
 }
 
@@ -1020,7 +1020,7 @@ static void revert_optimizations(struct bpftuner *tuner, int force)
                         details,
                         summary_buffer_truncated(&summary) ? " ..." : "");
         } else {
-            bpftune_log(LOG_NOTICE, "Gaming profile settings already at baseline");
+            bpftune_log(LOG_DEBUG, "Gaming profile settings already at baseline");
         }
         return;
     }
@@ -1186,7 +1186,6 @@ void event_handler(struct bpftuner *tuner, struct bpftune_event *event,
         int pps;
         long variance;
         unsigned int ifindex;
-        int should_schedule;
 
         memcpy(&data, event->raw_data, sizeof(data));
 
@@ -1207,35 +1206,23 @@ void event_handler(struct bpftuner *tuner, struct bpftune_event *event,
                 snprintf(g_state.active_ifname, sizeof(g_state.active_ifname), "%s", ifname);
         }
         g_state.active_ifname[sizeof(g_state.active_ifname) - 1] = '\0';
-        should_schedule = g_state.active;
         pthread_mutex_unlock(&g_state_lock);
 
         if (comm[0]) {
             bpftune_log(LOG_NOTICE,
-                        "Gaming traffic quiet (process: %s, pps: %d, variance: %ld%s%s)%s",
+                        "Gaming traffic quiet (process: %s, pps: %d, variance: %ld%s%s); scheduling baseline restore",
                         comm, pps, variance,
                         ifname[0] ? ", interface: " : "",
-                        ifname[0] ? ifname : "",
-                        should_schedule ?
-                            "; scheduling baseline restore" :
-                            "; nothing active to revert");
+                        ifname[0] ? ifname : "");
         } else {
-            bpftune_log(LOG_NOTICE,
-                        "Gaming traffic quiet (pps: %d, variance: %ld%s%s)%s",
+            bpftune_log(LOG_DEBUG,
+                        "Gaming traffic quiet (pps: %d, variance: %ld%s%s); scheduling baseline restore",
                         pps, variance,
                         ifname[0] ? ", interface: " : "",
-                        ifname[0] ? ifname : "",
-                        should_schedule ?
-                            "; scheduling baseline restore" :
-                            "; nothing active to revert");
+                        ifname[0] ? ifname : "");
         }
 
-        if (should_schedule) {
-            gaming_schedule_revert();
-            bpftune_log(LOG_NOTICE,
-                        "Baseline restore will run if still quiet after %d seconds",
-                        GAMING_REVERT_GRACE_SECONDS);
-        }
+        gaming_schedule_revert();
         break;
     }
 
