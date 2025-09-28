@@ -1016,7 +1016,7 @@ static void revert_optimizations(struct bpftuner *tuner, int force)
             const char *details = summary_buffer_is_empty(&summary) ?
                                   "baseline already active" :
                                   summary_buffer_text(&summary);
-            bpftune_log(LOG_NOTICE, "Restored gaming tunables: %s%s",
+            bpftune_log(LOG_NOTICE, "Reverted gaming tunables: %s%s",
                         details,
                         summary_buffer_truncated(&summary) ? " ..." : "");
         } else {
