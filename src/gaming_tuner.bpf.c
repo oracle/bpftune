@@ -9,6 +9,58 @@
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_endian.h>
 
+static __always_inline char gaming_tolower(char c)
+{
+    if (c >= 'A' && c <= 'Z')
+        return c + ('a' - 'A');
+    return c;
+}
+
+static const char gaming_ignore_comms[][GAMING_TUNER_COMM_LEN] = {
+#define GAMING_IGNORE_ENTRY(str) str,
+    GAMING_TUNER_FOR_EACH_IGNORE(GAMING_IGNORE_ENTRY)
+#undef GAMING_IGNORE_ENTRY
+};
+
+#define GAMING_IGNORE_COMM_COUNT \
+    (sizeof(gaming_ignore_comms) / sizeof(gaming_ignore_comms[0]))
+
+#define GAMING_INTENSITY_DWELL_NS (5ULL * 1000000000ULL)
+
+static __always_inline bool gaming_comm_match(const char *comm, const char *pattern)
+{
+    for (int i = 0; i < GAMING_TUNER_COMM_LEN; i++) {
+        char p = pattern[i];
+
+        if (p == '*')
+            return true;
+
+        char c = comm[i];
+
+        if (!p)
+            return c == '\0';
+        if (!c)
+            return false;
+        if (gaming_tolower(c) != p)
+            return false;
+    }
+
+    return pattern[GAMING_TUNER_COMM_LEN - 1] == '*';
+}
+
+static __always_inline bool gaming_comm_ignored(const char *comm)
+{
+    if (!comm || !comm[0])
+        return false;
+
+    for (int i = 0; i < GAMING_IGNORE_COMM_COUNT; i++) {
+        if (gaming_comm_match(comm, gaming_ignore_comms[i]))
+            return true;
+    }
+
+    return false;
+}
+
 struct gaming_stats {
     __u64 udp_packets;
     __u64 tracked_udp_packets;
@@ -30,6 +82,8 @@ struct gaming_stats {
     struct bpf_timer timeout_timer;
 #endif
     __u32 active_ifindex;
+    char current_comm[GAMING_TUNER_COMM_LEN];
+    __u64 last_intensity_change;
 };
 
 struct {
@@ -44,7 +98,6 @@ static __always_inline __u32 calculate_smooth_pps(struct gaming_stats *stats)
     __u32 sum = 0;
     __u32 count = 0;
 
-#pragma unroll
     for (int i = 0; i < (int)GAMING_TUNER_PPS_HISTORY; i++) {
         if (stats->pps_history[i]) {
             sum += stats->pps_history[i];
@@ -60,7 +113,6 @@ static __always_inline __u32 calculate_pps_variance(struct gaming_stats *stats, 
     __u32 variance_sum = 0;
     __u32 count = 0;
 
-#pragma unroll
     for (int i = 0; i < (int)GAMING_TUNER_PPS_HISTORY; i++) {
         __u32 value = stats->pps_history[i];
         if (!value)
@@ -78,16 +130,28 @@ static __always_inline __u32 calculate_pps_variance(struct gaming_stats *stats, 
 
 static __always_inline void notify_userspace(__u32 scenario, __u32 intensity,
                                             __u32 pps, __u32 variance,
-                                            __u32 ifindex)
+                                            __u32 ifindex,
+                                            const char *comm)
 {
     struct bpftune_event event = {};
+    struct gaming_event_data *payload;
 
+    event.pid = (__u32)(bpf_get_current_pid_tgid() >> 32);
     event.tuner_id = tuner_id;
     event.scenario_id = scenario;
-    event.update[GAMING_TUNER_EVENT_INTENSITY].new[0] = intensity;
-    event.update[GAMING_TUNER_EVENT_PPS].new[0] = pps;
-    event.update[GAMING_TUNER_EVENT_VARIANCE].new[0] = variance;
-    event.update[GAMING_TUNER_EVENT_IFINDEX].new[0] = ifindex;
+    payload = (struct gaming_event_data *)event.raw_data;
+    payload->intensity = intensity;
+    payload->pps = pps;
+    payload->variance = variance;
+    payload->ifindex = ifindex;
+
+    if (comm) {
+        for (int i = 0; i < GAMING_TUNER_COMM_LEN; i++) {
+            payload->comm[i] = comm[i];
+            if (!comm[i])
+                break;
+        }
+    }
 
     bpf_ringbuf_output(&ring_buffer_map, &event, sizeof(event), 0);
 }
@@ -123,12 +187,15 @@ static int gaming_timeout_cb(void *map, int *key, struct gaming_stats *stats)
                          stats->game_intensity,
                          stats->current_pps,
                          stats->pps_variance,
-                         stats->active_ifindex);
+                         stats->active_ifindex,
+                         stats->current_comm);
         stats->is_gaming = 0;
         stats->steady_periods = 0;
         stats->game_intensity = 0;
         stats->current_pps = 0;
         stats->pps_variance = 0;
+        stats->current_comm[0] = '\0';
+        stats->last_intensity_change = 0;
         return 0;
     }
 
@@ -210,6 +277,8 @@ static __always_inline void handle_pps_window(struct gaming_stats *stats, __u64 
     __u32 variance;
     __u64 recent_packets;
     __u64 quic_packets;
+    char current_comm[GAMING_TUNER_COMM_LEN] = {};
+    bool sample_comm_ignored = false;
 
     stats->pps_history_idx = (stats->pps_history_idx + 1) % GAMING_TUNER_PPS_HISTORY;
     stats->pps_history[stats->pps_history_idx] = stats->tracked_udp_packets;
@@ -225,6 +294,19 @@ static __always_inline void handle_pps_window(struct gaming_stats *stats, __u64 
     stats->tracked_udp_packets = 0;
     stats->last_pps_update = now;
     stats->quic_packets = 0;
+
+    if (bpf_get_current_comm(current_comm, sizeof(current_comm)) == 0) {
+        sample_comm_ignored = gaming_comm_ignored(current_comm);
+
+        if (!sample_comm_ignored) {
+            __builtin_memset(stats->current_comm, 0, sizeof(stats->current_comm));
+            for (int i = 0; i < GAMING_TUNER_COMM_LEN; i++) {
+                stats->current_comm[i] = current_comm[i];
+                if (!current_comm[i])
+                    break;
+            }
+        }
+    }
 
     if (!stats->is_gaming) {
         if (smooth_pps >= GAMING_TUNER_UDP_MIN_PPS) {
@@ -252,6 +334,21 @@ static __always_inline void handle_pps_window(struct gaming_stats *stats, __u64 
                 (!bursty && stats->steady_periods >= 3)) {
                 __u32 start_intensity;
 
+                if (sample_comm_ignored && stats->current_comm[0] == '\0') {
+                    stats->steady_periods = 0;
+                    stats->calm_periods = 0;
+                    stats->intensity_candidate = 0;
+                    stats->intensity_confidence = 0;
+                    stats->game_intensity = 0;
+                    stats->reported_intensity = 0;
+                    return;
+                }
+
+                if (stats->current_comm[0] == '\0') {
+                    stats->steady_periods = 0;
+                    return;
+                }
+
                 stats->is_gaming = 1;
                 stats->steady_periods = 0;
                 stats->calm_periods = 0;
@@ -266,7 +363,9 @@ static __always_inline void handle_pps_window(struct gaming_stats *stats, __u64 
                                  start_intensity,
                                  smooth_pps,
                                  variance,
-                                 stats->active_ifindex);
+                                 stats->active_ifindex,
+                                 stats->current_comm);
+                stats->last_intensity_change = now;
 #ifndef BPFTUNE_LEGACY
                 gaming_timer_schedule(stats, GAMING_TUNER_TIMEOUT_NS);
 #endif
@@ -281,11 +380,13 @@ static __always_inline void handle_pps_window(struct gaming_stats *stats, __u64 
                          stats->game_intensity,
                          smooth_pps,
                          variance,
-                         stats->active_ifindex);
+                         stats->active_ifindex,
+                         stats->current_comm);
         stats->is_gaming = 0;
         stats->steady_periods = 0;
         stats->calm_periods = 0;
         stats->game_intensity = 0;
+        stats->current_comm[0] = '\0';
         return;
     }
 #else
@@ -302,7 +403,8 @@ static __always_inline void handle_pps_window(struct gaming_stats *stats, __u64 
                          stats->game_intensity,
                          smooth_pps,
                          variance,
-                         stats->active_ifindex);
+                         stats->active_ifindex,
+                         stats->current_comm);
         stats->is_gaming = 0;
         stats->steady_periods = 0;
         stats->calm_periods = 0;
@@ -310,6 +412,8 @@ static __always_inline void handle_pps_window(struct gaming_stats *stats, __u64 
         stats->reported_intensity = 0;
         stats->intensity_candidate = 0;
         stats->intensity_confidence = 0;
+        stats->current_comm[0] = '\0';
+        stats->last_intensity_change = 0;
         return;
     }
 
@@ -322,6 +426,12 @@ static __always_inline void handle_pps_window(struct gaming_stats *stats, __u64 
             smooth_pps > GAMING_TUNER_IDLE_PPS)
             candidate = stats->reported_intensity;
 
+        if (sample_comm_ignored && stats->current_comm[0] == '\0')
+            return;
+
+        if (stats->current_comm[0] == '\0')
+            return;
+
         if (candidate != stats->intensity_candidate) {
             stats->intensity_candidate = candidate;
             stats->intensity_confidence = 1;
@@ -330,22 +440,37 @@ static __always_inline void handle_pps_window(struct gaming_stats *stats, __u64 
         }
 
         if (candidate != stats->reported_intensity) {
-            __u32 required = 2;
+            __u32 required;
+            __u64 since_change;
 
-            if (candidate < stats->reported_intensity)
-                required = (candidate == 0) ? 4 : 3;
+            since_change = stats->last_intensity_change ?
+                           (now - stats->last_intensity_change) :
+                           GAMING_INTENSITY_DWELL_NS;
+
+            if (since_change < GAMING_INTENSITY_DWELL_NS)
+                goto out;
+
+            if (candidate > stats->reported_intensity)
+                required = 3;
+            else if (candidate == 0)
+                required = 6;
+            else
+                required = 4;
 
             if (stats->intensity_confidence >= required) {
                 stats->reported_intensity = candidate;
+                stats->last_intensity_change = now;
                 notify_userspace(GAMING_SCENARIO_DETECTED,
                                  candidate,
                                  smooth_pps,
                                  variance,
-                                 stats->active_ifindex);
+                                 stats->active_ifindex,
+                                 stats->current_comm);
             }
         }
     }
 
+out:
     stats->game_intensity = stats->reported_intensity;
 }
 

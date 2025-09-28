@@ -10,7 +10,10 @@
 #include <bpftune/libbpftune.h>
 #include <bpftune/bpftune.h>
 
+#include <ctype.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <strings.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -199,6 +202,235 @@ static int summary_buffer_truncated(const struct summary_buffer *buffer)
     return buffer && buffer->truncated;
 }
 
+static char gaming_tolower_char(char c)
+{
+    if (c >= 'A' && c <= 'Z')
+        return c + ('a' - 'A');
+    return c;
+}
+
+static int gaming_comm_matches(const char *comm, const char *pattern)
+{
+    size_t i;
+
+    if (!comm || !pattern)
+        return 0;
+
+    for (i = 0; i < GAMING_TUNER_COMM_LEN; i++) {
+        char p = pattern[i];
+
+        if (p == '*')
+            return 1;
+
+        char c = comm[i];
+
+        if (p == '\0')
+            return c == '\0';
+        if (c == '\0')
+            return 0;
+        if (gaming_tolower_char(c) != p)
+            return 0;
+    }
+
+    return pattern[GAMING_TUNER_COMM_LEN - 1] == '*';
+}
+
+static int gaming_process_ignored(const char *comm)
+{
+    if (!comm || !comm[0])
+        return 0;
+
+#define GAMING_IGNORE_ENTRY(str) \
+    if (gaming_comm_matches(comm, str)) \
+        return 1;
+
+    GAMING_TUNER_FOR_EACH_IGNORE(GAMING_IGNORE_ENTRY)
+
+#undef GAMING_IGNORE_ENTRY
+
+    return 0;
+}
+
+static void gaming_copy_comm(char *dst, size_t dst_len, const char *src)
+{
+    size_t copy_len;
+
+    if (!dst || !dst_len)
+        return;
+
+    memset(dst, 0, dst_len);
+
+    if (!src)
+        return;
+
+    copy_len = strnlen(src, dst_len - 1);
+    if (copy_len)
+        memcpy(dst, src, copy_len);
+}
+
+static int gaming_launcher_comm(const char *comm)
+{
+    if (!comm || !comm[0])
+        return 0;
+
+#define GAMING_LAUNCHER_ENTRY(str) \
+    if (gaming_comm_matches(comm, str)) \
+        return 1;
+
+    GAMING_TUNER_FOR_EACH_LAUNCHER(GAMING_LAUNCHER_ENTRY)
+
+#undef GAMING_LAUNCHER_ENTRY
+
+    return 0;
+}
+
+static int gaming_read_proc_status(pid_t pid, char *comm, size_t comm_len, pid_t *ppid)
+{
+    char path[64];
+    FILE *f;
+    char line[256];
+    int need_comm = comm && comm_len;
+    int need_ppid = ppid != NULL;
+
+    if (comm && comm_len)
+        comm[0] = '\0';
+    if (ppid)
+        *ppid = -1;
+
+    if (pid <= 0)
+        return -EINVAL;
+
+    snprintf(path, sizeof(path), "/proc/%d/status", pid);
+    f = fopen(path, "re");
+    if (!f)
+        return -errno;
+
+    while ((need_comm || need_ppid) && fgets(line, sizeof(line), f)) {
+        if (need_comm && strncmp(line, "Name:", 5) == 0) {
+            char *value = line + 5;
+
+            while (*value && isspace((unsigned char)*value))
+                value++;
+
+            char *end = value + strlen(value);
+            while (end > value && isspace((unsigned char)end[-1]))
+                end--;
+
+            size_t len = (size_t)(end - value);
+            if (len >= comm_len)
+                len = comm_len ? comm_len - 1 : 0;
+
+            if (comm && comm_len) {
+                if (len && comm_len)
+                    memcpy(comm, value, len);
+                if (comm_len)
+                    comm[len] = '\0';
+            }
+
+            need_comm = 0;
+        } else if (need_ppid && strncmp(line, "PPid:", 5) == 0) {
+            char *value = line + 5;
+
+            while (*value && isspace((unsigned char)*value))
+                value++;
+
+            long parsed = strtol(value, NULL, 10);
+            if (ppid)
+                *ppid = (pid_t)parsed;
+            need_ppid = 0;
+        }
+    }
+
+    fclose(f);
+
+    if ((comm && comm_len && comm[0] == '\0') && need_comm)
+        return -ENOENT;
+    if (ppid && *ppid < 0 && need_ppid)
+        return -ENOENT;
+
+    return 0;
+}
+
+static int gaming_cmdline_launcher(pid_t pid)
+{
+    char path[64];
+    int fd;
+    ssize_t len;
+    static const size_t buf_sz = 4096;
+    char *buf;
+    int trusted = 0;
+
+    if (pid <= 0)
+        return 0;
+
+    snprintf(path, sizeof(path), "/proc/%d/cmdline", pid);
+    fd = open(path, O_RDONLY);
+    if (fd < 0)
+        return 0;
+
+    buf = malloc(buf_sz);
+    if (!buf) {
+        close(fd);
+        return 0;
+    }
+
+    len = read(fd, buf, buf_sz - 1);
+    close(fd);
+
+    if (len <= 0) {
+        free(buf);
+        return 0;
+    }
+
+    for (ssize_t i = 0; i < len; i++) {
+        if (buf[i] == '\0')
+            buf[i] = ' ';
+    }
+    buf[len] = '\0';
+
+#define GAMING_LAUNCHER_CMD_ENTRY(str) \
+    if (!trusted && strcasestr(buf, (str))) \
+        trusted = 1;
+
+    GAMING_TUNER_FOR_EACH_LAUNCHER_CMD(GAMING_LAUNCHER_CMD_ENTRY)
+
+#undef GAMING_LAUNCHER_CMD_ENTRY
+
+    free(buf);
+    return trusted;
+}
+
+static int gaming_process_trusted(pid_t pid)
+{
+    pid_t current = pid;
+
+    for (int depth = 0; depth < 6; depth++) {
+        char comm[GAMING_TUNER_COMM_LEN] = { 0 };
+        pid_t parent = -1;
+        int ret;
+
+        if (current <= 0)
+            break;
+
+        ret = gaming_read_proc_status(current, comm, sizeof(comm), &parent);
+        if (ret < 0) {
+            if (depth == 0)
+                return 0;
+            break;
+        }
+
+        if (gaming_launcher_comm(comm) || gaming_cmdline_launcher(current))
+            return 1;
+
+        if (parent <= 0 || parent == current)
+            break;
+
+        current = parent;
+    }
+
+    return 0;
+}
+
 static size_t clamp_profile_index(int intensity)
 {
     if (intensity < 0)
@@ -221,6 +453,7 @@ struct gaming_state {
     unsigned int revert_count;
     unsigned int active_ifindex;
     char active_ifname[IF_NAMESIZE];
+    char active_comm[GAMING_TUNER_COMM_LEN];
     int pending_revert;
     time_t revert_deadline;
 };
@@ -776,6 +1009,7 @@ static void revert_optimizations(struct bpftuner *tuner, int force)
         g_state.intensity = 0;
         g_state.active_ifindex = 0;
         g_state.active_ifname[0] = '\0';
+        g_state.active_comm[0] = '\0';
         pthread_cond_broadcast(&g_state_cond);
         pthread_mutex_unlock(&g_state_lock);
         if (restored) {
@@ -868,16 +1102,48 @@ void event_handler(struct bpftuner *tuner, struct bpftune_event *event,
 
     switch (event->scenario_id) {
     case GAMING_SCENARIO_DETECTED: {
-        int intensity = event->update[GAMING_TUNER_EVENT_INTENSITY].new[0];
-        int pps = event->update[GAMING_TUNER_EVENT_PPS].new[0];
-        long variance = event->update[GAMING_TUNER_EVENT_VARIANCE].new[0];
-        unsigned int ifindex = event->update[GAMING_TUNER_EVENT_IFINDEX].new[0];
+        struct gaming_event_data data = {};
         char ifname[IF_NAMESIZE] = { 0 };
-        size_t profile_idx = clamp_profile_index(intensity);
-        const char *profile_name = profiles[profile_idx].name;
+        char comm[GAMING_TUNER_COMM_LEN] = { 0 };
+        int intensity;
+        int pps;
+        long variance;
+        unsigned int ifindex;
+        size_t profile_idx;
+        const char *profile_name;
+
+        memcpy(&data, event->raw_data, sizeof(data));
+
+        intensity = (int)data.intensity;
+        pps = (int)data.pps;
+        variance = (long)data.variance;
+        ifindex = data.ifindex;
+        profile_idx = clamp_profile_index(intensity);
+        profile_name = profiles[profile_idx].name;
+
+        gaming_copy_comm(comm, sizeof(comm), data.comm);
 
         if (ifindex)
             if_indextoname(ifindex, ifname);
+
+        if (gaming_process_ignored(comm)) {
+            bpftune_log(LOG_DEBUG,
+                        "Ignoring gaming detection from process %s (pps: %d, variance: %ld)",
+                        comm, pps, variance);
+            break;
+        }
+
+        if (!gaming_launcher_comm(comm)) {
+            pid_t pid = (pid_t)event->pid;
+
+            if (!gaming_process_trusted(pid)) {
+                bpftune_log(LOG_DEBUG,
+                            "Ignoring gaming detection from untrusted lineage (pid: %d, process: %s)",
+                            event->pid,
+                            comm[0] ? comm : "");
+                break;
+            }
+        }
 
         pthread_mutex_lock(&g_state_lock);
         g_state.intensity = intensity;
@@ -890,14 +1156,23 @@ void event_handler(struct bpftuner *tuner, struct bpftune_event *event,
         else
             g_state.active_ifname[0] = '\0';
         g_state.active_ifname[sizeof(g_state.active_ifname) - 1] = '\0';
+        gaming_copy_comm(g_state.active_comm, sizeof(g_state.active_comm), comm);
         pthread_cond_broadcast(&g_state_cond);
         pthread_mutex_unlock(&g_state_lock);
 
-        bpftune_log(LOG_NOTICE,
-                    "Detected %s gaming profile (pps: %d, variance: %ld%s%s)",
-                    profile_name, pps, variance,
-                    ifname[0] ? ", interface: " : "",
-                    ifname[0] ? ifname : "");
+        if (comm[0]) {
+            bpftune_log(LOG_NOTICE,
+                        "Detected %s gaming profile (process: %s, pps: %d, variance: %ld%s%s)",
+                        profile_name, comm, pps, variance,
+                        ifname[0] ? ", interface: " : "",
+                        ifname[0] ? ifname : "");
+        } else {
+            bpftune_log(LOG_NOTICE,
+                        "Detected %s gaming profile (pps: %d, variance: %ld%s%s)",
+                        profile_name, pps, variance,
+                        ifname[0] ? ", interface: " : "",
+                        ifname[0] ? ifname : "");
+        }
 
         apply_profile(tuner, intensity, 0);
         apply_interface_tuning(ifindex, intensity);
@@ -905,11 +1180,21 @@ void event_handler(struct bpftuner *tuner, struct bpftune_event *event,
     }
 
     case GAMING_SCENARIO_ENDED: {
-        int pps = event->update[GAMING_TUNER_EVENT_PPS].new[0];
-        long variance = event->update[GAMING_TUNER_EVENT_VARIANCE].new[0];
-        unsigned int ifindex = event->update[GAMING_TUNER_EVENT_IFINDEX].new[0];
+        struct gaming_event_data data = {};
         char ifname[IF_NAMESIZE] = { 0 };
+        char comm[GAMING_TUNER_COMM_LEN] = { 0 };
+        int pps;
+        long variance;
+        unsigned int ifindex;
         int should_schedule;
+
+        memcpy(&data, event->raw_data, sizeof(data));
+
+        pps = (int)data.pps;
+        variance = (long)data.variance;
+        ifindex = data.ifindex;
+
+        gaming_copy_comm(comm, sizeof(comm), data.comm);
 
         if (ifindex)
             if_indextoname(ifindex, ifname);
@@ -925,14 +1210,25 @@ void event_handler(struct bpftuner *tuner, struct bpftune_event *event,
         should_schedule = g_state.active;
         pthread_mutex_unlock(&g_state_lock);
 
-        bpftune_log(LOG_NOTICE,
-                    "Gaming traffic quiet (pps: %d, variance: %ld%s%s)%s",
-                    pps, variance,
-                    ifname[0] ? ", interface: " : "",
-                    ifname[0] ? ifname : "",
-                    should_schedule ?
-                        "; scheduling baseline restore" :
-                        "; nothing active to revert");
+        if (comm[0]) {
+            bpftune_log(LOG_NOTICE,
+                        "Gaming traffic quiet (process: %s, pps: %d, variance: %ld%s%s)%s",
+                        comm, pps, variance,
+                        ifname[0] ? ", interface: " : "",
+                        ifname[0] ? ifname : "",
+                        should_schedule ?
+                            "; scheduling baseline restore" :
+                            "; nothing active to revert");
+        } else {
+            bpftune_log(LOG_NOTICE,
+                        "Gaming traffic quiet (pps: %d, variance: %ld%s%s)%s",
+                        pps, variance,
+                        ifname[0] ? ", interface: " : "",
+                        ifname[0] ? ifname : "",
+                        should_schedule ?
+                            "; scheduling baseline restore" :
+                            "; nothing active to revert");
+        }
 
         if (should_schedule) {
             gaming_schedule_revert();

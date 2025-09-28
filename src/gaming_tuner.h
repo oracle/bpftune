@@ -8,6 +8,51 @@
 
 #include <bpftune/bpftune.h>
 
+#ifndef GAMING_TUNER_COMM_LEN
+#ifdef TASK_COMM_LEN
+#define GAMING_TUNER_COMM_LEN TASK_COMM_LEN
+#else
+#define GAMING_TUNER_COMM_LEN 16
+#endif
+#endif
+
+#define GAMING_TUNER_FOR_EACH_IGNORE(ENTRY) \
+	ENTRY("discord") \
+	ENTRY("discordcanary") \
+	ENTRY("steam") \
+	ENTRY("steamwebhelper") \
+	ENTRY("steamservice") \
+	ENTRY("avahi-daemon") \
+	ENTRY("qbittorrent") \
+	ENTRY("qbittorrent-nox") \
+	ENTRY("transmission") \
+	ENTRY("transmission-da") \
+	ENTRY("transmission-gt") \
+	ENTRY("deluge-gtk") \
+	ENTRY("deluged") \
+	ENTRY("deluge-web") \
+	ENTRY("rtorrent") \
+	ENTRY("aria2c") \
+	ENTRY("ktorrent") \
+	ENTRY("utp::*") \
+	ENTRY("ipc:csteam*") \
+	ENTRY("chrome*") \
+	ENTRY("systemd-resolve") \
+	ENTRY("tokio-runtime-w")
+
+#define GAMING_TUNER_FOR_EACH_LAUNCHER(ENTRY) \
+	ENTRY("steam") \
+	ENTRY("steamwebhelper") \
+	ENTRY("pressure-vessel") \
+	ENTRY("gamescope") \
+	ENTRY("gamemoderun") \
+	ENTRY("gamemoded") \
+	ENTRY("heroic") \
+	ENTRY("lutris") \
+	ENTRY("legendary") \
+	ENTRY("bottles") \
+	ENTRY("mangohud")
+
 /* Number of samples stored when smoothing packets-per-second estimates. */
 #define GAMING_TUNER_PPS_HISTORY 8
 
@@ -67,4 +112,26 @@ enum gaming_tuner_event_index {
 	GAMING_TUNER_EVENT_COUNT,
 };
 
+struct gaming_event_data {
+	__u32 intensity;
+	__u32 pps;
+	__u32 variance;
+	__u32 ifindex;
+	char comm[GAMING_TUNER_COMM_LEN];
+};
+
 #endif /* GAMING_TUNER_H */
+#define GAMING_TUNER_FOR_EACH_LAUNCHER_CMD(ENTRY) \
+	ENTRY("steamapps/") \
+	ENTRY("SteamLaunch") \
+	ENTRY("PressureVessel") \
+	ENTRY("pressure-vessel") \
+	ENTRY("gamescope") \
+	ENTRY("gamemoderun") \
+	ENTRY("gamemode") \
+	ENTRY("heroic") \
+	ENTRY("lutris") \
+	ENTRY("legendary") \
+	ENTRY("bottles") \
+	ENTRY("mangohud") \
+	ENTRY("proton")
