@@ -9,62 +9,11 @@
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_endian.h>
 
-static __always_inline char gaming_tolower(char c)
-{
-    if (c >= 'A' && c <= 'Z')
-        return c + ('a' - 'A');
-    return c;
-}
-
-static const char gaming_ignore_comms[][GAMING_TUNER_COMM_LEN] = {
-#define GAMING_IGNORE_ENTRY(str) str,
-    GAMING_TUNER_FOR_EACH_IGNORE(GAMING_IGNORE_ENTRY)
-#undef GAMING_IGNORE_ENTRY
-};
-
-#define GAMING_IGNORE_COMM_COUNT \
-    (sizeof(gaming_ignore_comms) / sizeof(gaming_ignore_comms[0]))
-
 #define GAMING_INTENSITY_DWELL_NS (5ULL * 1000000000ULL)
-
-static __always_inline bool gaming_comm_match(const char *comm, const char *pattern)
-{
-    for (int i = 0; i < GAMING_TUNER_COMM_LEN; i++) {
-        char p = pattern[i];
-
-        if (p == '*')
-            return true;
-
-        char c = comm[i];
-
-        if (!p)
-            return c == '\0';
-        if (!c)
-            return false;
-        if (gaming_tolower(c) != p)
-            return false;
-    }
-
-    return pattern[GAMING_TUNER_COMM_LEN - 1] == '*';
-}
-
-static __always_inline bool gaming_comm_ignored(const char *comm)
-{
-    if (!comm || !comm[0])
-        return false;
-
-    for (int i = 0; i < GAMING_IGNORE_COMM_COUNT; i++) {
-        if (gaming_comm_match(comm, gaming_ignore_comms[i]))
-            return true;
-    }
-
-    return false;
-}
 
 struct gaming_stats {
     __u64 udp_packets;
     __u64 tracked_udp_packets;
-    __u64 quic_packets;
     __u64 last_activity;
     __u32 current_pps;
     __u32 is_gaming;
@@ -239,9 +188,6 @@ static __always_inline void gaming_count_packet(struct gaming_stats *stats,
     if (len <= GAMING_TUNER_UDP_MAX_SIZE) {
         stats->tracked_udp_packets++;
 
-        if (dport == 443)
-            stats->quic_packets++;
-
         if (now - stats->last_pps_update >= GAMING_PPS_WINDOW_NS)
             handle_pps_window(stats, now);
     }
@@ -276,9 +222,7 @@ static __always_inline void handle_pps_window(struct gaming_stats *stats, __u64 
     __u32 smooth_pps;
     __u32 variance;
     __u64 recent_packets;
-    __u64 quic_packets;
     char current_comm[GAMING_TUNER_COMM_LEN] = {};
-    bool sample_comm_ignored = false;
 
     stats->pps_history_idx = (stats->pps_history_idx + 1) % GAMING_TUNER_PPS_HISTORY;
     stats->pps_history[stats->pps_history_idx] = stats->tracked_udp_packets;
@@ -287,43 +231,41 @@ static __always_inline void handle_pps_window(struct gaming_stats *stats, __u64 
     variance = calculate_pps_variance(stats, smooth_pps);
 
     recent_packets = stats->tracked_udp_packets;
-    quic_packets = stats->quic_packets;
 
     stats->current_pps = smooth_pps;
     stats->pps_variance = variance;
     stats->tracked_udp_packets = 0;
     stats->last_pps_update = now;
-    stats->quic_packets = 0;
 
     if (bpf_get_current_comm(current_comm, sizeof(current_comm)) == 0) {
-        sample_comm_ignored = gaming_comm_ignored(current_comm);
-
-        if (!sample_comm_ignored) {
-            __builtin_memset(stats->current_comm, 0, sizeof(stats->current_comm));
-            for (int i = 0; i < GAMING_TUNER_COMM_LEN; i++) {
-                stats->current_comm[i] = current_comm[i];
-                if (!current_comm[i])
-                    break;
-            }
+        __builtin_memset(stats->current_comm, 0, sizeof(stats->current_comm));
+        for (int i = 0; i < GAMING_TUNER_COMM_LEN; i++) {
+            stats->current_comm[i] = current_comm[i];
+            if (!current_comm[i])
+                break;
         }
     }
 
     if (!stats->is_gaming) {
         if (smooth_pps >= GAMING_TUNER_UDP_MIN_PPS) {
             __u32 variance_threshold = smooth_pps / 2;
+            __u32 variance_rel;
             bool bursty = recent_packets >= (GAMING_TUNER_UDP_MIN_PPS * 2);
-            bool quic_heavy = quic_packets >= GAMING_TUNER_UDP_MIN_PPS;
 
-            if (variance_threshold < 15)
-                variance_threshold = 15;
+            if (variance_threshold < GAMING_TUNER_VARIANCE_MIN)
+                variance_threshold = GAMING_TUNER_VARIANCE_MIN;
+
+            variance_rel = (__u32)(((__u64)smooth_pps * GAMING_TUNER_VARIANCE_REL_NUM) /
+                                   GAMING_TUNER_VARIANCE_REL_DEN);
+            if (variance_rel < GAMING_TUNER_VARIANCE_MIN)
+                variance_rel = GAMING_TUNER_VARIANCE_MIN;
+            if (variance_threshold < variance_rel)
+                variance_threshold = variance_rel;
 
             if (!bursty && smooth_pps < GAMING_TUNER_UDP_MIN_PPS + 3) {
                 stats->steady_periods = 0;
                 return;
             }
-
-            if (quic_heavy && !bursty)
-                return;
 
             if (variance <= variance_threshold || bursty)
                 stats->steady_periods++;
@@ -333,16 +275,6 @@ static __always_inline void handle_pps_window(struct gaming_stats *stats, __u64 
             if ((bursty && stats->steady_periods >= 2) ||
                 (!bursty && stats->steady_periods >= 3)) {
                 __u32 start_intensity;
-
-                if (sample_comm_ignored && stats->current_comm[0] == '\0') {
-                    stats->steady_periods = 0;
-                    stats->calm_periods = 0;
-                    stats->intensity_candidate = 0;
-                    stats->intensity_confidence = 0;
-                    stats->game_intensity = 0;
-                    stats->reported_intensity = 0;
-                    return;
-                }
 
                 if (stats->current_comm[0] == '\0') {
                     stats->steady_periods = 0;
@@ -425,9 +357,6 @@ static __always_inline void handle_pps_window(struct gaming_stats *stats, __u64 
         if (candidate == 0 && stats->reported_intensity > 0 &&
             smooth_pps > GAMING_TUNER_IDLE_PPS)
             candidate = stats->reported_intensity;
-
-        if (sample_comm_ignored && stats->current_comm[0] == '\0')
-            return;
 
         if (stats->current_comm[0] == '\0')
             return;

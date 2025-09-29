@@ -13,11 +13,11 @@
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <strings.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <time.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
@@ -235,22 +235,6 @@ static int gaming_comm_matches(const char *comm, const char *pattern)
     return pattern[GAMING_TUNER_COMM_LEN - 1] == '*';
 }
 
-static int gaming_process_ignored(const char *comm)
-{
-    if (!comm || !comm[0])
-        return 0;
-
-#define GAMING_IGNORE_ENTRY(str) \
-    if (gaming_comm_matches(comm, str)) \
-        return 1;
-
-    GAMING_TUNER_FOR_EACH_IGNORE(GAMING_IGNORE_ENTRY)
-
-#undef GAMING_IGNORE_ENTRY
-
-    return 0;
-}
-
 static void gaming_copy_comm(char *dst, size_t dst_len, const char *src)
 {
     size_t copy_len;
@@ -266,6 +250,27 @@ static void gaming_copy_comm(char *dst, size_t dst_len, const char *src)
     copy_len = strnlen(src, dst_len - 1);
     if (copy_len)
         memcpy(dst, src, copy_len);
+}
+
+static void gaming_lineage_append(char *buffer, size_t buffer_len, const char *entry)
+{
+    size_t used;
+    int written;
+
+    if (!buffer || !buffer_len || !entry || !entry[0])
+        return;
+
+    used = strnlen(buffer, buffer_len);
+    if (used >= buffer_len - 1)
+        return;
+
+    written = snprintf(buffer + used, buffer_len - used, "%s%s",
+                       used ? " <- " : "", entry);
+    if (written < 0)
+        return;
+
+    if ((size_t)written >= buffer_len - used)
+        buffer[buffer_len - 1] = '\0';
 }
 
 static int gaming_launcher_comm(const char *comm)
@@ -400,9 +405,15 @@ static int gaming_cmdline_launcher(pid_t pid)
     return trusted;
 }
 
-static int gaming_process_trusted(pid_t pid)
+static int gaming_process_trusted(pid_t pid, char *lineage, size_t lineage_len,
+                                  int *matched_cmdline)
 {
     pid_t current = pid;
+
+    if (lineage && lineage_len)
+        lineage[0] = '\0';
+    if (matched_cmdline)
+        *matched_cmdline = 0;
 
     for (int depth = 0; depth < 6; depth++) {
         char comm[GAMING_TUNER_COMM_LEN] = { 0 };
@@ -419,8 +430,14 @@ static int gaming_process_trusted(pid_t pid)
             break;
         }
 
+        gaming_lineage_append(lineage, lineage_len, comm);
+
         if (gaming_launcher_comm(comm) || gaming_cmdline_launcher(current))
-            return 1;
+            {
+                if (matched_cmdline && !gaming_launcher_comm(comm))
+                    *matched_cmdline = 1;
+                return 1;
+            }
 
         if (parent <= 0 || parent == current)
             break;
@@ -1126,21 +1143,19 @@ void event_handler(struct bpftuner *tuner, struct bpftune_event *event,
         if (ifindex)
             if_indextoname(ifindex, ifname);
 
-        if (gaming_process_ignored(comm)) {
-            bpftune_log(LOG_DEBUG,
-                        "Ignoring gaming detection from process %s (pps: %d, variance: %ld)",
-                        comm, pps, variance);
-            break;
-        }
-
         if (!gaming_launcher_comm(comm)) {
             pid_t pid = (pid_t)event->pid;
+            char lineage[256] = { 0 };
+            int matched_cmdline = 0;
 
-            if (!gaming_process_trusted(pid)) {
+            if (!gaming_process_trusted(pid, lineage, sizeof(lineage),
+                                        &matched_cmdline)) {
                 bpftune_log(LOG_DEBUG,
-                            "Ignoring gaming detection from untrusted lineage (pid: %d, process: %s)",
+                            "Ignoring gaming detection from untrusted lineage (pid: %d, process: %s%s%s)",
                             event->pid,
-                            comm[0] ? comm : "");
+                            comm[0] ? comm : "",
+                            lineage[0] ? ", lineage: " : "",
+                            lineage[0] ? lineage : "");
                 break;
             }
         }
@@ -1183,6 +1198,9 @@ void event_handler(struct bpftuner *tuner, struct bpftune_event *event,
         struct gaming_event_data data = {};
         char ifname[IF_NAMESIZE] = { 0 };
         char comm[GAMING_TUNER_COMM_LEN] = { 0 };
+        char tracked_comm[GAMING_TUNER_COMM_LEN] = { 0 };
+        const char *log_comm = NULL;
+        int was_active;
         int pps;
         long variance;
         unsigned int ifindex;
@@ -1199,19 +1217,31 @@ void event_handler(struct bpftuner *tuner, struct bpftune_event *event,
             if_indextoname(ifindex, ifname);
 
         pthread_mutex_lock(&g_state_lock);
-        g_state.current_pps = pps;
-        if (ifindex) {
-            g_state.active_ifindex = ifindex;
-            if (ifname[0])
-                snprintf(g_state.active_ifname, sizeof(g_state.active_ifname), "%s", ifname);
+        was_active = g_state.active;
+        if (was_active) {
+            g_state.current_pps = pps;
+            if (ifindex) {
+                g_state.active_ifindex = ifindex;
+                if (ifname[0])
+                    snprintf(g_state.active_ifname, sizeof(g_state.active_ifname), "%s", ifname);
+            }
+            g_state.active_ifname[sizeof(g_state.active_ifname) - 1] = '\0';
+            gaming_copy_comm(tracked_comm, sizeof(tracked_comm), g_state.active_comm);
         }
-        g_state.active_ifname[sizeof(g_state.active_ifname) - 1] = '\0';
         pthread_mutex_unlock(&g_state_lock);
 
-        if (comm[0]) {
-            bpftune_log(LOG_NOTICE,
+        if (!was_active)
+            break;
+
+        if (tracked_comm[0])
+            log_comm = tracked_comm;
+        else if (comm[0])
+            log_comm = comm;
+
+        if (log_comm) {
+            bpftune_log(LOG_DEBUG,
                         "Gaming traffic quiet (process: %s, pps: %d, variance: %ld%s%s); scheduling baseline restore",
-                        comm, pps, variance,
+                        log_comm, pps, variance,
                         ifname[0] ? ", interface: " : "",
                         ifname[0] ? ifname : "");
         } else {

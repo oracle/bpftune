@@ -16,33 +16,10 @@
 #endif
 #endif
 
-#define GAMING_TUNER_FOR_EACH_IGNORE(ENTRY) \
-	ENTRY("discord") \
-	ENTRY("discordcanary") \
-	ENTRY("steam") \
-	ENTRY("steamwebhelper") \
-	ENTRY("steamservice") \
-	ENTRY("avahi-daemon") \
-	ENTRY("qbittorrent") \
-	ENTRY("qbittorrent-nox") \
-	ENTRY("transmission") \
-	ENTRY("transmission-da") \
-	ENTRY("transmission-gt") \
-	ENTRY("deluge-gtk") \
-	ENTRY("deluged") \
-	ENTRY("deluge-web") \
-	ENTRY("rtorrent") \
-	ENTRY("aria2c") \
-	ENTRY("ktorrent") \
-	ENTRY("utp::*") \
-	ENTRY("ipc:csteam*") \
-	ENTRY("chrome*") \
-	ENTRY("systemd-resolve") \
-	ENTRY("tokio-runtime-w")
-
 #define GAMING_TUNER_FOR_EACH_LAUNCHER(ENTRY) \
 	ENTRY("steam") \
 	ENTRY("steamwebhelper") \
+	ENTRY("steam-runtime*") \
 	ENTRY("pressure-vessel") \
 	ENTRY("gamescope") \
 	ENTRY("gamemoderun") \
@@ -51,7 +28,10 @@
 	ENTRY("lutris") \
 	ENTRY("legendary") \
 	ENTRY("bottles") \
-	ENTRY("mangohud")
+	ENTRY("mangohud") \
+	ENTRY("proton") \
+	ENTRY("steamworks*") \
+	ENTRY("wine*")
 
 /* Number of samples stored when smoothing packets-per-second estimates. */
 #define GAMING_TUNER_PPS_HISTORY 8
@@ -80,6 +60,10 @@
 	((GAMING_TUNER_INTENSE_PPS > GAMING_TUNER_INTENSITY_MARGIN) ? \
 	 (GAMING_TUNER_INTENSE_PPS - GAMING_TUNER_INTENSITY_MARGIN) : \
 	 GAMING_TUNER_COMP_HIGH)
+
+#define GAMING_TUNER_VARIANCE_MIN 15
+#define GAMING_TUNER_VARIANCE_REL_NUM 3
+#define GAMING_TUNER_VARIANCE_REL_DEN 2
 
 /* Nanoseconds without activity before declaring the session finished. */
 #define GAMING_TUNER_TIMEOUT_NS (5ULL * 1000000000ULL)
@@ -134,4 +118,9 @@ struct gaming_event_data {
 	ENTRY("legendary") \
 	ENTRY("bottles") \
 	ENTRY("mangohud") \
-	ENTRY("proton")
+	ENTRY("proton") \
+	ENTRY("steamapps/compatdata/") \
+	ENTRY("steamapps/common/") \
+	ENTRY("steam-runtime") \
+	ENTRY("wine") \
+	ENTRY(".exe")
