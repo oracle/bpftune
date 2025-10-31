@@ -295,6 +295,7 @@ void bpftune_cap_drop(void)
 
 static char bpftune_cgroup_path[PATH_MAX];
 static int __bpftune_cgroup_fd;
+static bool __bpftune_cgroup_mounted;
 
 int bpftune_cgroup_init(const char *cgroup_path)
 {
@@ -304,32 +305,26 @@ int bpftune_cgroup_init(const char *cgroup_path)
 	if (err)
 		return err;
 	strncpy(bpftune_cgroup_path, cgroup_path, sizeof(bpftune_cgroup_path));
-	__bpftune_cgroup_fd = open(cgroup_path, O_RDONLY);
-	if (__bpftune_cgroup_fd < 0) {
-		if (mkdir(cgroup_path, 0777)) {
-			err = -errno;
+	if (mkdir(cgroup_path, 0777)) {
+		err = -errno;
+		if (err != -EEXIST) {
 			bpftune_log(LOG_ERR, "couldnt create cgroup dir '%s': %s\n",
 				    cgroup_path, strerror(-err));
 			goto out;
 		}
-		close(__bpftune_cgroup_fd);
 	}
 	if (mount("none" , cgroup_path, "cgroup2", 0, NULL)) {
 		err = -errno;
 		if (err != -EEXIST && err != -EBUSY) {
 			bpftune_log(LOG_ERR, "couldnt mount cgroup2 for '%s': %s\n",
 				    cgroup_path, strerror(-err));
-			if (__bpftune_cgroup_fd > 0)
-				close(__bpftune_cgroup_fd);
 			goto out;
 		}
+	} else {
+		__bpftune_cgroup_mounted = true;
 	}
-	if (__bpftune_cgroup_fd < 0)
-		__bpftune_cgroup_fd = open(cgroup_path, O_RDONLY);
+	__bpftune_cgroup_fd = open(cgroup_path, O_RDONLY);
 	if (__bpftune_cgroup_fd < 0) {
-		/* we mounted above, unmount here. */
-		if (err == 0)
-			umount(cgroup_path);
 		err = -errno;
 		bpftune_log(LOG_ERR, "cannot open cgroup dir '%s': %s\n",
 			    cgroup_path, strerror(-err));
@@ -337,6 +332,8 @@ int bpftune_cgroup_init(const char *cgroup_path)
 		err = 0;
 	}
 out:
+	if (err)
+		bpftune_cgroup_fini();
 	bpftune_cap_drop();
 	return err;
 }
@@ -355,6 +352,13 @@ void bpftune_cgroup_fini(void)
 {
 	if (__bpftune_cgroup_fd)
 		close(__bpftune_cgroup_fd);
+	if (__bpftune_cgroup_mounted) {
+		if (bpftune_cap_add() == 0) {
+			umount(bpftune_cgroup_path);
+			rmdir(bpftune_cgroup_path);
+			bpftune_cap_drop();
+		}
+	}
 }
 
 int bpftuner_cgroup_attach(struct bpftuner *tuner, const char *prog_name,

@@ -429,6 +429,8 @@ int main(int argc, char *argv[])
 
 	support_level = bpftune_bpf_support();
 	print_support_level(support_level);
+	if (support_only)
+		bpftune_cgroup_fini();
 	if (support_level < BPFTUNE_SUPPORT_NOBTF) {
 		bpftune_log(BPFTUNE_LOG_LEVEL, "bpftune is not supported on this system; exiting\n");
 		return 1;
