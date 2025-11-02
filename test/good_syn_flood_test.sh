@@ -90,7 +90,7 @@ for NS in nonglobal global ; do
    FIREWALLD_PID=$(pgrep firewalld)
    set -e
    if [[ -n "$FIREWALLD_PID" ]]; then
-      service firewalld stop
+      service_cmd stop firewalld
    fi
 
    $SERVER_PREFIX ulimit -n 100000
@@ -123,7 +123,7 @@ for NS in nonglobal global ; do
 	fi
    done
    if [[ -n "$FIREWALLD_PID" ]]; then
-      service firewalld start
+      service_cmd start firewalld
    fi
 
    syn_backlog_post=$(sysctl -n net.ipv4.tcp_max_syn_backlog)

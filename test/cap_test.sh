@@ -30,7 +30,7 @@ SLEEPTIME=1
 
 test_setup "true"
 
-for BPFTUNECMD in "$BPFTUNE &" "service bpftune start" ; do
+for BPFTUNECMD in "$BPFTUNE &" "$(get_service_cmd start bpftune)" ; do
   test_start "$0|cap test: are caps dropped by '$BPFTUNECMD' after init?"
   test_run_cmd_local "$BPFTUNECMD" true
 
@@ -51,7 +51,7 @@ for BPFTUNECMD in "$BPFTUNE &" "service bpftune start" ; do
     break
   fi
   set +e
-  service bpftune stop 2>/dev/null
+  service_cmd stop bpftune 2>/dev/null
   pkill -TERM bpftune
   set -e
 done

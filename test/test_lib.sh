@@ -53,6 +53,33 @@ check_prog()
 	fi
 }
 
+export SERVICE_MANAGER=${SERVICE_MANAGER:-systemctl}
+
+get_service_cmd()
+{
+	case $SERVICE_MANAGER in
+	systemctl)
+		echo "systemctl $1 $2"
+		;;	
+	service)
+		echo "service $2 $1"
+		;;
+	*)
+		echo "Unknown service manager!"
+		exit 1
+		;;
+	esac
+}
+export -f get_service_cmd
+
+service_cmd()
+{
+	cmd=$(get_service_cmd $1 $2)
+	$cmd
+}
+
+export -f service_cmd
+
 export TC=$(which tc 2>/dev/null)
 check_prog "$TC" tc iproute-tc
 export IPERF3=$(which iperf3 2>/dev/null)
@@ -137,7 +164,7 @@ check_podman()
 	if [[ -n $PODMAN ]]; then
 		set +e
 		if [[ -n "$PROXYT_SERVICE" ]]; then
-			service proxyt start
+			service_cmd start proxyt
 		fi
 		timeout $TIMEOUT $PODMAN_SEARCH > /dev/null 2>&1
 		if [[ $? -ne 0 ]]; then
@@ -264,10 +291,10 @@ test_setup_local()
 		echo "skipping netns setup, $NETNS already present"
 	fi
 	set +e
-	service bpftune stop 2>/dev/null
+	service_cmd stop bpftune 2>/dev/null
 	# proxyt causes problems for tcp tests
 	if [[ -n "$PROXYT_SERVICE" ]]; then
-		service proxyt stop 2>/dev/null
+		service cmd stop proxyt 2>/dev/null
 	fi
 	set -e
 	if [[ -f "$FIREWALL_CMD" ]]; then
@@ -301,7 +328,7 @@ test_cleanup_local()
 	fi
 
 	set +e
-	service bpftune stop 2>/dev/null
+	service_cmd stop bpftune 2>/dev/null
 	ip --all netns del ${NETNS_PREFIX}\*
 	ip link del $VETH2 2>/dev/null
 	ip link del bpftunelocal 2>/dev/null

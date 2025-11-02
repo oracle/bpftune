@@ -40,7 +40,7 @@ for MODE in debug info syslog service; do
 	LOGFILE=$SYSLOGFILE
 	;;
    service)
-	BPFTUNECMD="service bpftue start"
+	BPFTUNECMD="$(get_service_cmd start bpftune)"
 	LOGFILE=$SYSLOGFILE
 	;;
    *)

@@ -31,8 +31,6 @@ TUNER_TESTS =	support_test log_test service_test inotify_test cap_test \
 		sysctl_test sysctl_legacy_test sysctl_netns_test \
 		netns_test netns_legacy_test \
 		file_download_test file_download_legacy_test \
-		udp_rmem_test udp_rmem_legacy_test \
-		udp_rmem_locked_test udp_mem_exhaust_test \
 		budget_test \
 		backlog_test backlog_legacy_test \
 		frag_test frag_legacy_test \
@@ -43,7 +41,9 @@ TUNER_TESTS =	support_test log_test service_test inotify_test cap_test \
 		good_syn_flood_test syn_flood_test \
 		wmem_test wmem_legacy_test \
 		rmem_test rmem_legacy_test \
-		cong_test cong_legacy_test
+		cong_test cong_legacy_test \
+		udp_rmem_test udp_rmem_legacy_test \
+		udp_rmem_locked_test udp_mem_exhaust_test
 
 DEFAULT_TESTS = $(TUNER_TESTS) $(PERF_TESTS)
 

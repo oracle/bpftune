@@ -104,7 +104,7 @@ for FAMILY in ipv4 ; do
    FIREWALLD_PID=$(pgrep firewalld)
    set -e
    if [[ -n "$FIREWALLD_PID" ]]; then
-      service firewalld stop
+      service_cmd stop firewalld
    fi
    for MODE in baseline test ; do
 
@@ -124,7 +124,7 @@ for FAMILY in ipv4 ; do
 	sleep $SLEEPTIME
    done
    if [[ -n "$FIREWALLD_PID" ]]; then
-      service firewalld start
+      service_cmd start firewalld
    fi
    frag_post=($(sysctl -n $SYSCTL_NAME))
    if [[ -n $SERVER_PREFIX ]]; then
