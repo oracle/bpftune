@@ -32,7 +32,7 @@ int sk_mem_quantum;
 int sk_mem_quantum_shift;
 unsigned long long nr_free_buffer_pages;
 
-long rmem_max, rmem_default;
+long long rmem_max, rmem_default;
 
 struct bpftune_sample udp_fail_rcv_sample = { };
 
