@@ -29,11 +29,11 @@ SLEEPTIME=1
 
 LOGFILE=$SYSLOGFILE
 
-test_start "$0|service test: does enabling the service work?"
+test_start "$0|service test: does starting the service work?"
 
 test_setup "true"
 
-test_run_cmd_local "service bpftune start" true
+test_run_cmd_local "$(get_service_cmd start bpftune)" true
 
 sleep $SETUPTIME
 grep "bpftune works" $LOGFILE
@@ -43,7 +43,7 @@ test_pass
 
 test_start "$0|service test: does restarting the service work?"
 
-test_run_cmd_local "service bpftune restart"
+test_run_cmd_local "$(get_service_cmd restart bpftune)"
 
 sleep $SETUPTIME
 newpid=$(pgrep bpftune)
@@ -55,7 +55,7 @@ else
 fi
 
 test_start "$0|service test: does stopping the service work?"
-test_run_cmd_local "service bpftune stop" true
+test_run_cmd_local "$(get_service_cmd stop bpftune)" true
 sleep $SETUPTIME
 
 set +e
@@ -70,12 +70,12 @@ else
 fi
 
 test_start "$0|service test: does enabling the service work?"
-test_run_cmd_local "systemctl enable bpftune"
+test_run_cmd_local "$(get_service_cmd enable /usr/lib/systemd/system/bpftune.service)"
 sleep $SETUPTIME
 test_pass
 
 test_start "$0|service test: does disabling the service work?"
-test_run_cmd_local "systemctl disable bpftune"
+test_run_cmd_local "$(get_service_cmd disable /usr/lib/systemd/system/bpftune.service)"
 sleep $SETUPTIME
 test_pass
 

@@ -39,7 +39,7 @@ for SOCKS in 10 $MAX_CONN ; do
    FIREWALLD_PID=$(pgrep firewalld)
    set -e
    if [[ -n "$FIREWALLD_PID" ]]; then
-      service firewalld stop
+      service_cmd stop firewalld
    fi
    for MODE in baseline test ; do
 
@@ -61,7 +61,7 @@ for SOCKS in 10 $MAX_CONN ; do
 	fi
    done
    if [[ -n "$FIREWALLD_PID" ]]; then
-      service firewalld start
+      service_cmd start firewalld
    fi
    test_pass	
    test_cleanup

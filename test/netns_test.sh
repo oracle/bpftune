@@ -22,7 +22,7 @@
 # verify netns/container add/remove is caught by bpftune
 
 # enable proxyt if available...
-service proxyt start 2>/dev/null
+service_cmd start proxyt 2>/dev/null
 
 # ...and skip disable of it during test setup so we can find podman images.
 PROXYT_SERVICE=""
