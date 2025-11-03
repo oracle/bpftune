@@ -56,7 +56,7 @@ ifeq ($(BPFTUNE_VERSION),)
 BPFTUNE_VERSION := $(KERNEL_REL)-$(GIT_SHA)
 endif
 
-VERSION = 0.2.1
+VERSION = 0.3.1
 VERSION_SCRIPT  := libbpftune.map
 
 CFLAGS = -fPIC -Wall -Wextra -g -I../include -std=c99
@@ -173,8 +173,7 @@ $(OPATH)libbpftune.so: libbpftune.c $(BPFTUNE_HDRS) $(OPATH)libbpftune.o
 			-shared -o $(@).$(VERSION) \
 			$(patsubst %.so,%.o,$(@)) \
 			$(LDLIBS) $(LDFLAGS) ; \
-	rm -f $(@) ; \
-	ln -sr $(@).$(VERSION) $(@)
+	ln -fsr $(@).$(VERSION) $(@)
 
 $(TUNER_OBJS): $(BPF_SKELS) $(LEGACY_BPF_SKELS) $(NOBTF_BPF_SKELS)
 
