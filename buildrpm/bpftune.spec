@@ -67,6 +67,8 @@ rm -Rf %{buildroot}
 %files
 %defattr(-,root,root)
 %{_sysconfdir}/ld.so.conf.d/libbpftune.conf
+%{_sysconfdir}/conf.d/bpftune
+%{_sysconfdir}/init.d/bpftune
 %{_sbindir}/bpftune
 %{_unitdir}/bpftune.service
 %{_libdir}/libbpftune.so.%{version}.%{rel}
