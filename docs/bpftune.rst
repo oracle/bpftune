@@ -47,8 +47,13 @@ OPTIONS
                   Show version.
         -d, --debug
                   Show debug output.
+        -a, --allow
+                  Allow tuner only, e.g. foo.so . Multiple -a options can
+                  be supplied to allow specific tuners.  Used for testing.
         -c, --cgroup
                   Filter events for cgroup.
+        -D, --daemon
+                  Run in daemon mode.
         -s, --stderr
                   Log to standard error instead of syslog.
         -S, --support
