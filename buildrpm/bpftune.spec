@@ -1,9 +1,9 @@
 # BPF-based auto-tuning SPEC file
 
 %define name        bpftune
-%define rel	    1
+%define rel	    2 
 %define release     %{rel}%{?dist}
-%define version     0.2
+%define version     0.3
 %global _unitdir    /usr/lib/systemd/system/	
 %global pcpdir	    /var/lib/pcp/pmdas
 
@@ -87,6 +87,8 @@ rm -Rf %{buildroot}
 %license LICENSE.txt
 
 %changelog
+* Mon Nov 03 2025 Alan Maguire <alan.maguire@oracle.com> - 0.3-2
+- Add udp tuner, query support
 * Wed Mar 26 2025 Alan Maguire <alan.maguire@oracle.com> - 0.2-1
 - Add support for PCP PMDA package
 * Tue May 30 2023 Alan Maguire <alan.maguire@oracle.com> - 0.1-3
