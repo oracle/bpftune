@@ -25,7 +25,7 @@
 
 __u64 tcp_cong_choices[NUM_TCP_CONG_ALGS];
 
-long tcp_thin_lto = 0;
+long long tcp_thin_lto = 0;
 
 BPF_MAP_DEF(remote_host_map, BPF_MAP_TYPE_HASH, struct in6_addr, struct remote_host, 1024, 0);
 
