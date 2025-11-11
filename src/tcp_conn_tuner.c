@@ -45,8 +45,9 @@ static struct bpftunable_desc descs[] = {
 };
 
 static struct bpftunable_scenario scenarios[] = {
-{ TCP_CONG_SET,		"specify TCP congestion control algorithm",
-  "To optimize TCP performance, a TCP congestion control algorithm was chosen to mimimize round-trip time and maximize delivery rate." },
+	BPFTUNABLE_SCENARIO(TCP_CONG_SET,
+			"specify TCP congestion control algorithm",
+	"To optimize TCP performance, a TCP congestion control algorithm was chosen to mimimize round-trip time and maximize delivery rate."),
 };
 
 struct tcp_conn_tuner_bpf *skel;

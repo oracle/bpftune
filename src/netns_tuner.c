@@ -33,8 +33,10 @@ static struct bpftunable_desc descs[] = {
 };
 
 static struct bpftunable_scenario scenarios[] = {
-{ NETNS_SCENARIO_CREATE, "netns created", "network namespace creation" },
-{ NETNS_SCENARIO_DESTROY, "netns destroyed", "network namespace destruction" },
+	BPFTUNABLE_SCENARIO(NETNS_SCENARIO_CREATE,
+			"netns created", "network namespace creation"),
+	BPFTUNABLE_SCENARIO(NETNS_SCENARIO_DESTROY,
+			"netns destroyed", "network namespace destruction"),
 };
 
 int init(struct bpftuner *tuner)

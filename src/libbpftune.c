@@ -1444,7 +1444,15 @@ static void __bpftuner_scenario_log(struct bpftuner *tuner, unsigned int tunable
 				    const char *fmt, va_list *args)
 {
 	struct bpftunable *t = bpftuner_tunable(tuner, tunable);
+	struct bpftunable_scenario *sc;
 	bool global_ns = netns_fd == 0;
+
+	if (!t)
+		return;
+	if (scenario >= tuner->num_scenarios)
+		return;
+
+	sc = &tuner->scenarios[scenario];
 
 	if (summary) {
 		unsigned long count;
@@ -1454,10 +1462,10 @@ static void __bpftuner_scenario_log(struct bpftuner *tuner, unsigned int tunable
 		if (!count)
 			return;
 		bpftune_log(BPFTUNE_LOG_LEVEL, "# Summary: scenario '%s' occurred %ld times for tunable '%s' in %sglobal ns. %s\n",
-			    tuner->scenarios[scenario].name, count,
+			    sc->name, count,
 			    t->desc.name,
 			    global_ns ? "" : "non-",
-			    tuner->scenarios[scenario].description);
+			    sc->description ? sc->description : "");
 		if (t->desc.type == BPFTUNABLE_SYSCTL && global_ns) {
 			char oldvals[PATH_MAX] = { };
 			char newvals[PATH_MAX] = { };
@@ -1484,14 +1492,19 @@ static void __bpftuner_scenario_log(struct bpftuner *tuner, unsigned int tunable
 				    t->desc.name, newvals);
 		}
 	} else {
-		bpftune_log(BPFTUNE_LOG_LEVEL, "Scenario '%s' occurred for tunable '%s' in %sglobal ns. %s\n",
-			    tuner->scenarios[scenario].name,
-			    t->desc.name,
-			    global_ns ? "" : "non-",
-			    tuner->scenarios[scenario].description);
-		if (args)
+	if (!(sc->flags & BPFTUNABLE_SCENARIO_QUIET)) {
+		bpftune_log(BPFTUNE_LOG_LEVEL,
+				"Scenario '%s' occurred for tunable '%s' in %sglobal ns. %s\n",
+				sc->name,
+				t->desc.name,
+				global_ns ? "" : "non-",
+				sc->description ? sc->description : "");
+		if (fmt && args)
 			__bpftune_log(BPFTUNE_LOG_LEVEL, fmt, *args);
-		__bpftuner_tunable_stats_update(t, scenario, global_ns, 1);
+	} else if (fmt && args) {
+		__bpftune_log(LOG_DEBUG, fmt, *args);
+	}
+	__bpftuner_tunable_stats_update(t, scenario, global_ns, 1);
 	}
 }
 

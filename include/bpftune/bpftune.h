@@ -80,11 +80,22 @@ enum bpftune_state {
 	BPFTUNE_GONE,		/* resource gone */
 };
 
+enum bpftunable_scenario_flags {
+	BPFTUNABLE_SCENARIO_QUIET	= 0x1,
+};
+
 struct bpftunable_scenario {
 	unsigned int id;
 	const char *name;
 	const char *description;
+	unsigned int flags;
 };
+
+#define BPFTUNABLE_SCENARIO(_id, _name, _description) \
+	{ (_id), (_name), (_description), 0 }
+
+#define BPFTUNABLE_SCENARIO_FLAGS(_id, _name, _description, _flags) \
+	{ (_id), (_name), (_description), (_flags) }
 
 /* some tunables are defined as triples */
 

@@ -168,6 +168,8 @@ The key components are
   containers also.  See [bpftune-netns (8)](./docs/bpftune-netns.rst)
 - UDP buffer tuner: auto-tune buffers relating to UDP. See
   [bpftune-udp-buffer (8)](./docs/bpftune-udp-buffer.rst)
+- Gaming tuner: detects sustained low-latency UDP activity and applies
+  per-profile network tweaks for gaming workloads.
 
 ## Code organization
 
