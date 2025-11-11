@@ -46,8 +46,10 @@ int BPF_PROG(bpftune_neigh_create, struct neigh_table *tbl,
 		new_tbl_stats.thresh1 = BPFTUNE_CORE_READ(tbl, gc_thresh1);
 		new_tbl_stats.thresh2 = BPFTUNE_CORE_READ(tbl, gc_thresh2);
 		new_tbl_stats.max = BPFTUNE_CORE_READ(tbl, gc_thresh3);
+
 		if (dev) {
-			bpf_probe_read(&new_tbl_stats.dev, sizeof(new_tbl_stats.dev), dev);
+			new_tbl_stats.dev[0] = '\0';
+			BPFTUNE_CORE_READ_STR_INTO(&new_tbl_stats.dev, dev, name);
 			new_tbl_stats.ifindex = BPFTUNE_CORE_READ(dev, ifindex);
 		}
 		bpf_map_update_elem(&tbl_map, &key, &new_tbl_stats, BPF_ANY);

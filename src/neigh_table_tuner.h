@@ -39,6 +39,7 @@ enum neigh_table_tunables {
 
 enum neigh_table_scenarios {
 	NEIGH_TABLE_FULL,
+	NEIGH_TABLE_GROWN_EXCESSIVELY,
 };
 
 struct tbl_stats {

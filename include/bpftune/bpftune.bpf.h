@@ -71,6 +71,16 @@ extern __u32 LINUX_KERNEL_VERSION __kconfig;
 #define BPFTUNE_CORE_READ	BPF_CORE_READ
 #endif
 
+#ifdef BPFTUNE_NOBTF
+#define BPFTUNE_CORE_READ_INTO(dest, src, field)	\
+	bpf_probe_read(dest, sizeof(dest), src->field)
+#define BPFTUNE_CORE_READ_STR_INTO(dest, src, field)	\
+	bpf_probe_read(dest, sizeof(dest), src->field)
+#else
+#define BPFTUNE_CORE_READ_INTO		BPF_CORE_READ_INTO
+#define BPFTUNE_CORE_READ_STR_INTO	BPF_CORE_READ_STR_INTO
+#endif
+
 /* provide BPF_KPROBE/BPF_KRETPROBE to simplify legacy support */
 
 #ifndef BPF_KPROBE

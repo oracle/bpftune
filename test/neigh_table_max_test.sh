@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note
 #
-# Copyright (c) 2023, Oracle and/or its affiliates.
+# Copyright (c) 2025, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public
@@ -19,7 +19,7 @@
 # Boston, MA 021110-1307, USA.
 #
 
-# run neigh table test when ipv6 is disabled
+# run neigh table test and hit limit for 1 IP address
 
 . ./test_lib.sh
 
@@ -34,14 +34,10 @@ for TUNER in neigh_table ; do
  for NS in global ; do
   for TBL in arp_cache ; do
  
-   test_start "$0|neigh table test ($NS netns): does filling $TBL make it grow?"
+   test_start "$0|neigh table test ($NS netns): do we hit max value for $TBL and stop growing?"
 
    test_setup "true"
 
-   sysctl -w net.ipv6.conf.all.disable_ipv6=1
-   if [[ $NS != "global" ]]; then
-     ip netns exec $NS sysctl -w net.ipv6.conf.all.disable_ipv6=1
-   fi
    test_run_cmd_local "$BPFTUNE -ds &" true
 
    sleep $SETUPTIME
@@ -66,6 +62,20 @@ for TUNER in neigh_table ; do
    done
    grep "updated thresholds for $TBL table" $LOGFILE
    grep "computed max" $LOGFILE
+
+
+   for ((i=1; i < 20; i++ ))
+   do
+      for ((j=1; j < 254; j++ ))
+      do
+          ipaddr="224.1.${i}.${j}"
+	  ih=$(printf '%x' $i)
+	  jh=$(printf '%x' $j)
+	  macaddr="01:00:5e:20:$ih:$jh"
+	  $PREFIX_CMD ip neigh replace $ipaddr lladdr $macaddr dev $INTF
+      done
+   done
+   grep "can no longer update thresholds" $LOGFILE |uniq
    test_pass
   done
  done

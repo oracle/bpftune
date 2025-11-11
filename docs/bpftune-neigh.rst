@@ -67,7 +67,17 @@ DESCRIPTION
         Note: to set table size we need to use the equivalent of
         "ip ntable"; i.e.
         "ip ntable change name arp_cache dev eth0 thresh3 1024"
-        (this is done directly in bpftune via netlink)
+        (this is done directly in bpftune via netlink).  We do
+        this for gc_thresh1, thresh2 and thresh3 to ensure that
+        GC scales with overall table size.  However we set an
+        upper limit on the adjustments based on gc_thresh3 size
+        comparison to the prefixlens of the IP addresses configured
+        on the netdevice the table manages.  For example for a single
+        IPv4 address with a /24 prefixlen, there are 256 possible
+        addresses and allowing for multicast etc we multiply this
+        by a scaling factor (currently 4).  So in this case we will
+        not increase beyond 1024. However with larger networks/more
+        devices we will.
 
         Contrast this approach with simply choosing a large
         net.ipv4.neigh.gc_thresh3. If thresh2 and thresh3

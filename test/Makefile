@@ -35,6 +35,7 @@ TUNER_TESTS =	support_test log_test service_test inotify_test cap_test \
 		backlog_test backlog_legacy_test \
 		frag_test frag_legacy_test \
 		neigh_table_test neigh_table_v4only_test \
+		neigh_table_max_test neigh_table_max2_test \
 		neigh_table_legacy_test \
 		mem_pressure_test mem_pressure_legacy_test \
 		mem_exhaust_test mem_exhaust_legacy_test \
