@@ -109,5 +109,4 @@ OPTIONS
                 jtunables   - show supported tunables in json format
                 status      - show current status of tunables
                 jstatus     - show current status of tunables in json format
-                rollback    - show changes needed to roll back changes made
-                              by bpftune
+                rollback    - show changes needed to roll back bpftune changes
