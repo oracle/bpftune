@@ -39,7 +39,7 @@ for TUNER in neigh_table ; do
 
    test_setup "true"
 
-   test_run_cmd_local "$BPFTUNE -sL &" true
+   test_run_cmd_local "$BPFTUNE -dsL &" true
 
    sleep $SETUPTIME
 
@@ -50,7 +50,10 @@ for TUNER in neigh_table ; do
 	PREFIX_CMD=""
 	INTF=$VETH2
    fi	
+   $PREFIX_CMD ip ntable change name $TBL dev $INTF thresh1 32 
+   $PREFIX_CMD ip ntable change name $TBL dev $INTF thresh2 64 
    $PREFIX_CMD ip ntable change name $TBL dev $INTF thresh3 128
+
 
    for ((i=3; i < 255; i++ ))
    do
@@ -64,7 +67,8 @@ for TUNER in neigh_table ; do
 	$PREFIX_CMD ip neigh replace $ip6addr lladdr $macaddr dev $INTF
       fi
    done
-   grep "updated gc_thresh3 for $TBL table" $LOGFILE
+   grep "updated thresholds for $TBL table" $LOGFILE
+   grep "computed max" $LOGFILE
    test_pass
   done
  done
