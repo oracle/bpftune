@@ -77,7 +77,7 @@ void fini(struct bpftuner *tuner)
 	bpftuner_bpf_fini(tuner);
 }
 
-static int set_gc_thresh3(struct bpftuner *tuner, struct tbl_stats *stats)
+static int increase_thresh(struct bpftuner *tuner, struct tbl_stats *stats)
 {
 	char *tbl_name = stats->family == AF_INET ? "arp_cache" : "ndisc_cache";
 	/* Open raw socket for the NETLINK_ROUTE protocol */
@@ -89,6 +89,8 @@ static int set_gc_thresh3(struct bpftuner *tuner, struct tbl_stats *stats)
                 .ndtm_family = stats->family,
         };
 	struct nl_msg *m = NULL, *parms = NULL;
+	int new_gc_thresh1 = 0;
+	int new_gc_thresh2 = 0;
 	int new_gc_thresh3 = 0;
 	int ret;
 
@@ -121,6 +123,10 @@ static int set_gc_thresh3(struct bpftuner *tuner, struct tbl_stats *stats)
 
 	new_gc_thresh3 = BPFTUNE_GROW_BY_DELTA(stats->max);
 	NLA_PUT_U32(m, NDTA_THRESH3, new_gc_thresh3);
+	new_gc_thresh2 = BPFTUNE_GROW_BY_DELTA(stats->thresh2);
+	new_gc_thresh1 = BPFTUNE_GROW_BY_DELTA(stats->thresh1);
+	NLA_PUT_U32(m, NDTA_THRESH2, new_gc_thresh2);
+	NLA_PUT_U32(m, NDTA_THRESH1, new_gc_thresh1);
 
 	parms = nlmsg_alloc();
 	if (!parms) {
@@ -152,8 +158,10 @@ out:
 			    stats->dev, strerror(-ret));
 	} else {
 		bpftuner_tunable_update(tuner, tunable, NEIGH_TABLE_FULL, 0,
-"updated gc_thresh3 for %s table, dev '%s' (ifindex %d) from %ld to %ld\n",
+"updated thresholds for %s table, dev '%s' (ifindex %d) thresh1: %ld to %ld, thresh2: %ld to %ld, thresh3: %ld to %ld\n",
 			    tbl_name, stats->dev, stats->ifindex,
+			    stats->thresh1, new_gc_thresh1,
+			    stats->thresh2, new_gc_thresh2,
 			    stats->max, new_gc_thresh3);
 	}
 	return ret;
@@ -169,7 +177,7 @@ void event_handler(struct bpftuner *tuner,
 	case NEIGH_TABLE_FULL:
 		if (bpftune_cap_add())
 			return;
-		set_gc_thresh3(tuner, stats);
+		increase_thresh(tuner, stats);
 		bpftune_cap_drop();
 		break;
 	default:
