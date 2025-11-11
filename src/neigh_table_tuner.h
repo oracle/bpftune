@@ -45,6 +45,8 @@ struct tbl_stats {
 	int family;
 	int entries;
 	int gc_entries;
+	int thresh1;
+	int thresh2;
 	int max;
 	int ifindex;
 	char dev[IFNAMSIZ];

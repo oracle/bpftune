@@ -43,6 +43,8 @@ int BPF_PROG(bpftune_neigh_create, struct neigh_table *tbl,
 
 		new_tbl_stats.family = BPFTUNE_CORE_READ(tbl, family);
 		new_tbl_stats.entries = BPFTUNE_CORE_READ(tbl, entries.counter);
+		new_tbl_stats.thresh1 = BPFTUNE_CORE_READ(tbl, gc_thresh1);
+		new_tbl_stats.thresh2 = BPFTUNE_CORE_READ(tbl, gc_thresh2);
 		new_tbl_stats.max = BPFTUNE_CORE_READ(tbl, gc_thresh3);
 		if (dev) {
 			bpf_probe_read(&new_tbl_stats.dev, sizeof(new_tbl_stats.dev), dev);
@@ -55,6 +57,8 @@ int BPF_PROG(bpftune_neigh_create, struct neigh_table *tbl,
 	}
 	tbl_stats->entries = BPFTUNE_CORE_READ(tbl, entries.counter);
 	tbl_stats->gc_entries = BPFTUNE_CORE_READ(tbl, gc_entries.counter);
+	tbl_stats->thresh1 = BPFTUNE_CORE_READ(tbl, gc_thresh1);
+	tbl_stats->thresh2 = BPFTUNE_CORE_READ(tbl, gc_thresh2);
 	tbl_stats->max = BPFTUNE_CORE_READ(tbl, gc_thresh3);
 
 	/* exempt from gc entries are not subject to space constraints, but
