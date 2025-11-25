@@ -133,7 +133,8 @@ retry:
 
 int init(struct bpftuner *tuner)
 {
-	/* on some platforms, this function is inlined */
+	/* on older kernels, this tracepoint is unavailable */
+	const char *optionals[] = { "bpftune_sock_exceed_buf_limit", NULL };
 	struct bpftunable *t;
 	int pagesize;
 	int err;
@@ -143,7 +144,7 @@ int init(struct bpftuner *tuner)
 	err = bpftuner_bpf_open(udp_buffer, tuner);
 	if (err)
 		return err;
-	err = bpftuner_bpf_load(udp_buffer, tuner, NULL);
+	err = bpftuner_bpf_load(udp_buffer, tuner, optionals);
 	if (err)
 		return err;
 
