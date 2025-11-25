@@ -225,9 +225,28 @@ SEC("tp_btf/udp_fail_queue_rcv_skb")
 int BPF_PROG(bpftune_udp_fail_rcv, int ret, struct sock *sk)
 {
 	if (ret == 0)
-                return 0;
+		return 0;
 	/* only sample subset of events to reduce overhead. */
-        bpftune_sample(udp_fail_rcv_sample);
+	if (ret != -ENOBUFS)
+		bpftune_sample(udp_fail_rcv_sample);
 
 	return udp_fail_rcv(ret, sk);
+}
+
+#define SK_MEM_RECV 1
+
+#ifdef BPFTUNE_LEGACY
+SEC("raw_tracepoint/sock_exceed_buf_limit")
+#else
+SEC("tp_btf/sock_exceed_buf_limit")
+#endif
+int BPF_PROG(bpftune_sock_exceed_buf_limit, struct sock *sk, struct proto *prot,
+	     long allocated, int kind)
+{
+	if (kind == SK_MEM_RECV) {
+		__u16 proto = BPFTUNE_CORE_READ(sk, sk_protocol);
+		if (proto == IPPROTO_UDP)
+			return udp_fail_rcv(-ENOBUFS, sk);
+	}
+	return 0;
 }

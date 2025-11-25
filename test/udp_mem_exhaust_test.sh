@@ -27,7 +27,7 @@ LOGFILE=$TESTLOG_LAST
 
 SLEEPTIME=5
 TIMEOUT=30
-MAX_CONN=10
+MAX_CONN=50
 
 # udp_fail_queue_rcv_skb tracepoint IPv6 support only on 6.4+ kernels.
 FAMILIES="ipv4"
@@ -53,8 +53,10 @@ for FAMILY in $FAMILIES ; do
    rmem_default_orig=$(sysctl -n net.core.rmem_default)
    sysctl -w net.core.rmem_default=8192
    mem_orig=($(sysctl -n net.ipv4.udp_mem))
+   wmem_default_orig=($(sysctl -n net.core.wmem_default))
+   sysctl -w net.core.wmem_default=8192
 
-   mem_test=($(echo 10 20 20))
+   mem_test=($(echo 50 100 150))
 
    sysctl -w net.ipv4.udp_mem="${mem_test[0]} ${mem_test[1]} ${mem_test[2]}"
 
@@ -71,8 +73,9 @@ for FAMILY in $FAMILIES ; do
 	else
 		LOGSZ=$(wc -l $LOGFILE | awk '{print $1}')
 	fi
+	sleep 1
 	set +e
-	$IPERF3 -u -b100m -fm -P $MAX_CONN -p $PORT -c $ADDR
+	$IPERF3 -u -b1000m -fm -P $MAX_CONN -p $PORT -c $ADDR
 	set -e
 
 	sleep $SLEEPTIME
@@ -81,6 +84,7 @@ for FAMILY in $FAMILIES ; do
    mem_post=($(sysctl -n net.ipv4.udp_mem))
    sysctl -w net.ipv4.udp_mem="${mem_orig[0]} ${mem_orig[1]} ${mem_orig[2]}"
    sysctl -w net.core.rmem_default=${rmem_default_orig}
+   sysctl -w net.core.wmem_default=${wmem_default_orig}
    echo "mem before ${mem_test[0]} ${mem_test[1]} ${mem_test[2]}"
    echo "mem after ${mem_post[0]} ${mem_post[1]} ${mem_post[2]}"
    if [[ $MODE == "test" ]]; then
