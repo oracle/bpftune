@@ -26221,7 +26221,6 @@ enum rpm_request {
 };
 
 enum rpm_status {
-	RPM_INVALID = -1,
 	RPM_ACTIVE = 0,
 	RPM_RESUMING = 1,
 	RPM_SUSPENDED = 2,
