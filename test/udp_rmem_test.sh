@@ -51,7 +51,7 @@ for FAMILY in $FAMILIES ; do
    test_start "$0|udp rmem test $BW to $ADDR:$PORT $FAMILY $MAX_CONN conn"
 
    rmem_default_orig=$(sysctl -n net.core.rmem_default)
-   rmem_max_orig=$(sysctl -n net.core.rmem_default)
+   rmem_max_orig=$(sysctl -n net.core.rmem_max)
    rmem_test=16384
    sysctl -w net.core.rmem_default=$rmem_test
    sysctl -w net.core.rmem_max=$rmem_test
