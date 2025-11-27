@@ -20,6 +20,9 @@
 #include <bpftune/bpftune.bpf.h>
 #include "net_buffer_tuner.h"
 
+#ifndef NET_RX_SUCCESS
+#define NET_RX_SUCCESS	0
+#endif
 #ifndef NET_RX_DROP
 #define NET_RX_DROP	1
 #endif
@@ -34,32 +37,24 @@ int netdev_budget = 0;
 int netdev_budget_usecs = 0;
 
 struct bpftune_sample drop_sample = {};
+struct bpftune_sample process_backlog_sample = {};
 
-#ifdef BPFTUNE_LEGACY
-SEC("kretprobe/enqueue_to_backlog")
-int BPF_KRETPROBE(bpftune_enqueue_to_backlog, int ret)
-#else
-SEC("fexit/enqueue_to_backlog")
-int BPF_PROG(bpftune_enqueue_to_backlog, struct sk_buff *skb, int cpu,
-	     unsigned int *qtail, int ret)
-#endif
+BPF_MAP_DEF(time_squeeze_map, BPF_MAP_TYPE_PERCPU_ARRAY, unsigned int, unsigned int, 1, 0);
+
+extern const struct softnet_data softnet_data __ksym;
+
+static __always_inline int update_backlog(void)
 {
 	int max_backlog = netdev_max_backlog;
 	struct bpftune_event event =  { 0 };
 	long old[3] = { 0, 0, 0 };
 	long new[3] = { 0, 0, 0 };
 	__u64 time, cpubit;
-
-	/* a high-frequency event so bail early if we can... */
-	if (ret != NET_RX_DROP)
-		return 0;
+	int cpu;
 
 	drop_count++;
 
-	/* only sample subset of drops to reduce overhead. */
-	bpftune_sample(drop_sample);
-
-	/* if we drop more than 1/16 of the backlog queue size/min,
+	/* if we drop more than 1/32 of the backlog queue size/min,
 	 * increase backlog queue size.  This means as the queue size
 	 * increases, the likliehood of hitting that limit decreases.
 	 */
@@ -68,24 +63,22 @@ int BPF_PROG(bpftune_enqueue_to_backlog, struct sk_buff *skb, int cpu,
 		drop_count = 1;
 		drop_interval_start = time;
 	}
-	if (drop_count >= (max_backlog >> 4)) {
+	if (drop_count >= (max_backlog >> 5)) {
 		old[0] = max_backlog;
 		new[0] = BPFTUNE_GROW_BY_DELTA(max_backlog);
 		send_net_sysctl_event(NULL, NETDEV_MAX_BACKLOG_INCREASE,
 				      NETDEV_MAX_BACKLOG, old, new, &event);
 
-#ifdef BPFTUNE_LEGACY
-		int cpu = bpf_get_smp_processor_id();
-#endif
+		cpu = bpf_get_smp_processor_id();
 		/* ensure flow limits prioritize small flows on this cpu */
 		if (cpu < 64) {
 			cpubit = 1 << cpu;
 			if (!(flow_limit_cpu_bitmap & cpubit)) {
 				old[0] = flow_limit_cpu_bitmap;
 				new[0] = flow_limit_cpu_bitmap |= cpubit;
-				if (!send_net_sysctl_event(NULL, FLOW_LIMIT_CPU_SET,	
+				if (!send_net_sysctl_event(NULL, FLOW_LIMIT_CPU_SET,
 							   FLOW_LIMIT_CPU_BITMAP,
-							   old, new, &event))
+							  old, new, &event))
 					flow_limit_cpu_bitmap = new[0];
 			}
 		}
@@ -93,16 +86,39 @@ int BPF_PROG(bpftune_enqueue_to_backlog, struct sk_buff *skb, int cpu,
 	return 0;
 }
 
-struct bpftune_sample rx_action_sample = {};
+#ifdef BPFTUNE_LEGACY
+SEC("kretprobe/enqueue_to_backlog")
+int BPF_KRETPROBE(bpftune_enqueue_to_backlog, int ret)
+{
+	if (ret != NET_RX_DROP)
+		return 0;
+	drop_count++;
+
+	/* only sample subset of drops to reduce overhead. */
+	bpftune_sample(drop_sample);
+	return update_backlog();
+}
+#else
+SEC("tp_btf/kfree_skb")
+int BPF_PROG(bpftune_kfree_skb, struct sk_buff *skb, void *location,
+	     enum skb_drop_reason reason)
+{
+	if (bpf_core_enum_value_exists(enum skb_drop_reason, SKB_DROP_REASON_CPU_BACKLOG)) {
+		int backlog_reason = bpf_core_enum_value(enum skb_drop_reason,
+							 SKB_DROP_REASON_CPU_BACKLOG);
+		if (reason == backlog_reason) {
+			drop_count++;
+			return update_backlog();
+		}
+	}
+	return 0;
+}
+#endif
 
 #ifndef BPFTUNE_LEGACY
-
-BPF_MAP_DEF(time_squeeze_map, BPF_MAP_TYPE_PERCPU_ARRAY, unsigned int, unsigned int, 1, 0);
-
-extern const struct softnet_data softnet_data __ksym;
-
-SEC("fexit/net_rx_action")
-int BPF_PROG(net_rx_action)
+SEC("fexit/process_backlog")
+int BPF_PROG(bpftune_process_backlog, struct napi_struct *napi, int quota,
+	     int ret)
 {
 	struct bpftune_event event =  { 0 };
 	long old[3] = { 0, 0, 0 };
@@ -112,7 +128,11 @@ int BPF_PROG(net_rx_action)
 	unsigned int *last_time_squeezep = NULL;
 	unsigned int zero = 0;
 
-	bpftune_sample(rx_action_sample);
+	/* no pending data */
+	if (ret == 0)
+		return 0;
+	/* only sample subset of drops to reduce overhead. */
+	bpftune_sample(process_backlog_sample);
 
 	sd = (struct softnet_data *)bpf_this_cpu_ptr(&softnet_data);
 	if (!sd)
