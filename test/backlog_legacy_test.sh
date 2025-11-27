@@ -35,10 +35,10 @@ for FAMILY in ipv4 ipv6 ; do
    # use localhost to maximize bandwidth -> hit backlog limits
    case $FAMILY in
    ipv4)
-   	ADDR=127.0.0.1
+   	ADDR=$VETH2_IPV4
 	;;
    ipv6)
-	ADDR=::1
+	ADDR=$VETH2_IPV6
 	;;
    esac
 
@@ -58,13 +58,13 @@ for FAMILY in ipv4 ipv6 ; do
 	echo "Running ${MODE}..."
 	test_run_cmd_local "$IPERF3 -s -p $PORT &"
 	if [[ $MODE != "baseline" ]]; then
-		test_run_cmd_local "$BPFTUNE -L &"
+		test_run_cmd_local "$BPFTUNE -sL&"
 		sleep $SETUPTIME
 	else
 		LOGSZ=$(wc -l $LOGFILE | awk '{print $1}')
 		LOGSZ=$(expr $LOGSZ + 1)
 	fi
-	test_run_cmd_local "$IPERF3 -fm -t 20 $CLIENT_OPTS -c $PORT -c $ADDR" true
+	test_run_cmd_local "ip netns exec $NETNS $IPERF3 -fm -t 10 $CLIENT_OPTS -c $PORT -c $ADDR" true
 	sleep $SLEEPTIME
 
 	sresults=$(grep -E "sender" ${CMDLOG} | awk '{print $7}')
