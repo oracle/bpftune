@@ -53,7 +53,7 @@ static __always_inline bool tcp_nearly_out_of_memory(struct sock *sk,
 	struct proto *prot = BPFTUNE_CORE_READ(sk, sk_prot);
 	atomic_long_t *memory_allocated = BPFTUNE_CORE_READ(prot, memory_allocated);
 	long *sysctl_mem = BPFTUNE_CORE_READ(prot, sysctl_mem);
-	__u8 shift = 0;
+	__s8 shift = 0;
 	int i;
 
 	if (!sk || !prot || !memory_allocated)
@@ -67,20 +67,21 @@ static __always_inline bool tcp_nearly_out_of_memory(struct sock *sk,
 	if (!mem[0] || !mem[1] || !mem[2])
 		return false;
 
-	if (kernel_page_shift >= sk_mem_quantum_shift) {
-		shift = kernel_page_shift - sk_mem_quantum_shift;
-		if (shift >= 32)
-			return false;
-	} else {
+	if (LINUX_KERNEL_VERSION < KERNEL_VERSION(5, 16, 0)) {
+		/* we are on v5.15 or earlier; mem quantum is used
+		 * to shift limits.
+		 */
 		shift = sk_mem_quantum_shift - kernel_page_shift;
-		if (shift >= 32)
+		if (shift >= 32 || shift <= -32)
 			return false;
 	}
 
 	for (i = 0; i < 3; i++) {
 		limit_sk_mem_quantum[i] = mem[i];
-		if (shift)
+		if (shift > 0)
 			limit_sk_mem_quantum[i] >>= shift;
+		else if (shift < 0)
+			limit_sk_mem_quantum[i] <<= shift;
 		if (limit_sk_mem_quantum[i] <= 0)
 			return false;
 	}

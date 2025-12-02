@@ -45,7 +45,7 @@ static __always_inline bool udp_nearly_out_of_memory(struct sock *sk,
 	struct proto *prot = BPFTUNE_CORE_READ(sk, sk_prot);
 	atomic_long_t *memory_allocated = BPFTUNE_CORE_READ(prot, memory_allocated);
 	long *sysctl_mem = BPFTUNE_CORE_READ(prot, sysctl_mem);
-	__u8 shift_left = 0, shift_right = 0;
+	__s8 shift = 0;
 	struct net *net;
 	int i;
 
@@ -64,22 +64,22 @@ static __always_inline bool udp_nearly_out_of_memory(struct sock *sk,
 	if (!mem[0] || !mem[1] || !mem[2])
 		return false;
 
-	if (kernel_page_shift >= sk_mem_quantum_shift) {
-		shift_left = kernel_page_shift - sk_mem_quantum_shift;
-		if (shift_left >= 32)
-			return false;
-	} else {
-		shift_right = sk_mem_quantum_shift - kernel_page_shift;
-		if (shift_right >= 32)
+	if (LINUX_KERNEL_VERSION < KERNEL_VERSION(5, 16, 0)) {
+		/* we are on v5.15 or earlier; mem quantum is used
+		 * to shift limits.
+		 */
+		shift = sk_mem_quantum_shift - kernel_page_shift;
+		if (shift >= 32 || shift <= -32)
 			return false;
 	}
 
 	for (i = 0; i < 3; i++) {
 		limit_sk_mem_quantum[i] = mem[i];
-		if (shift_left)
-			limit_sk_mem_quantum[i] <<= shift_left;
-		if (shift_right)
-			limit_sk_mem_quantum[i] >>= shift_right;
+		if (shift > 0)
+			limit_sk_mem_quantum[i] >>= shift;
+		else if (shift < 0)
+			limit_sk_mem_quantum[i] <<= shift;
+
 		if (limit_sk_mem_quantum[i] <= 0)
 			return false;
 	}
@@ -245,6 +245,7 @@ int BPF_PROG(bpftune_sock_exceed_buf_limit, struct sock *sk, struct proto *prot,
 {
 	if (kind == SK_MEM_RECV) {
 		__u16 proto = BPFTUNE_CORE_READ(sk, sk_protocol);
+
 		if (proto == IPPROTO_UDP)
 			return udp_fail_rcv(-ENOBUFS, sk);
 	}
