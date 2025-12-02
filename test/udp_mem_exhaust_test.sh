@@ -56,7 +56,7 @@ for FAMILY in $FAMILIES ; do
    wmem_default_orig=($(sysctl -n net.core.wmem_default))
    sysctl -w net.core.wmem_default=8192
 
-   mem_test=($(echo 50 100 150))
+   mem_test=($(echo 20 45 50))
 
    sysctl -w net.ipv4.udp_mem="${mem_test[0]} ${mem_test[1]} ${mem_test[2]}"
 
