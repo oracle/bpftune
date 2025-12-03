@@ -94,6 +94,7 @@ check_prog "$HPING" hping3 hping3
 export FIREWALL_CMD=$(which firewall-cmd 2>/dev/null)
 export AUDIT_CMD=$(which auditctl 2>/dev/null)
 export JQ_CMD=$(which jq 2>/dev/null)
+export ULIMIT="bash -c ulimit"
 export SYSLOGFILE=${SYSLOGFILE:-"/var/log/messages"}
 export DBPMDA_CMD=$(which dbpmda 2>/dev/null)
 if [[ ! -f $SYSLOGFILE ]]; then
