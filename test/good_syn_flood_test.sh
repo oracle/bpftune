@@ -93,10 +93,10 @@ for NS in nonglobal global ; do
       service_cmd stop firewalld
    fi
 
-   $SERVER_PREFIX ulimit -n 100000
-   $SERVER_PREFIX ulimit -u 100000
-   $CLIENT_PREFIX ulimit -n 100000
-   $CLIENT_PREFIX ulimit -u 100000
+   $SERVER_PREFIX $ULIMIT -n 100000
+   $SERVER_PREFIX $ULIMIT -u 100000
+   $CLIENT_PREFIX $ULIMIT -n 100000
+   $CLIENT_PREFIX $ULIMIT -u 100000
 
    for MODE in baseline test ; do
 
