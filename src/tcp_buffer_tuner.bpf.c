@@ -81,7 +81,7 @@ static __always_inline bool tcp_nearly_out_of_memory(struct sock *sk,
 		if (shift > 0)
 			limit_sk_mem_quantum[i] >>= shift;
 		else if (shift < 0)
-			limit_sk_mem_quantum[i] <<= shift;
+			limit_sk_mem_quantum[i] <<= -shift;
 		if (limit_sk_mem_quantum[i] <= 0)
 			return false;
 	}
