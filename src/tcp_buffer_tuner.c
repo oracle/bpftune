@@ -263,7 +263,7 @@ static void update_lowmem_tunables(struct bpftuner *tuner,
 				      1, new, msg, t->desc.name);
 }
 
-bool near_memory_exhaustion, under_memory_pressure, near_memory_pressure;
+bool near_memory_exhaustion, near_memory_pressure;
 
 void event_handler(struct bpftuner *tuner,
 		   struct bpftune_event *event,
@@ -296,18 +296,14 @@ void event_handler(struct bpftuner *tuner,
 		bpftune_log(LOG_DEBUG, "unknown tunable [%d] for tcp_buffer_tuner\n", id);
 		return;
 	}
-	prev_lowmem = under_memory_pressure || near_memory_exhaustion;
+	prev_lowmem = near_memory_pressure || near_memory_exhaustion;
 
 	near_memory_exhaustion = bpftuner_bpf_var_get(tcp_buffer, tuner,
 						     near_memory_exhaustion);
-	under_memory_pressure = bpftuner_bpf_var_get(tcp_buffer, tuner,
-					            under_memory_pressure);
 	near_memory_pressure = bpftuner_bpf_var_get(tcp_buffer, tuner,
 						   near_memory_pressure);
 	if (near_memory_exhaustion)
 		lowmem = "near memory exhaustion";
-	else if (under_memory_pressure)
-		lowmem = "under memory pressure";
 	else if (near_memory_pressure)
 		lowmem = "near memory pressure";
 	else if (prev_lowmem)
@@ -396,7 +392,7 @@ void event_handler(struct bpftuner *tuner,
 				break;
 
 			}
-		} else if (t && (under_memory_pressure || near_memory_exhaustion)) {
+		} else if (t && (near_memory_pressure || near_memory_exhaustion)) {
 			new[0] = 1;
 			bpftuner_tunable_sysctl_write(tuner, TCP_BUFFER_TCP_SYNCOOKIES,
 						      TCP_SYNCOOKIES_ENABLE,
