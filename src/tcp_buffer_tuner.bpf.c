@@ -23,7 +23,6 @@
 
 #define TCP_BUFFER_MAX 2147483647
 
-bool under_memory_pressure = false;
 bool near_memory_pressure = false;
 bool near_memory_exhaustion = false;
 
@@ -163,12 +162,6 @@ BPF_FENTRY(tcp_enter_memory_pressure, struct sock *sk)
 	struct bpftune_event event = { 0 };
 
 	(void) tcp_nearly_out_of_memory(sk, &event);
-	return 0;
-}
-
-BPF_FENTRY(tcp_leave_memory_pressure, struct sock *sk)
-{
-	under_memory_pressure = false;
 	return 0;
 }
 
