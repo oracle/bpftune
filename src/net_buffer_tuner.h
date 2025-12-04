@@ -33,3 +33,6 @@ enum net_buffer_scenarios {
 	NETDEV_BUDGET_INCREASE,
 	NETDEV_BUDGET_DECREASE,
 };
+
+/* above 50msec is too high */
+#define NETDEV_BUDGET_USECS_MAX	(1000 * 50)

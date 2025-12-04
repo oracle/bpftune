@@ -131,6 +131,12 @@ void event_handler(struct bpftuner *tuner,
 		budget_usecs = bpftuner_bpf_var_get(net_buffer, tuner,
 						    netdev_budget_usecs);
 		budget_usecs_new = BPFTUNE_GROW_BY_DELTA(budget_usecs);
+		/* make sure we do not grow too high */
+		if (budget_usecs_new > NETDEV_BUDGET_USECS_MAX) {
+			bpftune_log(BPFTUNE_LOG_LEVEL, "netdev_budget_usecs approached %d usec, increasing beyond %d usec is excessive, so ignoring.\n",
+				    budget_usecs_new, NETDEV_BUDGET_USECS_MAX);
+			break;
+		}
 
 		ret = bpftune_sched_wait_run_percent_read();
 		bpftune_log(LOG_DEBUG, "sched wait-run percent : %d\n", ret);
