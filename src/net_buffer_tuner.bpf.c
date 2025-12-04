@@ -37,7 +37,7 @@ int netdev_budget = 0;
 int netdev_budget_usecs = 0;
 
 struct bpftune_sample drop_sample = {};
-struct bpftune_sample process_backlog_sample = {};
+struct bpftune_sample napi_complete_sample = {};
 
 BPF_MAP_DEF(time_squeeze_map, BPF_MAP_TYPE_PERCPU_ARRAY, unsigned int, unsigned int, 1, 0);
 
@@ -116,9 +116,7 @@ int BPF_PROG(bpftune_kfree_skb, struct sk_buff *skb, void *location,
 #endif
 
 #ifndef BPFTUNE_LEGACY
-SEC("fexit/process_backlog")
-int BPF_PROG(bpftune_process_backlog, struct napi_struct *napi, int quota,
-	     int ret)
+BPF_FENTRY(napi_complete_done, struct napi_struct *napi, int work_done)
 {
 	struct bpftune_event event =  { 0 };
 	long old[3] = { 0, 0, 0 };
@@ -128,11 +126,11 @@ int BPF_PROG(bpftune_process_backlog, struct napi_struct *napi, int quota,
 	unsigned int *last_time_squeezep = NULL;
 	unsigned int zero = 0;
 
-	/* no pending data */
-	if (ret == 0)
+	/* zero indicates tx completions only. */
+	if (work_done == 0)
 		return 0;
-	/* only sample subset of drops to reduce overhead. */
-	bpftune_sample(process_backlog_sample);
+	/* only sample subset to reduce overhead. */
+	bpftune_sample(napi_complete_sample);
 
 	sd = (struct softnet_data *)bpf_this_cpu_ptr(&softnet_data);
 	if (!sd)
