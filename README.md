@@ -193,6 +193,15 @@ $ make pkg
 
 target, which will make a bpftune RPM.  See ./buildrpm/bpftune.spec
 
+By default, we disable openrc script installation to avoid unneeded
+package dependencies; to enable this add
+
+```
+--with openrc
+```
+
+to the rpmbuild command.
+
 We can also build with non-standard libdir for distros which do not
 use /usr/lib64 like CachyOS; in this case to install to /usr/lib
 instead
