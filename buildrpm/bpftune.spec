@@ -7,6 +7,10 @@
 %global _unitdir    /usr/lib/systemd/system/	
 %global pcpdir	    /var/lib/pcp/pmdas
 
+# openrc scripts are needed for Gentoo, not by default; run
+# rpmbuild "--with openrc" to include them.
+%bcond_with openrc
+
 License:        GPLv2 WITH Linux-syscall-note
 Name:           %{name}
 Summary:        BPF/tracing tools for auto-tuning Linux
@@ -67,13 +71,18 @@ rm -Rf %{buildroot}
 %files
 %defattr(-,root,root)
 %{_sysconfdir}/ld.so.conf.d/libbpftune.conf
-%{_sysconfdir}/conf.d/bpftune
-%{_sysconfdir}/init.d/bpftune
 %{_sbindir}/bpftune
 %{_unitdir}/bpftune.service
 %{_libdir}/libbpftune.so.%{version}.%{rel}
 %{_libdir}/bpftune/*
 %{_mandir}/*/*
+%if %{with openrc}
+%{_sysconfdir}/conf.d/bpftune
+%{_sysconfdir}/init.d/bpftune
+%else
+%exclude %{_sysconfdir}/conf.d/bpftune
+%exclude %{_sysconfdir}/init.d/bpftune
+%endif
 
 %license LICENSE.txt
 
