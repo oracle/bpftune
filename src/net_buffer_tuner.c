@@ -23,6 +23,8 @@ static struct bpftunable_desc descs[] = {
 								0, 1 },
 { NETDEV_BUDGET_USECS,	BPFTUNABLE_SYSCTL, "net.core.netdev_budget_usecs",
 								0, 1 },
+{ HIGH_ORDER_ALLOC_DISABLE, BPFTUNABLE_SYSCTL, "net.core.high_order_alloc_disable",
+								0, 1 },
 };
 
 static struct bpftunable_scenario scenarios[] = {
@@ -33,7 +35,9 @@ static struct bpftunable_scenario scenarios[] = {
 { NETDEV_BUDGET_INCREASE,	"need to increase # of packets processed per NAPI poll",
 	"Need to increase number of packets processed across network devices during NAPI poll to use all of net.core.netdev_budget_usecs" },
 { NETDEV_BUDGET_DECREASE,	"need to decrease # of packets processed per NAPI poll",
-	"Need to decrease netdev_budget[_usecs] since the ratio of time spent waiting to run versus time spent running for tasks has increased as we have increased netdev budget.  This indicates either our budget increases directly let to increased wait times for other tasks, or that general load has increased; either way spending too much time in NAPI processing will hurt system performance." }
+	"Need to decrease netdev_budget[_usecs] since the ratio of time spent waiting to run versus time spent running for tasks has increased as we have increased netdev budget.  This indicates either our budget increases directly let to increased wait times for other tasks, or that general load has increased; either way spending too much time in NAPI processing will hurt system performance." },
+{ HIGH_ORDER_ALLOC_ENABLE, "need to enable high-order allocation for skb page frags",
+	"On pre-5.14 kernels setting net.core.high_order_alloc_disable=1 reduced contention, but disabling high-order allocations lowers performance with little benefit now that frags are allocated on a pre-cpu basis and contention is minimized." }
 };
 
 int init(struct bpftuner *tuner)
@@ -42,12 +46,16 @@ int init(struct bpftuner *tuner)
 	long max_backlog = 0;
 	long budget = 0;
 	long budget_usecs = 0;
+	long high_order_alloc_disable = 0;
+	unsigned int kernel_version = 0;
 	int err;
 
 	bpftune_sysctl_read(0, "net.core.flow_limit_cpu_bitmap", &cpu_bitmap);
 	bpftune_sysctl_read(0, "net.core.netdev_max_backlog", &max_backlog);
 	bpftune_sysctl_read(0, "net.core.netdev_budget", &budget);
 	bpftune_sysctl_read(0, "net.core.netdev_budget_usecs", &budget_usecs);
+	bpftune_sysctl_read(0, "net.core.high_order_alloc_disable", &high_order_alloc_disable);
+
 	err = bpftuner_bpf_open(net_buffer, tuner);
 	if (err)
 		return err;
@@ -62,14 +70,30 @@ int init(struct bpftuner *tuner)
 			     budget);
 	bpftuner_bpf_var_set(net_buffer, tuner, netdev_budget_usecs,
 			     budget_usecs);
+
 	bpftuner_bpf_sample_add(net_buffer, tuner, drop_sample);
 	bpftuner_bpf_sample_add(net_buffer, tuner, napi_complete_sample);
 	err = bpftuner_bpf_attach(net_buffer, tuner);
 	if (err)
 		return err;
 
-	return bpftuner_tunables_init(tuner, NET_BUFFER_NUM_TUNABLES, descs,
-				      ARRAY_SIZE(scenarios), scenarios);
+	err = bpftuner_tunables_init(tuner, NET_BUFFER_NUM_TUNABLES, descs,
+				     ARRAY_SIZE(scenarios), scenarios);
+	if (!err && high_order_alloc_disable) {
+		kernel_version = bpf_object__kversion(tuner->obj);
+		bpftune_log(LOG_DEBUG, "high_order %ld got kver %d\n", high_order_alloc_disable, kernel_version);
+		if (kernel_version >= KERNEL_VERSION(5, 14, 0)) {
+			high_order_alloc_disable = 0;
+			bpftuner_tunable_sysctl_write(tuner,
+						      HIGH_ORDER_ALLOC_DISABLE,
+						      HIGH_ORDER_ALLOC_ENABLE,
+						      0,
+						      1,
+						      &high_order_alloc_disable,
+"To maximize performance, set net.core.high_order_alloc_disable=0 on more recent kernel since it is not needed as contention in high-order allocs is not present\n");
+		}
+	}
+	return err;
 }
 
 void fini(struct bpftuner *tuner)
