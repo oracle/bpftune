@@ -24,6 +24,7 @@ enum net_buffer_tunables {
 	FLOW_LIMIT_CPU_BITMAP,
 	NETDEV_BUDGET,
 	NETDEV_BUDGET_USECS,
+	HIGH_ORDER_ALLOC_DISABLE,
 	NET_BUFFER_NUM_TUNABLES,
 };
 
@@ -32,6 +33,7 @@ enum net_buffer_scenarios {
 	FLOW_LIMIT_CPU_SET,
 	NETDEV_BUDGET_INCREASE,
 	NETDEV_BUDGET_DECREASE,
+	HIGH_ORDER_ALLOC_ENABLE,
 };
 
 /* above 50msec is too high */

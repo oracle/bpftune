@@ -69,6 +69,10 @@
 #define ARRAY_SIZE(arr)			(sizeof(arr) / sizeof((arr)[0])) 
 #endif
 
+#ifndef KERNEL_VERSION
+#define KERNEL_VERSION(a, b, c) (((a) << 16) + ((b) << 8) + ((c) > 255 ? 255 : (c)))
+#endif
+
 #define BPFTUNE_SERVER_MSG_MAX		65536
 
 char *bpftune_state_string[] = {
