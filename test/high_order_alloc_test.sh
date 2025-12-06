@@ -46,7 +46,7 @@ for TUNER in net_buffer ; do
 	   ;;
    5)
 	   if [[ $MIN_KVER -gt 14 ]]; then
-		   expected_high_order=0
+		   expected=0
 	   fi
 	   ;;
    *)
@@ -59,6 +59,8 @@ for TUNER in net_buffer ; do
    sysctl -w net.core.high_order_alloc_disable=$orig_high_order
    if [[ "$val" == "$expected" ]]; then
 	   test_pass
+   else
+	   echo "Expected '$expected' , got '$val'"
    fi
    test_cleanup
 done
