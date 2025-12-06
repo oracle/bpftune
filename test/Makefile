@@ -29,7 +29,7 @@ GENERAL_TESTS =	support_test log_test service_test inotify_test cap_test \
 		many_netns_test many_netns_legacy_test \
 		podman_globalonly_test podman_globalonly_legacy_test \
 		sysctl_test sysctl_legacy_test sysctl_netns_test \
-		netns_test netns_legacy_test
+		netns_test netns_legacy_test cgroup_cleanup_test
 
 IP_FRAG_TESTS =		frag_test frag_legacy_test
 

@@ -81,7 +81,7 @@ static __always_inline void set_cong(struct bpf_sock_ops *ops, __u8 i)
 __u64 tcp_thin_lto_choices;
 
 SEC("sockops")
-int conn_tuner_sockops(struct bpf_sock_ops *ops)
+int bpftune_conn_tuner(struct bpf_sock_ops *ops)
 {
 	int cb_flags = BPF_SOCK_OPS_STATE_CB_FLAG|BPF_SOCK_OPS_RETRANS_CB_FLAG;
 	struct remote_host *remote_host;

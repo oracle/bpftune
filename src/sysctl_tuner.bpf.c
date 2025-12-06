@@ -105,7 +105,7 @@ int BPF_KPROBE(bpftune_sysctl, struct ctl_table_header *head,
  * via kprobe.
  */
 SEC("cgroup/sysctl")
-int sysctl_write(struct bpf_sysctl *ctx)
+int bpftune_sysctl_write(struct bpf_sysctl *ctx)
 {
 	return 1;
 }
