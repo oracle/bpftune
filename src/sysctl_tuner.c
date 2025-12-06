@@ -32,14 +32,24 @@
 
 extern unsigned short learning_rate;
 
+#define SYSCTL_TUNER_BPF	"bpftune_sysctl_write"
+
 int init(struct bpftuner *tuner)
 {
-	int err = bpftuner_bpf_init(sysctl, tuner, NULL);
+	int err; 
+	
+	/* first detach any dangling cgroup attachment for our prog; this
+	 * can happen if the bpftune process is killed and we do not get to
+	 * detach from cgroup.
+	 */
+	bpftuner_cgroup_detach(tuner, SYSCTL_TUNER_BPF, BPF_CGROUP_SYSCTL);
 
+	err = bpftuner_bpf_init(sysctl, tuner, NULL);
 	if (err)
 		return err;
+
 	/* attach to root cgroup */
-	if (bpftuner_cgroup_attach(tuner, "sysctl_write", BPF_CGROUP_SYSCTL))
+	if (bpftuner_cgroup_attach(tuner, SYSCTL_TUNER_BPF, BPF_CGROUP_SYSCTL))
 		return 1;
 
 	return 0;
@@ -48,7 +58,7 @@ int init(struct bpftuner *tuner)
 void fini(struct bpftuner *tuner)
 {
 	bpftune_log(LOG_DEBUG, "calling fini for %s\n", tuner->name);
-	bpftuner_cgroup_detach(tuner, "sysctl_write", BPF_CGROUP_SYSCTL);
+	bpftuner_cgroup_detach(tuner, SYSCTL_TUNER_BPF, BPF_CGROUP_SYSCTL);
 	bpftuner_bpf_fini(tuner);
 }
 

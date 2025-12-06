@@ -33,6 +33,8 @@ enum tcp_cong_scenarios {
 
 #define CONG_MAXNAME	16
 
+#define CONN_TUNER_BPF	"bpftune_conn_tuner"
+
 enum tcp_states {
 	TCP_STATE_CONG_CUBIC,
 	TCP_STATE_CONG_BBR,

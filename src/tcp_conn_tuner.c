@@ -71,6 +71,12 @@ int init(struct bpftuner *tuner)
 				    name, strerror(-err));
 	}
 
+	/* first detach any dangling cgroup attachment for our prog; this
+	 * can happen if the bpftune process is killed and we do not get to
+	 * detach from cgroup.
+	 */
+	bpftuner_cgroup_detach(tuner, CONN_TUNER_BPF, BPF_CGROUP_SOCK_OPS);
+
 	err = bpftuner_bpf_init(tcp_conn, tuner, NULL);
 	if (err)
 		return err;
@@ -82,7 +88,7 @@ int init(struct bpftuner *tuner)
 	}
 
 	/* attach to root cgroup */
-	err = bpftuner_cgroup_attach(tuner, "conn_tuner_sockops", BPF_CGROUP_SOCK_OPS);
+	err = bpftuner_cgroup_attach(tuner, CONN_TUNER_BPF, BPF_CGROUP_SOCK_OPS);
 	if (err)
 		goto out;
 
@@ -173,7 +179,7 @@ void summarize(struct bpftuner *tuner)
 void fini(struct bpftuner *tuner)
 {
 	bpftune_log(LOG_DEBUG, "calling fini for %s\n", tuner->name);
-	bpftuner_cgroup_detach(tuner, "conn_tuner_sockops", BPF_CGROUP_SOCK_OPS);
+	bpftuner_cgroup_detach(tuner, CONN_TUNER_BPF, BPF_CGROUP_SOCK_OPS);
 	summarize(tuner);
 	bpftuner_bpf_fini(tuner);
 }

@@ -408,7 +408,7 @@ out:
 void bpftuner_cgroup_detach(struct bpftuner *tuner, const char *prog_name,
 			   enum bpf_attach_type attach_type)
 {
-	int prog_fd, cgroup_fd, err = 0;
+	int prog_fd = -1, cgroup_fd, err = 0;
 	struct bpf_program *prog;
 
 	/* if cgroup prog is not in current strategy prog list, skip attach */
@@ -418,19 +418,48 @@ void bpftuner_cgroup_detach(struct bpftuner *tuner, const char *prog_name,
 	err = bpftune_cap_add();
 	if (err)
 		return;
-	prog = bpf_object__find_program_by_name(tuner->obj, prog_name);
-	if (prog) {
-		prog_fd = bpf_program__fd(prog);
-		cgroup_fd = bpftune_cgroup_fd();
 
+	cgroup_fd = bpftune_cgroup_fd();
+
+	if (!tuner->obj) {
+		__u32 last_id = 0, next_id = 0;
+
+		/* no object, we are cleaning up possible old attachments. */
+		while (bpf_prog_get_next_id(last_id, &next_id) == 0) {
+			struct bpf_prog_info info = {};
+			__u32 info_len = sizeof(info);
+
+			last_id = next_id;
+			prog_fd = bpf_prog_get_fd_by_id(next_id);
+			if (prog_fd < 0)
+				continue;
+			if (!bpf_obj_get_info_by_fd(prog_fd, &info, &info_len) &&
+			    strncmp(info.name, prog_name, sizeof(info.name) - 1) == 0) {
+				bpftune_log(LOG_DEBUG, "detaching old BPF program '%s'\n",
+					    prog_name); 
+				if (bpf_prog_detach2(prog_fd, cgroup_fd,
+						     attach_type)) {
+					err = -errno;
+					bpftune_log(LOG_ERR,
+						    "error detaching old prog %s fd %d, cgroup fd %d: %s\n",
+						    prog_name, prog_fd, cgroup_fd, strerror(-err));
+				}
+			}
+			close(prog_fd);
+		}
+	} else {
+		prog = bpf_object__find_program_by_name(tuner->obj, prog_name);
+		if (!prog) {
+			bpftune_log(LOG_ERR, "bpftuner_cgroup_detach: could not find prog '%s'\n",
+				    prog_name);
+		} else {
+			prog_fd = bpf_program__fd(prog);
+		}
 		if (bpf_prog_detach2(prog_fd, cgroup_fd, attach_type)) {
-                        err = -errno;
-                        bpftune_log(LOG_ERR, "error detaching prog fd %d, cgroup fd %d: %s\n",
-                                prog_fd, cgroup_fd, strerror(-err));
-                }
-        } else {
-		bpftune_log(LOG_ERR, "bpftuner_cgroup_detach: could not find prog '%s'\n",
-			    prog_name);
+			err = -errno;
+			bpftune_log(LOG_ERR, "error detaching prog fd %d, cgroup fd %d: %s\n",
+				    prog_fd, cgroup_fd, strerror(-err));
+		}
 	}
 	bpftune_cap_drop();
 }
