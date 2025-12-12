@@ -98,8 +98,8 @@ rm -Rf %{buildroot}
 %license LICENSE.txt
 
 %changelog
-* Thu Dec 11 2025 Alan Maguire <alan.maguire@oracle.com> - 0.4.1
-- Minimize overheads, improve cleanups, improve test reliability
+* Thu Dec 11 2025 Alan Maguire <alan.maguire@oracle.com> - 0.4-1
+- Minimize overheads, cleanups, test reliability. [Orabug: 38757036]
 * Mon Nov 03 2025 Alan Maguire <alan.maguire@oracle.com> - 0.3-2
 - Add udp tuner, query support
 * Wed Mar 26 2025 Alan Maguire <alan.maguire@oracle.com> - 0.2-1
