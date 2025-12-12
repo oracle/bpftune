@@ -23,6 +23,14 @@
 
 . ./test_lib.sh
 
+set +e
+$HPING --help >/dev/null 2>&1
+if [[ $? -ne 0 ]]; then
+	echo "hping ($HPING) unavailable/does not work, skipping test..."
+        exit 0
+fi
+set -e
+
 LOGFILE=$TESTLOG_LAST
 
 SLEEPTIME=1

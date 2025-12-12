@@ -29,11 +29,13 @@ PORT=5201
 SLEEPTIME=1
 TIMEOUT=30
 
+set +e
 LSOF=$(which lsof 2>/dev/null)
 if [[ -z "$LSOF" ]]; then
      echo "lsof not available, skipping..."
      exit 0
 fi
+set -e
 
 for i in $(seq 1 1000); do
      ip netns add ${NETNS_PREFIX}-extra${i}
