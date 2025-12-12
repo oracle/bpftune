@@ -90,7 +90,6 @@ check_prog "$NC" nc nmap-netcat
 export STRESS_NG=$(which stress-ng 2>/dev/null)
 check_prog "$STRESS_NG" stress-ng stress-ng
 export HPING=$(which hping3 2>/dev/null)
-check_prog "$HPING" hping3 hping3
 export FIREWALL_CMD=$(which firewall-cmd 2>/dev/null)
 export AUDIT_CMD=$(which auditctl 2>/dev/null)
 export JQ_CMD=$(which jq 2>/dev/null)
