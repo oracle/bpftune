@@ -88,7 +88,7 @@ struct remote_host {
 #define RTT_SCALE       1000000
 #define DELIVERY_SCALE  1000000
 
-/* The metric we calcuate compares current connection min_rtt and rate_delivered to
+/* The metric we calculate compares current connection min_rtt and rate_delivered to
  * the min rtt and max rate delivered we have observed for the remote host.
  * The idea is that we want to reward congestion control algorithms that minimize
  * RTT and maximize delivery rate, as these are operating at the bottleneck

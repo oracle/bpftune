@@ -27,7 +27,7 @@ BPF_FENTRY(proc_dostring_coredump, struct ctl_table *table, int write,
 	struct bpftune_event event = {};
 	int ret, scenario_id = 0;
 
-	/* tuner id is a global declared in bpftune.bpf.h and set by bfttune
+	/* tuner id is a global declared in bpftune.bpf.h and set by bpftune
 	 * when the tuner is added.
 	 */
 	event.tuner_id = tuner_id;
@@ -45,7 +45,7 @@ BPF_FENTRY(proc_dostring, struct ctl_table *table, int write,
 	struct bpftune_event event = {};
 	int ret, scenario_id = 0;
 
-	/* tuner id is a global declared in bpftune.bpf.h and set by bfttune
+	/* tuner id is a global declared in bpftune.bpf.h and set by bpftune
 	 * when the tuner is added.
 	 */
         event.tuner_id = tuner_id;
