@@ -1,11 +1,11 @@
 # BPF-based auto-tuning SPEC file
 
 %define name        bpftune
-%define rel	    1
+%define rel	    2
 %define release     %{rel}%{?dist}
 %define version     0.4
-%global _unitdir    /usr/lib/systemd/system/	
-%global pcpdir	    /var/lib/pcp/pmdas
+%define _unitdir    /usr/lib/systemd/system/
+%define pcpdir	    /var/lib/pcp/pmdas
 
 # openrc scripts are needed for Gentoo, not by default; run
 # rpmbuild "--with openrc" to include them.
@@ -15,6 +15,10 @@ License:        GPLv2 WITH Linux-syscall-note
 Name:           %{name}
 Summary:        BPF/tracing tools for auto-tuning Linux
 Group:          Development/Tools
+Version:        %{version}
+Release:        %{release}
+Source:         bpftune-%{version}.tar.bz2
+Prefix:         %{_prefix}
 Requires:       libbpf >= 0.6
 Requires:       libnl3
 Requires:       libcap
@@ -27,10 +31,6 @@ BuildRequires:  clang-libs >= 11
 BuildRequires:  llvm >= 11
 BuildRequires:  llvm-libs >= 11
 BuildRequires:	python3-docutils
-Version:        %{version}
-Release:        %{release}
-Source:         bpftune-%{version}.tar.bz2
-Prefix:         %{_prefix}
 
 %description
 Service consisting of daemon (bpftune) and plugins which
@@ -98,7 +98,7 @@ rm -Rf %{buildroot}
 %license LICENSE.txt
 
 %changelog
-* Thu Dec 11 2025 Alan Maguire <alan.maguire@oracle.com> - 0.4-1
+* Mon Dec 15 2025 Alan Maguire <alan.maguire@oracle.com> - 0.4-2
 - Minimize overheads, cleanups, test reliability. [Orabug: 38757036]
 * Mon Nov 03 2025 Alan Maguire <alan.maguire@oracle.com> - 0.3-2
 - Add udp tuner, query support
