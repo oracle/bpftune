@@ -56,7 +56,7 @@ ifeq ($(BPFTUNE_VERSION),)
 BPFTUNE_VERSION := $(KERNEL_REL)-$(GIT_SHA)
 endif
 
-VERSION = 0.4.1
+VERSION = 0.4.2
 VERSION_SCRIPT  := libbpftune.map
 
 CFLAGS = -fPIC -Wall -Wextra -g -I../include -std=c99
