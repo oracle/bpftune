@@ -63,7 +63,7 @@ LIBS = test_lib.sh
 
 PROGS = conn_bomb
 
-CFLAGS += -lpthread
+LDLIBS += -lpthread
 
 OBJS = conn_bomb.o
 
