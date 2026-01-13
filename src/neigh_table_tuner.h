@@ -17,6 +17,10 @@
 
 #include <bpftune/bpftune.h>
 
+#define MIN_GC_THRESH1 128
+#define MIN_GC_THRESH2 512
+#define MIN_GC_THRESH3 1024
+
 #ifndef IFNAMSIZ
 #define IFNAMSIZ 16
 #endif
@@ -38,6 +42,7 @@ enum neigh_table_tunables {
 enum neigh_table_scenarios {
 	NEIGH_TABLE_FULL,
 	NEIGH_TABLE_GROWN_EXCESSIVELY,
+	NEIGH_TABLE_EMPTY,
 };
 
 struct tbl_stats {
