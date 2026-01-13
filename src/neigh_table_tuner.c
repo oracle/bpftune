@@ -76,6 +76,8 @@ static struct bpftunable_scenario scenarios[] = {
 		"neighbour table is nearly full, preventing new entries from being added." },
 { NEIGH_TABLE_GROWN_EXCESSIVELY,	"neighbour table grown excessively",
 		"neighbour table increases are beyond what would be expected for the device given the number of IP addresses/prefixlens associated with it."},
+{ NEIGH_TABLE_EMPTY,			"neighbour table nearly empty",
+		"neighbour table is nearly empty, consuming unnecessary memory." },
 };
 
 int init(struct bpftuner *tuner)
@@ -306,6 +308,99 @@ out:
 	return ret;
 }		
 
+static int decrease_thresh(struct bpftuner *tuner, struct tbl_stats *stats)
+{
+	char *tbl_name = stats->family == AF_INET ? "arp_cache" : "ndisc_cache";
+	/* Open raw socket for the NETLINK_ROUTE protocol */
+	unsigned int tunable = stats->family == AF_INET ?
+				NEIGH_TABLE_IPV4_GC_THRESH3 :
+				NEIGH_TABLE_IPV6_GC_THRESH3;
+	struct nl_sock *sk = nl_socket_alloc();
+	struct ndtmsg ndt = {
+                .ndtm_family = stats->family,
+        };
+	struct nl_msg *m = NULL, *parms = NULL;
+	int new_gc_thresh1 = 0;
+	int new_gc_thresh2 = 0;
+	int new_gc_thresh3 = 0;
+	int ret;
+
+	if (!sk) {
+		bpftune_log(LOG_ERR, "failed to alloc netlink socket\n");
+		return -ENOMEM;
+	}
+	ret = nl_connect(sk, NETLINK_ROUTE);
+	if (ret) {
+		bpftune_log(LOG_ERR, "nl_connect() failed: %d\n",
+			    strerror(-ret));
+		goto out;
+	}
+
+	/* it would be nice if we could simply call rtnl_neightbl_change()
+	* here but it has a bug; it doesn't set gc_thresh3 (copy-and-paste
+	 * sets gc_thresh2 twice); instead roll our own...
+	 */
+	m = nlmsg_alloc_simple(RTM_SETNEIGHTBL, 0);
+	if (!m) {
+		ret = -ENOMEM;
+		goto out;
+	}
+
+	ret = nlmsg_append(m, &ndt, sizeof(ndt), NLMSG_ALIGNTO);
+	if (ret < 0)
+	goto out;
+
+	NLA_PUT_STRING(m, NDTA_NAME, tbl_name);
+
+	new_gc_thresh3 = BPFTUNE_SHRINK_BY_DELTA(stats->max);
+	if (new_gc_thresh3 <= MIN_GC_THRESH3) {
+		new_gc_thresh3 = MIN_GC_THRESH3;
+		new_gc_thresh2 = MIN_GC_THRESH2;
+		new_gc_thresh1 = MIN_GC_THRESH1;
+	} else {
+		new_gc_thresh2 = BPFTUNE_SHRINK_BY_DELTA(stats->thresh2);
+		new_gc_thresh1 = BPFTUNE_SHRINK_BY_DELTA(stats->thresh1);
+	}
+	NLA_PUT_U32(m, NDTA_THRESH3, new_gc_thresh3);
+	NLA_PUT_U32(m, NDTA_THRESH2, new_gc_thresh2);
+	NLA_PUT_U32(m, NDTA_THRESH1, new_gc_thresh1);
+
+	parms = nlmsg_alloc();
+	if (!parms) {
+		ret = -ENOMEM;
+		goto out;
+	}
+
+	ret = nla_put_nested(m, NDTA_PARMS, parms);
+	if (ret < 0)
+		goto out;
+
+	ret = nl_send_auto_complete(sk, m);
+	if (ret < 0)
+		bpftune_log(LOG_ERR, "nl_send_auto_complete() failed: %s\n",
+			    strerror(-ret));
+
+nla_put_failure:
+out:
+	if (parms)
+		nlmsg_free(parms);
+	if (m)
+		nlmsg_free(m);
+	nl_socket_free(sk);
+
+	if (ret < 0) {
+		bpftune_log(LOG_ERR, "could not change neightbl");
+	} else {
+		bpftuner_tunable_update(tuner, tunable, NEIGH_TABLE_EMPTY, 0,
+"reduced thresholds for %s table, thresh1: %ld to %ld, thresh2: %ld to %ld, thresh3: %ld to %ld\n",
+			    tbl_name, stats->thresh1, new_gc_thresh1,
+			    stats->thresh2, new_gc_thresh2, stats->max,
+			    new_gc_thresh3);
+	}
+	return ret;
+}
+
+
 void event_handler(struct bpftuner *tuner,
 		   struct bpftune_event *event,
 		   __attribute__((unused))void *ctx)
@@ -317,6 +412,12 @@ void event_handler(struct bpftuner *tuner,
 		if (bpftune_cap_add())
 			return;
 		increase_thresh(tuner, stats);
+		bpftune_cap_drop();
+		break;
+	case NEIGH_TABLE_EMPTY:
+		if (bpftune_cap_add())
+			return;
+		decrease_thresh(tuner, stats);
 		bpftune_cap_drop();
 		break;
 	default:

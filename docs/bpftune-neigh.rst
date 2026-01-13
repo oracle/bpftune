@@ -77,7 +77,9 @@ DESCRIPTION
         addresses and allowing for multicast etc we multiply this
         by a scaling factor (currently 4).  So in this case we will
         not increase beyond 1024. However with larger networks/more
-        devices we will.
+        devices we will. We also scale down the table size when there
+        are too few entries, upto the minimum of kernel default values,
+        to minimize memory usage.
 
         Contrast this approach with simply choosing a large
         net.ipv4.neigh.gc_thresh3. If thresh2 and thresh3

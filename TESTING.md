@@ -87,6 +87,11 @@ only the network namespace tuning is switched off.
 Ensure that the neigh table tuner notices the ARP/IPv6 neighbour
 table filling up and expands it via netlink request.
 
+## neigh_table_shrink tests (gc_thresh[2])
+
+Ensure that the neigh table shrink tuner notices an expanded ARP/IPv6
+neighbour table getting emptied and shrinks it via netlink request.
+
 ## mem_pressure tests (tcp_mem[1])
 
 With artificially low memory pressure value, generate traffic
