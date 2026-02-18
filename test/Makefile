@@ -35,7 +35,8 @@ IP_FRAG_TESTS =		frag_test frag_legacy_test
 
 NEIGH_TABLE_TESTS =	neigh_table_test neigh_table_v4only_test \
 			neigh_table_max_test neigh_table_max2_test \
-			neigh_table_legacy_test
+			neigh_table_legacy_test \
+			neigh_table_shrink_test neigh_table_shrink_legacy_test
 
 NET_BUFFER_TESTS =	budget_test backlog_test backlog_legacy_test \
 			high_order_alloc_test

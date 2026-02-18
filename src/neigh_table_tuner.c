@@ -76,6 +76,8 @@ static struct bpftunable_scenario scenarios[] = {
 		"neighbour table is nearly full, preventing new entries from being added." },
 { NEIGH_TABLE_GROWN_EXCESSIVELY,	"neighbour table grown excessively",
 		"neighbour table increases are beyond what would be expected for the device given the number of IP addresses/prefixlens associated with it."},
+{ NEIGH_TABLE_EMPTY,			"neighbour table nearly empty",
+		"neighbour table is nearly empty, consuming unnecessary memory." },
 };
 
 int init(struct bpftuner *tuner)
@@ -160,7 +162,9 @@ static int finish_handler(__attribute__((unused))struct nl_msg *msg, void *arg)
 	return NL_STOP;
 }
 
-static int increase_thresh(struct bpftuner *tuner, struct tbl_stats *stats)
+static int increase_or_decrease_thresh(struct bpftuner *tuner,
+				struct tbl_stats *stats,
+				bool increase)
 {
 	char *tbl_name = stats->family == AF_INET ? "arp_cache" : "ndisc_cache";
 	/* Open raw socket for the NETLINK_ROUTE protocol */
@@ -199,46 +203,48 @@ static int increase_thresh(struct bpftuner *tuner, struct tbl_stats *stats)
 		goto out;
 	}
 
-	/* First compute upper bound on gc_thresh3 based upon addresses
-	 * configured for the ifindex
-	 */
-	m = nlmsg_alloc_simple(RTM_GETADDR, NLM_F_REQUEST | NLM_F_DUMP);
-	if (!m) {
-		ret = -ENOMEM;
-		goto out;
-	}
-	ret = nlmsg_append(m, &ifa, sizeof(ifa), 0);
-	if (ret)
-		goto out;
+	if (stats->ifindex != -1 && increase) {
+		/* First compute upper bound on gc_thresh3 based upon addresses
+		* configured for the ifindex
+		*/
+		m = nlmsg_alloc_simple(RTM_GETADDR, NLM_F_REQUEST | NLM_F_DUMP);
+		if (!m) {
+			ret = -ENOMEM;
+			goto out;
+		}
+		ret = nlmsg_append(m, &ifa, sizeof(ifa), 0);
+		if (ret)
+			goto out;
 
-	cb = nl_cb_alloc(NL_CB_DEFAULT);
-	if (!cb) {
-		ret = -ENOMEM;
-		goto out;
-	}
-	nl_cb_set(cb, NL_CB_VALID, NL_CB_CUSTOM, valid_handler, &max_addr_info);
-	nl_cb_set(cb, NL_CB_FINISH, NL_CB_CUSTOM, finish_handler, &max_addr_info);
-	nl_send_auto_complete(sk, m);
-	while (max_addr_info.pending > 0)
-		nl_recvmsgs(sk, cb);
-	nlmsg_free(m);
-	m = NULL;
+		cb = nl_cb_alloc(NL_CB_DEFAULT);
+		if (!cb) {
+			ret = -ENOMEM;
+			goto out;
+		}
+		nl_cb_set(cb, NL_CB_VALID, NL_CB_CUSTOM, valid_handler, &max_addr_info);
+		nl_cb_set(cb, NL_CB_FINISH, NL_CB_CUSTOM, finish_handler, &max_addr_info);
+		nl_send_auto_complete(sk, m);
+		while (max_addr_info.pending > 0)
+			nl_recvmsgs(sk, cb);
+		nlmsg_free(m);
+		m = NULL;
 
-	bpftune_log(LOG_DEBUG, "%s: computed max tbl size of %ld for '%s'(ifindex %d) based on %d addresses\n",
-		    tuner->name, max_addr_info.max_tbl_size,
-		    stats->dev, stats->ifindex, max_addr_info.num_addrs);
+		bpftune_log(LOG_DEBUG, "%s: computed max tbl size of %ld for '%s'(ifindex %d) based on %d addresses\n",
+				tuner->name, max_addr_info.max_tbl_size,
+				stats->dev, stats->ifindex, max_addr_info.num_addrs);
 
-	new_gc_thresh3 = BPFTUNE_GROW_BY_DELTA(stats->max);
+		new_gc_thresh3 = BPFTUNE_GROW_BY_DELTA(stats->max);
 
-	if (stats->max >= max_addr_info.max_tbl_size) {
-		bpftuner_tunable_update(tuner, tunable,
-					NEIGH_TABLE_GROWN_EXCESSIVELY, 0,
-"can no longer update thresholds for gc_thresh[1-3] for table '%s' for device '%s' (ifindex %d) due to excessive size of table (we computed a reasonable max of %ld based on the prefixlens of the %d configured addresses). Current thresh1: %ld , thresh2: %ld , thresh3: %ld.\n",
-                            tbl_name, stats->dev, stats->ifindex,
-			    max_addr_info.max_tbl_size, max_addr_info.num_addrs,
-                            stats->thresh1, stats->thresh2, stats->max);
+		if (stats->max >= max_addr_info.max_tbl_size) {
+			bpftuner_tunable_update(tuner, tunable,
+						NEIGH_TABLE_GROWN_EXCESSIVELY, 0,
+	"can no longer update thresholds for gc_thresh[1-3] for table '%s' for device '%s' (ifindex %d) due to excessive size of table (we computed a reasonable max of %ld based on the prefixlens of the %d configured addresses). Current thresh1: %ld , thresh2: %ld , thresh3: %ld.\n",
+								tbl_name, stats->dev, stats->ifindex,
+					max_addr_info.max_tbl_size, max_addr_info.num_addrs,
+								stats->thresh1, stats->thresh2, stats->max);
 
-		goto out;
+			goto out;
+		}
 	}
 
 	/* it would be nice if we could simply call rtnl_neightbl_change()
@@ -256,10 +262,22 @@ static int increase_thresh(struct bpftuner *tuner, struct tbl_stats *stats)
 		goto out;
 
 	NLA_PUT_STRING(m, NDTA_NAME, tbl_name);
+	if (increase) {
+		new_gc_thresh2 = BPFTUNE_GROW_BY_DELTA(stats->thresh2);
+		new_gc_thresh1 = BPFTUNE_GROW_BY_DELTA(stats->thresh1);
+	} else {
+		new_gc_thresh3 = BPFTUNE_SHRINK_BY_DELTA(stats->max);
+		if (new_gc_thresh3 <= MIN_GC_THRESH3) {
+			new_gc_thresh3 = MIN_GC_THRESH3;
+			new_gc_thresh2 = MIN_GC_THRESH2;
+			new_gc_thresh1 = MIN_GC_THRESH1;
+		} else {
+			new_gc_thresh2 = BPFTUNE_SHRINK_BY_DELTA(stats->thresh2);
+			new_gc_thresh1 = BPFTUNE_SHRINK_BY_DELTA(stats->thresh1);
+		}
+	}
 
 	NLA_PUT_U32(m, NDTA_THRESH3, new_gc_thresh3);
-	new_gc_thresh2 = BPFTUNE_GROW_BY_DELTA(stats->thresh2);
-	new_gc_thresh1 = BPFTUNE_GROW_BY_DELTA(stats->thresh1);
 	NLA_PUT_U32(m, NDTA_THRESH2, new_gc_thresh2);
 	NLA_PUT_U32(m, NDTA_THRESH1, new_gc_thresh1);
 
@@ -296,15 +314,22 @@ out:
 		bpftune_log(LOG_ERR, "could not change neightbl for %s : %s\n",
 			    stats->dev, strerror(-ret));
 	} else if (updated) {
+		if (increase) {
 		bpftuner_tunable_update(tuner, tunable, NEIGH_TABLE_FULL, 0,
 "updated thresholds for %s table, dev '%s' (ifindex %d) thresh1: %ld to %ld, thresh2: %ld to %ld, thresh3: %ld to %ld\n",
 			    tbl_name, stats->dev, stats->ifindex,
 			    stats->thresh1, new_gc_thresh1,
 			    stats->thresh2, new_gc_thresh2,
 			    stats->max, new_gc_thresh3);
+		} else {
+		bpftuner_tunable_update(tuner, tunable, NEIGH_TABLE_EMPTY, 0,
+			"reduced thresholds for %s table, thresh1: %ld to %ld, thresh2: %ld to %ld, thresh3: %ld to %ld\n",
+			tbl_name, stats->thresh1, new_gc_thresh1, stats->thresh2,
+			new_gc_thresh2, stats->max, new_gc_thresh3);
+		}
 	}
 	return ret;
-}		
+}
 
 void event_handler(struct bpftuner *tuner,
 		   struct bpftune_event *event,
@@ -316,7 +341,13 @@ void event_handler(struct bpftuner *tuner,
 	case NEIGH_TABLE_FULL:
 		if (bpftune_cap_add())
 			return;
-		increase_thresh(tuner, stats);
+		increase_or_decrease_thresh(tuner, stats, true);
+		bpftune_cap_drop();
+		break;
+	case NEIGH_TABLE_EMPTY:
+		if (bpftune_cap_add())
+			return;
+		increase_or_decrease_thresh(tuner, stats, false);
 		bpftune_cap_drop();
 		break;
 	default:
