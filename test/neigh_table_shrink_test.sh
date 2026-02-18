@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note
 #
-# Copyright (c) 2023, Oracle and/or its affiliates.
+# Copyright (c) 2026, Oracle and/or its affiliates.
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public
@@ -19,8 +19,7 @@
 # Boston, MA 021110-1307, USA.
 #
 
-
-# run neigh table test
+# run neigh table shrink test
 
 . ./test_lib.sh
 
@@ -34,12 +33,12 @@ for TUNER in neigh_table ; do
 
  for NS in global ; do
   for TBL in arp_cache ndisc_cache ; do
- 
-   test_start "$0|neigh table legacy test ($NS netns): does filling $TBL make it grow?"
+
+   test_start "$0|neigh table shrink test ($NS netns): does emptying $TBL make it shrink?"
 
    test_setup "true"
 
-   test_run_cmd_local "$BPFTUNE -dsL &" true
+   test_run_cmd_local "$BPFTUNE -ds &" true
 
    sleep $SETUPTIME
 
@@ -49,11 +48,10 @@ for TUNER in neigh_table ; do
    else
 	PREFIX_CMD=""
 	INTF=$VETH2
-   fi	
-   $PREFIX_CMD ip ntable change name $TBL dev $INTF thresh1 32
-   $PREFIX_CMD ip ntable change name $TBL dev $INTF thresh2 64
-   $PREFIX_CMD ip ntable change name $TBL dev $INTF thresh3 128
-
+   fi
+   $PREFIX_CMD ip ntable change name $TBL dev $INTF thresh1 512
+   $PREFIX_CMD ip ntable change name $TBL dev $INTF thresh2 2048
+   $PREFIX_CMD ip ntable change name $TBL dev $INTF thresh3 4096
 
    for ((i=3; i < 255; i++ ))
    do
@@ -67,8 +65,20 @@ for TUNER in neigh_table ; do
 	$PREFIX_CMD ip neigh replace $ip6addr lladdr $macaddr dev $INTF
       fi
    done
-   grep "updated thresholds for $TBL table" $LOGFILE
-   grep "computed max" $LOGFILE
+
+   for ((i=3; i < 255; i++ ))
+   do
+      ipaddr="192.168.168.${i}"
+      ih=$(printf '%x' $i)
+      ip6addr="fd::${ih}"
+      macaddr="de:ad:be:ef:de:${ih}"
+      if [[ $TBL == "arp_cache" ]]; then
+	$PREFIX_CMD ip neigh del $ipaddr lladdr $macaddr dev $INTF
+      else
+	$PREFIX_CMD ip neigh del $ip6addr lladdr $macaddr dev $INTF
+      fi
+   done
+   grep "reduced thresholds for $TBL table" $LOGFILE
    test_pass
   done
  done

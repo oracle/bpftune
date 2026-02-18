@@ -65,6 +65,9 @@ extern unsigned short bpftune_learning_rate;
 #define NEARLY_FULL(val, limit) \
 	((val) >= (limit) || (val) + ((limit) >> BPFTUNE_BITSHIFT) >= (limit))
 
+#define NEARLY_EMPTY(val, limit) \
+	(val <= (limit >> BPFTUNE_BITSHIFT))
+
 enum bpftunable_type {
 	BPFTUNABLE_SYSCTL,
 	BPFTUNABLE_OTHER,

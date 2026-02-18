@@ -20,16 +20,7 @@
 
 BPF_MAP_DEF(tbl_map, BPF_MAP_TYPE_HASH, __u64, struct tbl_stats, 1024, 0);
 
-#ifdef BPFTUNE_LEGACY
-SEC("raw_tracepoint/neigh_create")
-#else
-SEC("tp_btf/neigh_create")
-#endif
-int BPF_PROG(bpftune_neigh_create, struct neigh_table *tbl,
-	     struct net_device *dev, const void *pkey,
-	     struct neighbour *n, bool exempt_from_gc)
-{
-	
+static __always_inline int neigh_add_or_remove(struct neigh_table *tbl, struct neighbour *n, struct net_device *dev, bool add) {
 	struct tbl_stats *tbl_stats;
 	struct bpftune_event event = {};
 	__u64 key = (__u64)tbl;
@@ -49,6 +40,8 @@ int BPF_PROG(bpftune_neigh_create, struct neigh_table *tbl,
 			new_tbl_stats.dev[0] = '\0';
 			BPFTUNE_CORE_READ_STR_INTO(&new_tbl_stats.dev, dev, name);
 			new_tbl_stats.ifindex = BPFTUNE_CORE_READ(dev, ifindex);
+		} else {
+			new_tbl_stats.ifindex = -1;
 		}
 		bpf_map_update_elem(&tbl_map, &key, &new_tbl_stats, BPF_ANY);
 		tbl_stats = bpf_map_lookup_elem(&tbl_map, &key);
@@ -64,21 +57,59 @@ int BPF_PROG(bpftune_neigh_create, struct neigh_table *tbl,
 	/* exempt from gc entries are not subject to space constraints, but
  	 * do take up table entries.
  	 */
-	if (NEARLY_FULL(tbl_stats->entries, tbl_stats->max)) {
-		struct neigh_parms *parms = BPFTUNE_CORE_READ(n, parms);
-		struct net *net = BPFTUNE_CORE_READ(parms, net.net);
+	if (add) {
+		if (NEARLY_FULL(tbl_stats->entries, tbl_stats->max)) {
+			struct neigh_parms *parms = BPFTUNE_CORE_READ(n, parms);
+			struct net *net = BPFTUNE_CORE_READ(parms, net.net);
 
-		event.tuner_id = tuner_id;
-		event.scenario_id = NEIGH_TABLE_FULL;
-		if (net) {
-			event.netns_cookie = get_netns_cookie(net);
-			if (event.netns_cookie < 0)
-				return 0;
+			event.tuner_id = tuner_id;
+			event.scenario_id = NEIGH_TABLE_FULL;
+			if (net) {
+				event.netns_cookie = get_netns_cookie(net);
+				if (event.netns_cookie < 0)
+					return 0;
+			}
+			STATIC_ASSERT(sizeof(event.raw_data) >= sizeof(*tbl_stats),
+					"event.raw_data too small");
+			__builtin_memcpy(&event.raw_data, tbl_stats, sizeof(*tbl_stats));
+			bpf_ringbuf_output(&ring_buffer_map, &event, sizeof(event), 0);
 		}
-		STATIC_ASSERT(sizeof(event.raw_data) >= sizeof(*tbl_stats),
-			      "event.raw_data too small");
-		__builtin_memcpy(&event.raw_data, tbl_stats, sizeof(*tbl_stats));
-		bpf_ringbuf_output(&ring_buffer_map, &event, sizeof(event), 0);
+	} else {
+		if (NEARLY_EMPTY(tbl_stats->entries, tbl_stats->max) && tbl_stats->max > MIN_GC_THRESH3) {
+			struct neigh_parms *parms = BPFTUNE_CORE_READ(n, parms);
+			struct net *net = BPFTUNE_CORE_READ(parms, net.net);
+
+			event.tuner_id = tuner_id;
+			event.scenario_id = NEIGH_TABLE_EMPTY;
+			if (net) {
+				event.netns_cookie = get_netns_cookie(net);
+				if (event.netns_cookie < 0)
+					return 0;
+			}
+			STATIC_ASSERT(sizeof(event.raw_data) >= sizeof(*tbl_stats),
+					"event.raw_data too small");
+			__builtin_memcpy(&event.raw_data, tbl_stats, sizeof(*tbl_stats));
+			bpf_ringbuf_output(&ring_buffer_map, &event, sizeof(event), 0);
+		}
 	}
 	return 0;
+}
+
+#ifdef BPFTUNE_LEGACY
+SEC("raw_tracepoint/neigh_create")
+#else
+SEC("tp_btf/neigh_create")
+#endif
+int BPF_PROG(bpftune_neigh_create, struct neigh_table *tbl,
+	     struct net_device *dev, const void *pkey,
+	     struct neighbour *n, bool exempt_from_gc)
+{
+	return neigh_add_or_remove(tbl, n, dev, true);
+}
+
+BPF_FENTRY(neigh_remove_one, struct neighbour *n)
+{
+	struct neigh_table *tbl = BPFTUNE_CORE_READ(n, tbl);
+
+	return neigh_add_or_remove(tbl, n, NULL, false);
 }
