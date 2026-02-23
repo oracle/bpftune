@@ -21,7 +21,7 @@ INSTALLFILES = $(wildcard bpftune/*.h)
 
 DESTDIR ?=
 prefix ?= /usr
-installprefix ?= $(DESTDIR)/$(prefix)
+installprefix = $(DESTDIR)/$(prefix)
 
 INSTALLPATH = $(installprefix)/include
 
