@@ -32,6 +32,9 @@ NL_INCLUDE := /usr/include/libnl3
 INCLUDES := -I../include -I$(BPF_INCLUDE) -I$(BPF_LOCAL_INCLUDE) -I$(NL_INCLUDE) -I../include/uapi
 INSTALL ?= install
 
+SBINPATH ?= $(shell rpm --eval '%{_sbindir}' 2>/dev/null)
+SBINPATH ?= /usr/sbin
+SBINDIR = $(shell basename $(SBINPATH))
 DESTDIR ?= /
 prefix ?= /usr
 libdir ?= lib64
@@ -144,8 +147,8 @@ distclean: clean
 	$(Q)$(RM) -r .output .sanitize
 
 install: $(OPATH)libbpftune.so $(OPATH)bpftune bpftune.service
-	$(INSTALL) -m 0755 -d $(INSTALLPATH)/sbin
-	$(INSTALL) $(OPATH)bpftune $(INSTALLPATH)/sbin/bpftune
+	$(INSTALL) -m 0755 -d $(INSTALLPATH)/$(SBINDIR)
+	$(INSTALL) $(OPATH)bpftune $(INSTALLPATH)/$(SBINDIR)/bpftune
 	$(INSTALL) -m 0755 -d $(INSTALLPATH)/$(libdir)
 	$(INSTALL) $(OPATH)libbpftune.so* $(INSTALLPATH)/$(libdir)
 	$(INSTALL) -m 0755 -d $(installprefix)/lib/systemd/system
