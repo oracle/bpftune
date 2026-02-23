@@ -33,7 +33,10 @@ INCLUDES := -I../include -I$(BPF_INCLUDE) -I$(BPF_LOCAL_INCLUDE) -I$(NL_INCLUDE)
 INSTALL ?= install
 
 SBINPATH ?= $(shell rpm --eval '%{_sbindir}' 2>/dev/null)
-SBINPATH ?= /usr/sbin
+ifeq ($(SBINPATH),)
+SBINPATH = /usr/sbin
+endif
+
 SBINDIR = $(shell basename $(SBINPATH))
 DESTDIR ?= /
 prefix ?= /usr
