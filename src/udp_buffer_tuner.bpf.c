@@ -150,7 +150,7 @@ static __always_inline bool udp_nearly_out_of_memory(struct sock *sk,
 static __always_inline int udp_fail_rcv(int ret, struct sock *sk)
 {
 	struct bpftune_event event = { 0 };
-	long rmem[3], rmem_new[3];
+	long rmem[3] = { 0 }, rmem_new[3] = { 0 };
 	int rcvbuf;
 	int id;
 
