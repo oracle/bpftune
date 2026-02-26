@@ -217,7 +217,7 @@ To build the following packages are needed (names may vary by distro);
 - libcap-devel
 - bpftool >= 4.18
 - libnl3-devel (on some distros like Debian libnl-route-3-dev is needed)
-- clang >= 11
+- clang >= 11 (if not using GCC BPF)
 - llvm >= 11
 - python3-docutils
 
