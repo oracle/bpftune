@@ -101,7 +101,7 @@ void bpftune_log_syslog(__attribute__((unused)) void *ctx, int level,
 
 	buflen = vsnprintf(buf, sizeof(buf), fmt, args);
 	if (buflen > 0)
-		syslog(level, buf, buflen + 1);
+		syslog(level, "%s", buf);
 }
 
 /* log to ctx buffer for specific thread, fall back to usual log destination */
@@ -811,7 +811,7 @@ struct bpftuner *bpftuner_init(const char *path)
 	tuner->id = bpftune_num_tuners;
 	tuner->state = BPFTUNE_ACTIVE;
 	bpftune_tuners[bpftune_num_tuners++] = tuner;
-	bpftune_log(LOG_DEBUG, "sucessfully initialized tuner %s[%d]\n",
+	bpftune_log(LOG_DEBUG, "successfully initialized tuner %s[%d]\n",
 		    tuner->name, tuner->id);
 	return tuner;
 }
@@ -1391,7 +1391,7 @@ int bpftuner_tunables_init(struct bpftuner *tuner, unsigned int num_descs,
 	for (i = 0; i < num_descs; i++) {
 		int num_values;
 
-		bpftune_log(LOG_DEBUG, "handling desc %ld/%ld\n", i, num_descs);
+		bpftune_log(LOG_DEBUG, "handling desc %u/%u\n", i, num_descs);
 		memcpy(&tuner->tunables[i].desc, &descs[i], sizeof(*descs));
 
 		if (descs[i].type != BPFTUNABLE_SYSCTL)
@@ -1414,7 +1414,7 @@ int bpftuner_tunables_init(struct bpftuner *tuner, unsigned int num_descs,
 		}
 		if (num_values != descs[i].num_values) {
 			bpftune_log(LOG_ERR, "error reading tunable '%s'; expected %d values, got %d\n",
-				    descs[i].num_values, num_values);
+				    descs[i].name, descs[i].num_values, num_values);
 			return -EINVAL;
 		}
 		if (descs[i].flags & BPFTUNABLE_STRING) {
