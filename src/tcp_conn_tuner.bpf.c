@@ -78,6 +78,52 @@ static __always_inline void set_cong(struct bpf_sock_ops *ops, __u8 i)
 
 __u64 tcp_thin_lto_choices;
 
+__u64 tcp_tw_reuse;
+
+__u64 tcp_active_conn;
+__u64 tcp_active_last;
+
+/*
+ * Send regular events to check if we are accumulating too many timewait
+ * sockets.
+ */
+static __always_inline void tcp_active_conn_update(struct bpf_sock_ops *ops)
+{
+	struct bpftune_event event = { 0 };
+	long reuse_old[3] = { 0 }, reuse_new[3] = { 0 };
+	struct bpf_sock *sk = ops->sk;
+	struct tcp_sock *tp;
+	__u64 active_curr;
+
+	if (tcp_tw_reuse == 1)
+		return;
+
+	/* avoid excessive processing */
+	if ((++tcp_active_conn % TCP_TW_MIN_THRESH) != 0)
+		return;
+	active_curr = bpf_ktime_get_ns();
+	if ((active_curr - tcp_active_last) < MINUTE)
+		return;
+	if (!sk)
+		return;
+	tp = bpf_skc_to_tcp_sock(sk);
+	if (!tp)
+		return;
+
+	reuse_old[0] = tcp_tw_reuse;
+	reuse_new[0] = 1;
+	/* send number of active connections in last minute to inform userspace */
+	reuse_new[1] = tcp_active_conn;
+
+	tcp_active_conn = 0;
+	tcp_active_last = active_curr;
+
+	/* send event to check if we approach limits with active + tw socks */
+	send_sk_sysctl_event((struct sock *)tp,
+			     TCP_TW_REUSE_ENABLE,
+			     TCP_TW_REUSE, reuse_old, reuse_new, &event);
+}
+
 SEC("sockops")
 int bpftune_conn_tuner(struct bpf_sock_ops *ops)
 {
@@ -96,6 +142,8 @@ int bpftune_conn_tuner(struct bpf_sock_ops *ops)
 
 	switch (ops->op) {
 	case BPF_SOCK_OPS_ACTIVE_ESTABLISHED_CB:
+		tcp_active_conn_update(ops);
+		/* FALLTHRU */
 	case BPF_SOCK_OPS_PASSIVE_ESTABLISHED_CB:
 		/* enable other needed events */
 		bpf_sock_ops_cb_flags_set(ops, cb_flags);
