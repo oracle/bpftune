@@ -74,7 +74,8 @@ rm -Rf %{buildroot}
 %{_sbindir}/bpftune
 %{_unitdir}/bpftune.service
 %{_libdir}/libbpftune.so.%{version}.%{rel}
-%{_libdir}/bpftune/*
+%dir %attr(0755,root,root) %{_libdir}/bpftune
+%attr(0644,root,root) %{_libdir}/bpftune/*
 %{_mandir}/*/*
 %if %{with openrc}
 %{_sysconfdir}/conf.d/bpftune
