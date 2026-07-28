@@ -25,6 +25,7 @@
 
 
 SLEEPTIME=10
+STRATEGY_DIR=/var/lib/bpftune-test/strategy
 
 
 test_start "$0|strategy test: does strategy tuner appear, trigger event and change strategies?"
@@ -32,7 +33,9 @@ test_start "$0|strategy test: does strategy tuner appear, trigger event and chan
 test_setup "true"
 
 sleep 1
-test_run_cmd_local "$BPFTUNE -dsl ./strategy &" true
+install -d -o root -g root -m 0755 "$STRATEGY_DIR"
+install -o root -g root -m 0644 strategy/strategy_tuner.so "$STRATEGY_DIR"
+test_run_cmd_local "$BPFTUNE -dsl $STRATEGY_DIR &" true
 sleep $SETUPTIME
 # trigger event
 sysctl kernel.core_pattern
@@ -43,6 +46,7 @@ sleep 30
 sysctl kernel.core_pattern
 sleep $SLEEPTIME
 grep -E "event .* for tuner strategy, strategy strategy_B" $TESTLOG_LAST
+rm -rf "$STRATEGY_DIR"
 test_pass
 test_cleanup
 test_exit

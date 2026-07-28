@@ -14,7 +14,8 @@ SYNOPSIS
 
 	*OPTIONS* := { { **-V** | **--version** } | { **-h** | **--help** }
 	| { [**-s** | **--stderr** } | { [**-c** | **--cgroup**] cgroup} |
-        { [**-l** | **--libdir** ] libdir} | [{ **-d** | **--debug** }] }
+        { [**-l** | **--libdir** ] libdir} | { **--print-libdir** }
+        | [{ **-d** | **--debug** }] }
         { [**-r** | **--learning_rate** ] learning_rate}
         { [**-R** | **--rollback** ]}
         { [**-S** | **--support** ]}
@@ -59,11 +60,17 @@ OPTIONS
         -S, --support
                   Scan system to see what level of bpftune support is present.
         -l, --libdir
-                  bptune extra plugin directory; defaults to
+                  bpftune extra plugin directory; defaults to
                   /usr/local/lib64/bpftune . Both /usr/lib64/bpftune and
                   /usr/local/lib64/bpftune can be used to install plugin tuners;
                   if an alternative to /usr/local/lib64/bpftune is wanted,
-                  it must be specified via library path.
+                  it must be specified via library path. Plugin directories must
+                  be absolute paths whose components and plugin
+                  files are root-owned, are not group- or other-writable, and
+                  have no POSIX ACLs. Symbolic links are rejected.
+
+        --print-libdir
+                  Print the compiled-in standard plugin directory and exit.
 
         -r, --learning_rate
 
