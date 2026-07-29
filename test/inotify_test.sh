@@ -24,7 +24,7 @@
 . ./test_lib.sh
 
 
-SLEEPTIME=10
+SLEEPTIME=20
 
 for TUNER in neigh_table ; do
 
@@ -36,15 +36,15 @@ for TUNER in neigh_table ; do
 
    sleep $SETUPTIME
 
+   cp -f ${BPFTUNE_LIBDIR}/tcp_buffer_tuner.so /tmp
+   rm ${BPFTUNE_LIBDIR}/tcp_buffer_tuner.so
+
    sleep $SLEEPTIME
-   cp /usr/lib64/bpftune/tcp_buffer_tuner.so /tmp
-   rm /usr/lib64/bpftune/tcp_buffer_tuner.so
-   
    grep "fini tuner" $TESTLOG_LAST
 
-   sleep $SLEEPTIME
-
-   cp /tmp/tcp_buffer_tuner.so /usr/lib64/bpftune
+   install -o root -g root -m 0755 /tmp/tcp_buffer_tuner.so \
+      ${BPFTUNE_LIBDIR}/tcp_buffer_tuner.so
+   rm -f /tmp/tcp_buffer_tuner.so
 
    sleep $SLEEPTIME
    grep "added lib" $TESTLOG_LAST

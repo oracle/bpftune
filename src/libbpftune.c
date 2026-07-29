@@ -43,6 +43,7 @@
 #include <sched.h>
 #include <mntent.h>
 #include <sys/capability.h>
+#include <sys/xattr.h>
 #include <pthread.h>
 #include <signal.h>
 #include <time.h>
@@ -743,10 +744,11 @@ unsigned long bpftune_global_netns_cookie(void)
 /* add a tuner to the list of tuners, or replace existing inactive tuner.
  * If successful, call init().
  */
-struct bpftuner *bpftuner_init(const char *path)
+static struct bpftuner *__bpftuner_init(const char *path, int fd)
 {
 	struct bpftuner *tuner = NULL;
 	int err, retries;
+	char fd_path[64];
 
 	tuner = calloc(1, sizeof(*tuner));
 	if (!tuner) {
@@ -754,13 +756,16 @@ struct bpftuner *bpftuner_init(const char *path)
 		return NULL;
 	}
 	tuner->name = path;
+	if (fd >= 0)
+		snprintf(fd_path, sizeof(fd_path), "/proc/self/fd/%d", fd);
 
 	bpftune_cap_add();
 	/* if file appears via inotify we may get "file too short" errors;
 	 * retry a few times to avoid this.
 	 */
 	for (retries = 0; retries < 5; retries++) {
-		tuner->handle = dlopen(path, RTLD_NOW | RTLD_GLOBAL);
+		tuner->handle = dlopen(fd >= 0 ? fd_path : path,
+				       RTLD_NOW | RTLD_GLOBAL);
 		if (tuner->handle)
 			break;
 		usleep(1000);
@@ -814,6 +819,133 @@ struct bpftuner *bpftuner_init(const char *path)
 	bpftune_log(LOG_DEBUG, "sucessfully initialized tuner %s[%d]\n",
 		    tuner->name, tuner->id);
 	return tuner;
+}
+
+static bool root_controlled_dir(const char *path)
+{
+	struct stat st;
+	ssize_t acl_size;
+
+	if (lstat(path, &st)) {
+		bpftune_log(LOG_ERR, "cannot stat plugin directory '%s': %s\n",
+			    path, strerror(errno));
+		return false;
+	}
+	if (!S_ISDIR(st.st_mode) || st.st_uid != 0 ||
+	    (st.st_mode & (S_IWGRP | S_IWOTH))) {
+		bpftune_log(LOG_ERR,
+			    "untrusted plugin directory '%s' (mode %o, uid %u)\n",
+			    path, st.st_mode & 07777, st.st_uid);
+		return false;
+	}
+	acl_size = lgetxattr(path, "system.posix_acl_access", NULL, 0);
+	if (acl_size >= 0) {
+		bpftune_log(LOG_ERR, "plugin directory '%s' has an access ACL\n",
+			    path);
+		return false;
+	}
+	if (errno != ENODATA && errno != ENOTSUP && errno != EOPNOTSUPP) {
+		bpftune_log(LOG_ERR, "cannot inspect ACL for plugin directory '%s': %s\n",
+			    path, strerror(errno));
+		return false;
+	}
+	acl_size = lgetxattr(path, "system.posix_acl_default", NULL, 0);
+	if (acl_size >= 0) {
+		bpftune_log(LOG_ERR, "plugin directory '%s' has a default ACL\n",
+			    path);
+		return false;
+	}
+	if (errno != ENODATA && errno != ENOTSUP && errno != EOPNOTSUPP) {
+		bpftune_log(LOG_ERR, "cannot inspect ACL for plugin directory '%s': %s\n",
+			    path, strerror(errno));
+		return false;
+	}
+	return true;
+}
+
+static bool trusted_plugin_path(const char *path)
+{
+	char directory[PATH_MAX];
+	char component[PATH_MAX] = "/";
+	char *cursor, *next;
+	char *slash;
+
+	if (!path || path[0] != '/' || strlen(path) >= sizeof(directory))
+		return false;
+	strcpy(directory, path);
+	slash = strrchr(directory, '/');
+	if (!slash || !slash[1] || !strcmp(slash + 1, ".") ||
+	    !strcmp(slash + 1, ".."))
+		return false;
+	*slash = '\0';
+	if (!directory[0])
+		return false;
+	while (strlen(directory) > 1 && directory[strlen(directory) - 1] == '/')
+		directory[strlen(directory) - 1] = '\0';
+	for (cursor = directory + 1; *cursor; cursor = next + 1) {
+		next = strchr(cursor, '/');
+		if (!next)
+			next = cursor + strlen(cursor);
+		if (next == cursor || (next - cursor == 1 && cursor[0] == '.') ||
+		    (next - cursor == 2 && cursor[0] == '.' && cursor[1] == '.'))
+			return false;
+		if (strlen(component) + (size_t)(next - cursor) + 2 > sizeof(component))
+			return false;
+		if (strcmp(component, "/"))
+			strcat(component, "/");
+		strncat(component, cursor, (size_t)(next - cursor));
+		if (!root_controlled_dir(component))
+			return false;
+		if (!*next)
+			break;
+	}
+	return true;
+}
+
+struct bpftuner *bpftuner_init(const char *path)
+{
+	struct stat st;
+	ssize_t acl_size;
+	int fd, acl_err = 0;
+	struct bpftuner *tuner;
+
+	if (!trusted_plugin_path(path)) {
+		bpftune_log(LOG_ERR, "refusing untrusted plugin '%s'\n", path);
+		return NULL;
+	}
+	fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+	acl_size = fd >= 0 ? fgetxattr(fd, "system.posix_acl_access", NULL, 0) : -1;
+	if (acl_size < 0)
+		acl_err = errno;
+	if (fd < 0 || fstat(fd, &st)) {
+		bpftune_log(LOG_ERR, "cannot inspect plugin '%s': %s\n", path,
+			    strerror(errno));
+		goto untrusted;
+	}
+	if (!S_ISREG(st.st_mode) || st.st_uid != 0 ||
+	    (st.st_mode & (S_IWGRP | S_IWOTH))) {
+		bpftune_log(LOG_ERR, "untrusted plugin '%s' (mode %o, uid %u)\n",
+			    path, st.st_mode & 07777, st.st_uid);
+		goto untrusted;
+	}
+	if (acl_size >= 0) {
+		bpftune_log(LOG_ERR, "plugin '%s' has an access ACL\n", path);
+		goto untrusted;
+	}
+	if (acl_err != ENODATA && acl_err != ENOTSUP && acl_err != EOPNOTSUPP) {
+		bpftune_log(LOG_ERR, "cannot inspect ACL for plugin '%s': %s\n",
+			    path, strerror(acl_err));
+		goto untrusted;
+	}
+	tuner = __bpftuner_init(path, fd);
+	close(fd);
+	return tuner;
+
+untrusted:
+	if (fd >= 0)
+		close(fd);
+	bpftune_log(LOG_ERR, "refusing untrusted plugin '%s'\n", path);
+	return NULL;
 }
 
 static void __bpftuner_scenario_log(struct bpftuner *tuner, unsigned int tunable,

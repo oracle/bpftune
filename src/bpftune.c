@@ -111,15 +111,34 @@ void *inotify_thread(void *arg)
 		return NULL;
 	}
 	wd = inotify_add_watch(inotify_fd, library_dir, IN_CREATE | IN_DELETE);
+	if (wd < 0) {
+		bpftune_log(BPFTUNE_LOG_LEVEL,
+			    "cannot monitor '%s' for changes: %s\n", library_dir,
+			    strerror(errno));
+		bpftune_cap_drop();
+		close(inotify_fd);
+		return NULL;
+	}
 
 	bpftune_cap_drop();
 
 	while (!exiting) {
 		len = read(inotify_fd, buf, sizeof(buf));
+		if (len < 0) {
+			if (errno == EINTR)
+				continue;
+			bpftune_log(BPFTUNE_LOG_LEVEL,
+				    "cannot read changes for '%s': %s\n", library_dir,
+				    strerror(errno));
+			break;
+		}
 
-		for (i = 0; i < len; i += sizeof(struct inotify_event)) {
+		for (i = 0; i < len; ) {
 			struct inotify_event *event = (struct inotify_event *)&buf[i];
 			char *suffix;
+			int event_len = sizeof(*event) + event->len;
+
+			i += event_len;
 
 			if (event->mask & IN_ISDIR)
 				continue;
@@ -153,7 +172,6 @@ void *inotify_thread(void *arg)
 		inotify_rm_watch(inotify_fd, wd);
 	bpftune_cap_drop();
 	close(inotify_fd);
-
 	return NULL;
 }
 
@@ -213,9 +231,10 @@ int init(const char *library_dir)
 	}
 
 	if (pthread_attr_init(&attr) ||
-	    pthread_create(&inotify_tid, &attr, inotify_thread, (void *)library_dir))
+	    pthread_create(&inotify_tid, &attr, inotify_thread, (void *)library_dir)) {
 		bpftune_log(LOG_ERR, "could not create inotify thread: %s\n",
 			    strerror(errno));
+	}
 
 	if (ringbuf_map_fd > 0) {
 		ring_buffer = bpftune_ring_buffer_init(ringbuf_map_fd, NULL);
@@ -296,6 +315,7 @@ int main(int argc, char *argv[])
 		{ "libdir",	required_argument,	NULL,	'l' },
 		{ "learning_rate", required_argument,	NULL,	'r' },
 		{ "port",	required_argument,	NULL,	'p' },
+		{ "print-libdir", no_argument,		NULL,	'P' },
 		{ "query",	required_argument,	NULL,	'q' },
 		{ "rollback",	no_argument,		NULL,	'R' },
 		{ "stderr", 	no_argument,		NULL,	's' },
@@ -319,7 +339,7 @@ int main(int argc, char *argv[])
 
 	bin_name = argv[0];
 
-	while ((opt = getopt_long(argc, argv, "a:c:dDhl:Lr:p:q:RsSV", options, NULL))
+	while ((opt = getopt_long(argc, argv, "a:c:dDhl:Lr:p:Pq:RsSV", options, NULL))
 		>= 0) {
 		switch (opt) {
 		case 'a':
@@ -358,6 +378,9 @@ int main(int argc, char *argv[])
 		case 'p':
 			port = (unsigned short)atoi(optarg);
 			break;
+		case 'P':
+			printf("%s\n", BPFTUNER_LIB_DIR);
+			return 0;
 		case 'q':
 			query = optarg;
 			client = true;
@@ -447,7 +470,7 @@ int main(int argc, char *argv[])
 			    BPFTUNER_LIB_DIR, strerror(-err));
 		exit(EXIT_FAILURE);
 	}
-	/* optional dir absence will not trigger failure */
+	/* Optional directories are always an executable-code source. */
 	if (library_dir)
 		init(library_dir);
 

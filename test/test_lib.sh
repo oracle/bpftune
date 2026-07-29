@@ -183,6 +183,7 @@ if [[ "$DEBUG" != 0 ]]; then
 fi
 export CGROUPDIR=${CGROUPDIR:-"/var/run/bpftune/cgroupv2"}
 export BPFTUNE_PROG=${BPFTUNE_PROG:-"/usr/sbin/bpftune"}
+export BPFTUNE_LIBDIR="$($BPFTUNE_PROG --print-libdir)"
 export BPFTUNE="${BPFTUNE_PROG} -c $CGROUPDIR $BPFTUNE_FLAGS"
 export BPFTUNE_CMD=${BPFTUNE_CMD:-"$BPFTUNE"}
 
@@ -335,8 +336,10 @@ test_cleanup_local()
 	sysctl -w net.ipv6.conf.all.disable_ipv6=0
 	rm -fr $SERVERDIR
 	set -e
-	if [[ ! -f /usr/lib64/bpftune/tcp_buffer_tuner.so ]]; then
-		mv /tmp/tcp_buffer_tuner.so /usr/lib64/bpftune
+	if [[ ! -f ${BPFTUNE_LIBDIR}/tcp_buffer_tuner.so ]]; then
+		install -o root -g root -m 0755 /tmp/tcp_buffer_tuner.so \
+			${BPFTUNE_LIBDIR}/tcp_buffer_tuner.so
+		rm -f /tmp/tcp_buffer_tuner.so
 	fi
 	if [[ $EXIT -ne 0 ]]; then
 		if [[ -f $TESTLOG_LAST ]]; then

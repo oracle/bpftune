@@ -40,7 +40,19 @@ endif
 SBINDIR = $(shell basename $(SBINPATH))
 DESTDIR ?= /
 prefix ?= /usr
-libdir ?= lib64
+PKG_CONFIG ?= pkg-config
+LIBBPF_LIBDIR := $(shell $(PKG_CONFIG) --variable=libdir libbpf 2>/dev/null)
+
+# Prefer the ABI-specific library directory reported by libbpf when it is
+# below our install prefix (for example, lib/x86_64-linux-gnu on Debian).
+# Distribution packages and cross-builds can still override libdir explicitly.
+ifneq ($(filter $(prefix)/%,$(LIBBPF_LIBDIR)),)
+DEFAULT_LIBDIR := $(patsubst $(prefix)/%,%,$(LIBBPF_LIBDIR))
+else
+DEFAULT_LIBDIR := lib64
+endif
+
+libdir ?= $(DEFAULT_LIBDIR)
 installprefix = $(DESTDIR)/$(prefix)
 
 INSTALLPATH = $(installprefix)
