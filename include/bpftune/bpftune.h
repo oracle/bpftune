@@ -190,8 +190,8 @@ struct bpftuner {
 	unsigned int id;
 	enum bpftune_state state;
 	struct bpftuner_netns netns;
-	const char *path;
 	void *handle;
+	int plugin_fd;
 	const char *name;
 	struct bpf_object_skeleton *skeleton;
 	enum bpftune_support_level bpf_support;
