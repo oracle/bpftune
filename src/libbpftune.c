@@ -756,6 +756,7 @@ static struct bpftuner *__bpftuner_init(const char *path, int fd)
 		return NULL;
 	}
 	tuner->name = path;
+	tuner->plugin_fd = fd;
 	if (fd >= 0)
 		snprintf(fd_path, sizeof(fd_path), "/proc/self/fd/%d", fd);
 
@@ -775,6 +776,7 @@ static struct bpftuner *__bpftuner_init(const char *path, int fd)
 		bpftune_log(LOG_ERR,
 			    "could not dlopen '%s' after %d retries: %s\n",
 			    path, retries, dlerror());
+		close(tuner->plugin_fd);
 		free(tuner);
 		return NULL;
 	}
@@ -792,6 +794,7 @@ static struct bpftuner *__bpftuner_init(const char *path, int fd)
 		bpftune_log(LOG_ERR, "missing definitions in '%s': need 'init', 'fini' and 'event_handler'\n",
 			    path);
 		dlclose(tuner->handle);
+		close(tuner->plugin_fd);
 		free(tuner);
 		return NULL;
 	}
@@ -804,6 +807,7 @@ static struct bpftuner *__bpftuner_init(const char *path, int fd)
 		dlclose(tuner->handle);
 		bpftune_log(LOG_ERR, "error initializing '%s: %s\n",
 			    path, strerror(-err));
+		close(tuner->plugin_fd);
 		free(tuner);
 		return NULL;
 	}
@@ -906,14 +910,19 @@ struct bpftuner *bpftuner_init(const char *path)
 {
 	struct stat st;
 	ssize_t acl_size;
-	int fd, acl_err = 0;
-	struct bpftuner *tuner;
+	int fd = -1, acl_err = 0, retries;
 
 	if (!trusted_plugin_path(path)) {
 		bpftune_log(LOG_ERR, "refusing untrusted plugin '%s'\n", path);
 		return NULL;
 	}
-	fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+	/* An IN_CREATE notification can arrive before the file is openable. */
+	for (retries = 0; retries < 5; retries++) {
+		fd = open(path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+		if (fd >= 0 || errno != ENOENT)
+			break;
+		usleep(1000);
+	}
 	acl_size = fd >= 0 ? fgetxattr(fd, "system.posix_acl_access", NULL, 0) : -1;
 	if (acl_size < 0)
 		acl_err = errno;
@@ -937,9 +946,7 @@ struct bpftuner *bpftuner_init(const char *path)
 			    path, strerror(acl_err));
 		goto untrusted;
 	}
-	tuner = __bpftuner_init(path, fd);
-	close(fd);
-	return tuner;
+	return __bpftuner_init(path, fd);
 
 untrusted:
 	if (fd >= 0)
@@ -1055,6 +1062,14 @@ void bpftuner_fini(struct bpftuner *tuner, enum bpftune_state state)
                 }
         }
 	bpftuner_rollback(tuner, false);
+	if (tuner->handle) {
+		dlclose(tuner->handle);
+		tuner->handle = NULL;
+	}
+	if (tuner->plugin_fd >= 0) {
+		close(tuner->plugin_fd);
+		tuner->plugin_fd = -1;
+	}
 
 	tuner->state = state;
 }
