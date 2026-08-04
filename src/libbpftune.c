@@ -2589,9 +2589,10 @@ void *bpftune_server_thread(void *arg)
 	bpftune_server_running = true;
 	while (bpftune_server_running) {
 		char buf[BPFTUNE_SERVER_MSG_MAX];
-		char req[80];
+		char req[81];
 		struct sockaddr_in caddr;
 		int cfd = accept(fd, (struct sockaddr_in *)&caddr, &len);
+		ssize_t req_len;
 		unsigned long i;
 
 		if (cfd < 0) {
@@ -2599,12 +2600,14 @@ void *bpftune_server_thread(void *arg)
 				    port, strerror(errno));
 			continue;
 		}
-		if (read(cfd, req, sizeof(req)) < 0) {
+		req_len = read(cfd, req, sizeof(req) - 1);
+		if (req_len < 0) {
 			bpftune_log(LOG_DEBUG, "could not read request from client for port %d: %s\n",
 				    port, strerror(errno));
 			close(cfd);
 			continue;
 		}
+		req[req_len] = '\0';
 		bpftune_log(LOG_DEBUG, "request '%s' from client for port %d\n",
 			    req, port);
 		for (i = 0; i < ARRAY_SIZE(bpftune_reqs); i++) {
