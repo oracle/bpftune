@@ -198,7 +198,7 @@ static int increase_or_decrease_thresh(struct bpftuner *tuner,
 	}
 	ret = nl_connect(sk, NETLINK_ROUTE);
 	if (ret) {
-		bpftune_log(LOG_ERR, "nl_connect() failed: %d\n",
+		bpftune_log(LOG_ERR, "nl_connect() failed: %s\n",
 			    strerror(-ret));
 		goto out;
 	}
