@@ -40,16 +40,19 @@ static struct bpftunable_desc descs[] = {
 { TCP_CONG_DEFAULT, BPFTUNABLE_SYSCTL, "net.ipv4.tcp_congestion_control",
   BPFTUNABLE_NAMESPACED | BPFTUNABLE_STRING, 1 },
 { TCP_THIN_LINEAR_TIMEOUTS, BPFTUNABLE_SYSCTL, "net.ipv4.tcp_thin_linear_timeouts", BPFTUNABLE_NAMESPACED, 1 },
+{ TCP_TW_REUSE, BPFTUNABLE_SYSCTL, "net.ipv4.tcp_tw_reuse", BPFTUNABLE_NAMESPACED, 1 },
+{ NET_IP_LOCAL_PORT_RANGE, BPFTUNABLE_SYSCTL, "net.ipv4.ip_local_port_range", BPFTUNABLE_NAMESPACED, 2 },
 };
 
 static struct bpftunable_scenario scenarios[] = {
 { TCP_CONG_SET,		"specify TCP congestion control algorithm",
   "To optimize TCP performance, a TCP congestion control algorithm was chosen to mimimize round-trip time and maximize delivery rate." },
+{ TCP_TW_REUSE_ENABLE,	"enable TCP timewait reuse",
+  "To avoid outbound exhaustion of TCP ephemeral ports, enable TCP timewait reuse" },
 };
-
 struct tcp_conn_tuner_bpf *skel;
 
-int tcp_iter_fd;
+static long tcp_tw_reuse = 0;
 
 int init(struct bpftuner *tuner)
 {
@@ -113,6 +116,9 @@ int init(struct bpftuner *tuner)
 	t = bpftuner_tunable(tuner, TCP_THIN_LINEAR_TIMEOUTS);
 	if (t)
 		bpftuner_bpf_var_set(tcp_conn, tuner, tcp_thin_lto, t->initial_values[0]);
+	t = bpftuner_tunable(tuner, TCP_TW_REUSE);
+	if (t)
+		bpftuner_bpf_var_set(tcp_conn, tuner, tcp_tw_reuse, t->initial_values[0]);
 out:
 	bpftune_cap_drop();
 	return err;
@@ -182,9 +188,63 @@ void fini(struct bpftuner *tuner)
 	bpftuner_bpf_fini(tuner);
 }
 
-void event_handler(struct bpftuner *tuner,  __attribute__((unused))struct bpftune_event *event,
+static void tcp_tw_reuse_update(struct bpftuner *tuner, unsigned long netns_cookie,
+				int scenario, long est_count)
+{
+	long tw_count = 0, port_range = 0, port_max, port_min, new = 1;
+	int family = AF_INET;
+	struct bpftunable *t;
+
+	if (tcp_tw_reuse == 1)
+		return;
+
+	t = bpftuner_tunable(tuner, NET_IP_LOCAL_PORT_RANGE);
+	if (t) {
+		port_max = t->current_values[1];
+		port_min = t->current_values[0];
+		port_range = port_max - port_min;
+	}
+	if (port_range <= 0)
+		return;
+	if (bpftune_sockstat_read(netns_cookie, family, "TCP", "tw", &tw_count))
+		return;
+
+	bpftune_log(LOG_DEBUG, "TCP tw_count %ld + est_count %ld approaches port range %ld?\n",
+		    tw_count, est_count, port_range);
+	if (!NEARLY_FULL(tw_count + est_count, port_range))
+		return;
+
+	t = bpftuner_tunable(tuner, TCP_TW_REUSE);
+	if (!t)
+		return;
+	tcp_tw_reuse = t->current_values[0];
+
+	if (tcp_tw_reuse == new)
+		return;
+	if (!bpftuner_tunable_sysctl_write(tuner, TCP_TW_REUSE, scenario,
+					   netns_cookie, 1, &new,
+"Due to approaching ephemeral port limit of %ld (%ld - %ld), change %s from %ld -> %ld\n",
+					   port_range, port_max, port_min, 
+					   bpftuner_tunable_name(tuner, TCP_TW_REUSE),
+					   tcp_tw_reuse, new)) {
+		bpftuner_bpf_var_set(tcp_conn, tuner, tcp_tw_reuse, new);
+		tcp_tw_reuse = 1;
+	}
+}
+
+void event_handler(struct bpftuner *tuner,  struct bpftune_event *event,
 		   __attribute__((unused))void *ctx)
 {
-	bpftune_log(LOG_DEBUG,
-		    "%s: got unexpected event\n", tuner->name);
+	int scenario = event->scenario_id;
+
+	switch (scenario) {
+	case TCP_TW_REUSE_ENABLE:
+		tcp_tw_reuse_update(tuner, event->netns_cookie, scenario,
+				    event->update[0].new[1]);
+		break;
+	default:
+		bpftune_log(LOG_DEBUG,
+			    "%s: got unexpected event\n", tuner->name);
+		break;
+	}
 }

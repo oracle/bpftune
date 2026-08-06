@@ -47,7 +47,8 @@ TCP_BUFFER_TESTS =	mem_pressure_test mem_pressure_legacy_test \
 			wmem_test wmem_legacy_test \
 			rmem_test rmem_legacy_test
 
-TCP_CONN_TESTS =	cong_test cong_legacy_test \
+TCP_CONN_TESTS =	tw_reuse_netns_test tw_reuse_test tw_reuse_legacy_test \
+			cong_test cong_legacy_test \
 			file_download_test file_download_legacy_test
 
 UDP_BUFFER_TESTS =	udp_rmem_test udp_rmem_legacy_test \

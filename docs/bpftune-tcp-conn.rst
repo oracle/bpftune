@@ -127,6 +127,9 @@ DESCRIPTION
         In addition, when retransmits occur for a TCP connection, we enable
         TCP thin linear timeouts to improve responsiveness for thin TCP connections.
 
+        Also we watch out for potential exhaustion of outbound ephemeral ports
+        and set net.ipv4.tcp_rw_reuse=1 if that event is imminent.
+
         References:
 
         BBR: Congestion-Based Congestion Control

@@ -17,17 +17,26 @@
 
 #include <bpftune/bpftune.h>
 
-enum tcp_cong_tunables {
+enum tcp_conn_tunables {
 	TCP_CONG,
 	TCP_ALLOWED_CONG,
 	TCP_AVAILABLE_CONG,
 	TCP_CONG_DEFAULT,
-	TCP_THIN_LINEAR_TIMEOUTS
+	TCP_THIN_LINEAR_TIMEOUTS,
+	TCP_TW_REUSE,
+	NET_IP_LOCAL_PORT_RANGE,
+	TCP_TIMESTAMPS,
 };
 
-enum tcp_cong_scenarios {
+enum tcp_conn_scenarios {
 	TCP_CONG_SET,
+	TCP_TW_REUSE_ENABLE,
 };
+
+/* min threshold of active connections/min to send event checking
+ * for outbound port exhaustion.
+ */
+#define TCP_TW_MIN_THRESH	128
 
 #define CONG_MAXNAME	16
 

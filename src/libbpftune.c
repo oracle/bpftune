@@ -1386,7 +1386,7 @@ out:
 	return ret;
 }
 
-static int bpftune_nstat_read(unsigned long netns_cookie, int family,
+static int bpftune_nstat_read(unsigned long netns_cookie, bool key_val,
 			      const char *file, const char *linename,
 			      const char *name, long *value)
 {
@@ -1415,11 +1415,11 @@ static int bpftune_nstat_read(unsigned long netns_cookie, int family,
 		char *next, *s, *saveptr = NULL;
 		int index = 0;
 
-		/* for IPv6 it is a "key value" format per line; for
-		 * IPv4 it is a set of parameter names on one line
+		/* for key_val it is a "key value" format per line;
+		 * otherwise it is a set of parameter names on one line
 		 * followed by the values on the next.
 		 */
-		if (family == AF_INET6) {
+		if (key_val) {
 			char nextname[128];
 
 			sscanf(line, "%s %ld", nextname, value);
@@ -1468,7 +1468,8 @@ out_unset:
 int bpftune_snmpstat_read(unsigned long netns_cookie, int family,
                           const char *linename, const char *name, long *value)
 {
-	return bpftune_nstat_read(netns_cookie, family,
+	/* for IPv6 format is key value, for IPv4 it is keys on one line, values next. */
+	return bpftune_nstat_read(netns_cookie, family == AF_INET6,
 				  family == AF_INET ? "/proc/net/snmp" :
 				 		      "/proc/net/snmp6",
 				  linename, name, value);
@@ -1477,7 +1478,16 @@ int bpftune_snmpstat_read(unsigned long netns_cookie, int family,
 int bpftune_netstat_read(unsigned long netns_cookie, int family,
 			 const char *linename, const char *name, long *value)
 {
-	return bpftune_nstat_read(netns_cookie, family, "/proc/net/netstat",
+	return bpftune_nstat_read(netns_cookie, family == AF_INET6, "/proc/net/netstat",
+				  linename, name, value);
+}
+
+int bpftune_sockstat_read(unsigned long netns_cookie, int family,
+			   const char *linename, const char *name, long *value)
+{
+	return bpftune_nstat_read(netns_cookie, true,
+				  family == AF_INET ? "/proc/net/sockstat" :
+				  		      "/proc/net/sockstat6",
 				  linename, name, value);
 }
 
