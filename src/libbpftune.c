@@ -2154,7 +2154,7 @@ static void bpftuner_strategy_update(struct bpftuner *tuner)
 		bpftuner_strategy_set(tuner, max_strategy);
 }
 
-static void bpftuner_strategy_timeout(sigval_t sigval)
+static void bpftuner_strategy_timeout(union sigval sigval)
 {
 	struct bpftuner *tuner = sigval.sival_ptr;
 
@@ -2570,7 +2570,7 @@ void *bpftune_server_thread(void *arg)
 	if (port == 0) {
 		len = sizeof(saddr);
 
-		if (!getsockname(fd, &saddr, &len))
+		if (!getsockname(fd, (struct sockaddr *)&saddr, &len))
 			port = ntohs(saddr.sin_port);
 	}
 	if (port != 0) {
@@ -2591,7 +2591,7 @@ void *bpftune_server_thread(void *arg)
 		char buf[BPFTUNE_SERVER_MSG_MAX];
 		char req[81];
 		struct sockaddr_in caddr;
-		int cfd = accept(fd, (struct sockaddr_in *)&caddr, &len);
+		int cfd = accept(fd, (struct sockaddr *)&caddr, &len);
 		ssize_t req_len;
 		unsigned long i;
 
