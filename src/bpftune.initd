@@ -12,7 +12,7 @@ depend() {
 }
 
 checkconf() {
-	"${command}" -S "${command_args}" 2>&1
+	"${command}" -S ${command_args} 2>&1
 }
 
 start_pre() {
